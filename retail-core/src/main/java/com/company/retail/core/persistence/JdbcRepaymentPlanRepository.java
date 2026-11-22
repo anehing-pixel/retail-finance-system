@@ -132,12 +132,14 @@ public class JdbcRepaymentPlanRepository {
      */
     public int updateItemAfterAllocation(long itemId, long paidInterestTotal, long paidPrincipalTotal,
                                          String nextStatus, int version) {
+        // 注意：PG UPDATE 的 SET 右侧引用旧行值，paid_amount 必须显式传「新值之和」，不能写表达式
         return jdbc.update(
                 "UPDATE core.schedule_items SET paid_interest = ?, paid_principal = ?, "
-                        + "paid_amount = paid_interest + paid_principal, status = ?, "
+                        + "paid_amount = ?, status = ?, "
                         + "version = version + 1, updated_at = now() "
                         + "WHERE item_id = ? AND version = ?",
-                paidInterestTotal, paidPrincipalTotal, nextStatus, itemId, version);
+                paidInterestTotal, paidPrincipalTotal, paidInterestTotal + paidPrincipalTotal,
+                nextStatus, itemId, version);
     }
 
     /**
@@ -146,12 +148,13 @@ public class JdbcRepaymentPlanRepository {
      */
     public int updateItemAfterClosure(long itemId, long paidPrincipalTotal, long waivedTotal,
                                       String nextStatus, int version) {
+        // 同上：paid_amount 显式传「paid_interest 新值 + paid_principal 新值」（PG SET 旧行值语义）
         return jdbc.update(
                 "UPDATE core.schedule_items SET paid_principal = ?, "
-                        + "paid_amount = paid_interest + paid_principal, waived_amount = ?, status = ?, "
+                        + "paid_amount = paid_interest + ?, waived_amount = ?, status = ?, "
                         + "version = version + 1, updated_at = now() "
                         + "WHERE item_id = ? AND version = ?",
-                paidPrincipalTotal, waivedTotal, nextStatus, itemId, version);
+                paidPrincipalTotal, paidPrincipalTotal, waivedTotal, nextStatus, itemId, version);
     }
 
     /** 到期批量（W6 唯一写者）：OPEN 且 due_date ≤ bizDate → DUE。返回行数。 */

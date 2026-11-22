@@ -247,7 +247,6 @@ public class TitleReleaseApplicationService {
 
         // EXTERNAL_REGISTRY：唯一可推进解押完成的权威（R04 §3.5：仅 EXTERNAL_SUBMITTED / MANUAL_RECORDED 可达）
         order.confirmRegistration(authority);
-        updateOrderStatus(order);
 
         // 第 7 步：改写保留状态（INV-3 唯一入口）
         JdbcTitleRepository.TitleRow titleRow = titleRepository.findById(order.titleId())
@@ -263,10 +262,12 @@ public class TitleReleaseApplicationService {
                 retention.releasedAt() == null ? null : Timestamp.from(retention.releasedAt()),
                 titleRow.version());
 
-        // 第 8 步：关闭订单与保留（终态）+ 闭环事件 TITLE_RELEASE_REGISTERED
+        // 第 8 步：关闭订单与保留（终态）+ 闭环事件 TITLE_RELEASE_REGISTERED。
+        // REGISTRATION_CONFIRMED → CLOSED 的两段迁移各自过内存状态机守卫，DB 合并为一次写
+        //（避免同一 version 上的二次乐观锁更新冲突）。
         order.close();
-        updateOrderStatus(order);
         retention.close();
+        updateOrderStatus(order);
         JdbcTitleRepository.TitleRow latestTitle = titleRepository.findById(order.titleId())
                 .orElseThrow();
         titleRepository.updateStatus(latestTitle.titleId(), retention.status().name(), null,

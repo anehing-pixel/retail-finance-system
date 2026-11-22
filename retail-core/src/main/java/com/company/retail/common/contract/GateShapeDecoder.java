@@ -53,13 +53,23 @@ public class GateShapeDecoder implements Decoder {
             tree = mapper.readTree(body);
         }
         try {
-            Constructor<?> ctor = FeignContracts.ApiResponseShape.class
-                    .getDeclaredConstructor(FeignContracts.class);
-            ctor.setAccessible(true);
-            Constructor<FeignContracts> outerCtor = FeignContracts.class.getDeclaredConstructor();
-            outerCtor.setAccessible(true);
-            FeignContracts outer = outerCtor.newInstance();
-            Object shape = ctor.newInstance(outer);
+            // 兼容两种冻结契约形态：S2 遗留收口后 ApiResponseShape 已是 public static class
+            //（无参构造）；若仍是历史非静态内部类（需外部实例）则回退旧路径。
+            Constructor<?> ctor;
+            Object shape;
+            try {
+                ctor = FeignContracts.ApiResponseShape.class.getDeclaredConstructor();
+                ctor.setAccessible(true);
+                shape = ctor.newInstance();
+            } catch (NoSuchMethodException legacy) {
+                ctor = FeignContracts.ApiResponseShape.class
+                        .getDeclaredConstructor(FeignContracts.class);
+                ctor.setAccessible(true);
+                java.lang.reflect.Constructor<FeignContracts> outerCtor =
+                        FeignContracts.class.getDeclaredConstructor();
+                outerCtor.setAccessible(true);
+                shape = ctor.newInstance(outerCtor.newInstance());
+            }
             setField(shape, "code", textOrNull(tree, "code"));
             setField(shape, "message", textOrNull(tree, "message"));
             setField(shape, "traceId", textOrNull(tree, "traceId"));
