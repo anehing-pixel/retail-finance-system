@@ -42,13 +42,30 @@ public class RfSecurityConfig {
     @Value("${retail.auth.secret:dev-only-retail-staff-secret-change-me-in-prod-0123456789}")
     private String staffSecret;
 
+    /** 客户侧密钥：与 auth-service 签发侧同一属性键（RETAIL_CUSTOMER_JWT_SECRET），保证签发/验签一致。 */
+    @Value("${retail.customer-auth.secret:dev-only-retail-customer-secret-change-me-in-prod-01234}")
+    private String customerSecret;
+
     /**
-     * 员工侧验签器。客户侧同构实例由 customer-service 在 W3 提供
-     * （{@code new JwtTokenVerifier(customerSecret, SubjectType.CUSTOMER)}）。
+     * 客户自助端点路径段：这些路径挂客户侧拦截器（验 CUSTOMER token），
+     * 其余 /api/** 挂员工侧拦截器（S2 遗留收口：客户 token 过员工拦截器 401 的机制性解法）。
+     * 可用 retail.security.customer-path-prefixes 覆盖（逗号分隔）。
+     */
+    @Value("${retail.security.customer-path-prefixes:/api/customer-self/**}")
+    private String[] customerPathPrefixes;
+
+    /**
+     * 员工侧验签器。
      */
     @Bean
     public JwtTokenVerifier staffTokenVerifier() {
         return new JwtTokenVerifier(staffSecret, SubjectType.EMPLOYEE);
+    }
+
+    /** 客户侧验签器（双主体切断点③的另一半：互拒已由主体类型强关保证）。 */
+    @Bean
+    public JwtTokenVerifier customerTokenVerifier() {
+        return new JwtTokenVerifier(customerSecret, SubjectType.CUSTOMER);
     }
 
     /** 平台拦截器（员工侧）：三道关机制 + 401/403 语义码走 RF_*。 */
@@ -57,6 +74,14 @@ public class RfSecurityConfig {
                                                           ObjectMapper objectMapper) {
         return new PlatformJwtAuthInterceptor(
                 staffTokenVerifier, objectMapper, RFErrorCode.RF_AUTH_001, RFErrorCode.RF_AUTH_002);
+    }
+
+    /** 平台拦截器（客户侧）：同机制，只挂客户自助路径段。 */
+    @Bean
+    public PlatformJwtAuthInterceptor customerAuthInterceptor(JwtTokenVerifier customerTokenVerifier,
+                                                             ObjectMapper objectMapper) {
+        return new PlatformJwtAuthInterceptor(
+                customerTokenVerifier, objectMapper, RFErrorCode.RF_AUTH_001, RFErrorCode.RF_AUTH_002);
     }
 
     /** 密码散列（auth-service 登录用；机制统一，成本因子 10）。 */
@@ -80,10 +105,11 @@ public class RfSecurityConfig {
         return new JwtPassthroughInterceptor();
     }
 
-    /** 拦截器注册：/api/** 全拦，登录与健康端点放行（见 PERMIT_ALL）。 */
+    /** 拦截器注册：/api/** 员工侧全拦；客户自助路径段挂客户侧拦截器（见 customerPathPrefixes）。 */
     @Bean
-    public WebMvcConfig rfWebMvcConfig(PlatformJwtAuthInterceptor staffAuthInterceptor) {
-        return new WebMvcConfig(staffAuthInterceptor);
+    public WebMvcConfig rfWebMvcConfig(PlatformJwtAuthInterceptor staffAuthInterceptor,
+                                       PlatformJwtAuthInterceptor customerAuthInterceptor) {
+        return new WebMvcConfig(staffAuthInterceptor, customerAuthInterceptor, customerPathPrefixes);
     }
 
     /** 供门禁/控制器统一取 traceId（属性由 TraceIdFilter 放入）。 */
@@ -96,17 +122,29 @@ public class RfSecurityConfig {
     /** WebMvc 装配体（独立类便于 auth-service 定制放行清单）。 */
     public static class WebMvcConfig implements WebMvcConfigurer {
 
-        private final PlatformJwtAuthInterceptor interceptor;
+        private final PlatformJwtAuthInterceptor staffInterceptor;
+        private final PlatformJwtAuthInterceptor customerInterceptor;
+        private final String[] customerPathPrefixes;
 
-        public WebMvcConfig(PlatformJwtAuthInterceptor interceptor) {
-            this.interceptor = interceptor;
+        public WebMvcConfig(PlatformJwtAuthInterceptor staffInterceptor,
+                            PlatformJwtAuthInterceptor customerInterceptor,
+                            String[] customerPathPrefixes) {
+            this.staffInterceptor = staffInterceptor;
+            this.customerInterceptor = customerInterceptor;
+            this.customerPathPrefixes = customerPathPrefixes == null || customerPathPrefixes.length == 0
+                    ? new String[]{"/api/customer-self/**"} : customerPathPrefixes;
         }
 
         @Override
         public void addInterceptors(InterceptorRegistry registry) {
-            registry.addInterceptor(interceptor)
-                    .addPathPatterns("/api/**")
+            // 客户自助路径段优先挂客户侧拦截器；员工侧拦截器对其放行（路径互斥，无双挂）
+            registry.addInterceptor(customerInterceptor)
+                    .addPathPatterns(customerPathPrefixes)
                     .excludePathPatterns(PERMIT_ALL);
+            registry.addInterceptor(staffInterceptor)
+                    .addPathPatterns("/api/**")
+                    .excludePathPatterns(PERMIT_ALL)
+                    .excludePathPatterns(customerPathPrefixes);
         }
 
         @Override
