@@ -29,7 +29,7 @@ spring:
         - id: customer
           uri: ${ROUTE_CUSTOMER:lb://customer-service}
           predicates:
-            - Path=/api/customers/**,/api/identity-verifications/**,/api/consents/**,/api/pii/**
+            - Path=/api/customers/**,/api/identity-verifications/**,/api/consents/**,/api/pii/**,/api/customer-self/**
         - id: application
           uri: ${ROUTE_APPLICATION:lb://application-service}
           predicates:
@@ -53,7 +53,7 @@ spring:
         - id: servicing
           uri: ${ROUTE_SERVICING:lb://servicing-service}
           predicates:
-            - Path=/api/collection-cases/**
+            - Path=/api/collection-cases/**,/api/dpd-snapshots/**,/api/jobs/dpd-snapshot,/api/jobs/dpd-snapshot/**
         - id: recon
           uri: ${ROUTE_RECON:lb://recon-service}
           predicates:

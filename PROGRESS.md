@@ -15,7 +15,7 @@
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
 | 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/`（check_docs / normalize_terms / gen_w2_services / smoke_w2）；`run-microservices.sh`；`.github/workflows/docs-check.yml` |
 | 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——父 pom + 四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
-| 验证 | `mvn -B clean package` → **BUILD SUCCESS**；`bash run-microservices.sh smoke` → **26 断言 PASS / 0 FAIL / EXIT 0**（走网关 18081 + DMZ 18091 实测，见 §6）；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰（`git status` 干净） |
+| 验证 | `mvn -B clean package` → **BUILD SUCCESS（538 测试 0 失败）**；`run-microservices.sh smoke` → **26/26**；`scripts/e2e_w8.py` 全链路 → **98/98 EXIT 0**（可重复）；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰 |
 | 业务阻塞 | ✅ 系统口径已全部定源（`C-01` 用户签；`C-02`~`C-12` AI 裁决，`R01 §6`）；外部核实项不阻塞 |
 | 外部依赖 | 中台 jar ✅；`R07 §7`：DMS ✅ 回填（`ADR-RF-011`）；集成商选型与其余通道未回填（**不阻塞 S2 并行窗口**） |
 | 下一轮 | **W6 账务闭环与解除**（retail-core 后半 + title-release-service：入金核销、余额对拍、结清、两态分离解除八步、`LOAN_SETTLED`/`TITLE_RELEASE_REGISTERED` 事件闭环）；W6 开工前须先收口 S2 遗留共享区事项：① common 双拦截器支持客户自助端点（W3 反馈）② FeignContracts 公开性已修（`ApiResponseShape` static + public）③ 客户侧 JWT 真实认证 |
@@ -77,7 +77,7 @@
 | **S1** | 地基：抽取中台 jar、父 pom、四层共享 jar、网关/DMZ、双主体认证、Flyway V1–V9、12 进程编排 | C-01 签字 ✅ + 号段登记（`R11 §6` 其余项） | ✅ **完成（2026-11-22）**：W1+W2 全绿（tag `w2-frozen`） |
 | **S2** | 并行窗口 W3‖W4‖W5（客户与申请 / 审查与征信 / 合同与账务前半） | W2 冻结（`w2-frozen`） | ✅ **完成（2026-11-22）**：三包全合，`mvn clean package` 332 测试 0 失败，走网关冒烟 26/26，Flyway 12/12 迁移、51 张表实测 |
 | **S3** | W6 账务闭环与解除 ‖ W7 贷后对拍合规（写入集互斥沿用并行纪律） | S2 全合 | ✅ **完成（2026-11-23 凌晨）**：V13/V14 落地（14 迁移 60 表实测）；合并后 538 测试 0 失败 + 走网关冒烟 26/26 |
-| **S4** | W8 收口：全链路 E2E 走网关 + 文档回灌 + 放行 | S3 全合 | ⬜ 进行中：`scripts/e2e_w8.py` 开发调试（12 服务常驻栈 `scripts/dev-stack.sh`） |
+| **S4** | W8 收口：全链路 E2E 走网关 + 文档回灌 + 放行 | S3 全合 | ✅ **完成（2026-11-23）**：`scripts/e2e_w8.py` **98 断言 PASS / 0 FAIL / EXIT 0**（可重复跑），一镜到底覆盖 注册→核验→同意→申请→征信→审查→合同→冷静期→债权→三门禁代付→核销→结清→解押闭环→DPD/对拍→客户自助 |
 | **S2** | 核心链路：申请→同意→查询→审查→合同→代付→还款计划→入金核销→结清→解除（本地事务闭环 + 跨服务事件） | S1 全量构建 + 走网关冒烟全绿 | ⬜ 未开始 |
 | **S3** | 外部对接：DMS、征信机构（查询/报送/异议）、账户自动扣款、身份核验、登记代办、通知书面文件 | `R07 §7` 调研清单回填 | ⬜ 未开始 |
 | **S4** | 合规与验收：个人信息保护控制、访问审计、职责分离、验收红线 A1–A30、全量回归 | C-01~C-12 全签字 | ⬜ 未开始 |
@@ -142,6 +142,7 @@
 | 2026-11-23 | S2 遗留共享区收口（`dc57c1f`） | **PASS**：common 双拦截器（客户自助路径挂客户验签器，员工拦截器放行）+ customer-service `/api/customer-self/me`（客户 token 查本人脱敏视图）；构建 EXIT 0 |
 | 2026-11-23 | S3-W6 合并验收（`wt/w6` `eb37f15`） | **PASS**：合后 `mvn clean package` 444 测试 0 失败；走网关冒烟 **26/26**（V13 套用，13/13 迁移、52 表）；W6 自验 88 单测 + 69 冒烟断言（核销顺序/余额对拍/C-10 公式/解除八步/两态分离/回执权威） |
 | 2026-11-23 | S3-W7 合并验收（`wt/w7` `e3a1cae`） | **PASS**：合后 `mvn clean package` **538 测试 0 失败**；走网关冒烟 **26/26**（V14 套用，14/14 迁移、60 表）；W7 自验 47 单测 + 26 冒烟（DPD/催收状态机/报送触发/INV-1~5 对拍/审计留痕） |
+| 2026-11-23 | W8 E2E 定稿 | **PASS**：`python scripts/e2e_w8.py` **98/98 全绿 × 多轮可重复**；期间修复 ①网关 `/api/jobs/**` 通配误劫持 retail-core `schedule-due-rollup`（改 servicing 只精确收 `dpd-snapshot`）②`/api/customer-self/**` 路由段补齐 ③建库固化 `max_connections=300`；复跑 W2 冒烟 26/26 无回归 |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 

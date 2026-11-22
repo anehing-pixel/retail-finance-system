@@ -52,7 +52,8 @@ ensure_db() {
     echo "[数据库] 创建 $DB_CONTAINER（postgres:16-alpine，宿主 5435，独立实例不与 floorplan 共库）"
     docker run -d --name "$DB_CONTAINER" \
       -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=retail_finance \
-      -p 5435:5432 postgres:16-alpine >/dev/null
+      -p 5435:5432 postgres:16-alpine \
+      -c max_connections=300 >/dev/null
   fi
   # 等 PG 就绪（首次建库要初始化，最多 60s）
   for i in $(seq 1 60); do
