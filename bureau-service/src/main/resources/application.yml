@@ -24,6 +24,10 @@ spring:
         fail-fast: false
 
 retail:
+  bureau:
+    # 报送日批开关（默认 false=不跑）与 cron（默认每日 08:00 JST；C-05 T+1 口径）
+    report-schedule-enabled: ${RETAIL_BUREAU_REPORT_SCHEDULE_ENABLED:false}
+    report-cron: ${RETAIL_BUREAU_REPORT_CRON:0 0 8 * * *}
   auth:
     # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
     secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}

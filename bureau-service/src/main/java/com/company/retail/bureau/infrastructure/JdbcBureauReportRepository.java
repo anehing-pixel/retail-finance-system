@@ -20,11 +20,17 @@ public class JdbcBureauReportRepository implements BureauReportRepository {
 
     @Override
     public boolean insert(long loanId, long consentId, String bureau, String trigger, String traceId) {
+        return insertWithSource(loanId, consentId, bureau, trigger, "AUTO", traceId);
+    }
+
+    @Override
+    public boolean insertWithSource(long loanId, long consentId, String bureau, String trigger,
+                                    String source, String traceId) {
         try {
             return jdbc.update("INSERT INTO integration.credit_bureau_reports "
-                            + "(loan_id, consent_id, bureau, trigger, status, trace_id) "
-                            + "VALUES (?, ?, ?, ?, 'PENDING', ?)",
-                    loanId, consentId, bureau, trigger, traceId) > 0;
+                            + "(loan_id, consent_id, bureau, trigger, status, source, trace_id) "
+                            + "VALUES (?, ?, ?, ?, 'PENDING', ?, ?)",
+                    loanId, consentId, bureau, trigger, source, traceId) > 0;
         } catch (org.springframework.dao.DuplicateKeyException e) {
             // uk_report_loan_trigger：同一 (loan_id, trigger) 已有报送留痕 → 幂等冲突（RF_CONFLICT_001）
             return false;
@@ -53,11 +59,11 @@ public class JdbcBureauReportRepository implements BureauReportRepository {
 
     private Optional<ReportRow> queryOne(String where, Object... args) {
         List<ReportRow> rows = jdbc.query(
-                "SELECT report_id, loan_id, consent_id, bureau, trigger, status "
+                "SELECT report_id, loan_id, consent_id, bureau, trigger, status, source "
                         + "FROM integration.credit_bureau_reports WHERE " + where,
                 (rs, i) -> new ReportRow(rs.getLong("report_id"), rs.getLong("loan_id"),
                         rs.getLong("consent_id"), rs.getString("bureau"),
-                        rs.getString("trigger"), rs.getString("status")),
+                        rs.getString("trigger"), rs.getString("status"), rs.getString("source")),
                 args);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
