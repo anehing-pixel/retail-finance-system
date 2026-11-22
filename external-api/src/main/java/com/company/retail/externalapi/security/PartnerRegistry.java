@@ -15,6 +15,10 @@ import java.util.Set;
  * <p>生产真相源是 {@code integration.partners} / {@code integration.partner_credentials}
  * （secret_ref 指向密钥管理设施、key_version 轮换宽限），随 S3 外部对接接线；
  * W2 不接真实供应商，只把「验签机制」做真——密钥管理是外部事实，不凭空对接（P-11）。</p>
+ *
+ * <p>W9-B 起端点校验由 {@link DmzGatekeeper} 编排（三关 + call_logs 留痕），
+ * 本类保留为密钥来源（{@link #secretOf}）；{@link #verify} 为 W2 纯函数链，
+ * 不再被端点调用，保留供机制回溯。</p>
  */
 @Component
 public class PartnerRegistry {

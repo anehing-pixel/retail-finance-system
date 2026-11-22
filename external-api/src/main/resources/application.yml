@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: external-api
+  datasource:
+    # 第一版共库（ADR-RF-009）：W9-B 起 nonce 防重放 / call_logs 留痕 / partner 档案
+    # 走 integration.* 表（R06 §integration）
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/retail_finance}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+  flyway:
+    enabled: false               # 迁移由部署脚本按序执行（V1–V14），服务启动不接管
   jackson:
     time-zone: Asia/Tokyo
     default-property-inclusion: non_null
@@ -14,8 +25,20 @@ spring:
         fail-fast: false
 
 retail:
+  dmz:
+    # W9-B 三关开关：生产默认开（ip-allowlist-enabled 置 true + trust-forwarded-for 视 LB 拓扑）
+    registry-mode: ${RETAIL_DMZ_REGISTRY_MODE:CONFIG}   # CONFIG=配置档案（W2 口径）/ DB=integration.partners 表
+    nonce-enabled: true                                  # nonce 写 integration.nonces 防重放
+    nonce-retention-seconds: 600                         # 过期 nonce 惰性清理（2×时间戳容差）
+    scope-enabled: true                                  # partner scope 校验，超出 → 403
+    ip-allowlist-enabled: ${RETAIL_DMZ_IP_ALLOWLIST_ENABLED:false}  # 全局 IP 白名单开关（默认关）
+    trust-forwarded-for: false                           # 仅在可信 LB 前置时开启（防 XFF 伪造绕过）
   integration:
     partners:
       # dev partner 密钥：生产真相源是 integration.partner_credentials.secret_ref（不明文、走密钥管理设施）
       DMS-DEV-01:
         secret: ${RETAIL_PARTNER_DMS_SECRET:dev-dms-partner-secret-0123456789}
+        # CONFIG 模式档案：scope（路由键）与 IP 白名单；DB 模式以 integration.partners 为准
+        scopes:
+          - echo
+        ip-allowlist: ${RETAIL_PARTNER_DMS_IP_ALLOWLIST:}
