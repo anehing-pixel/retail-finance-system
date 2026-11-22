@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -84,6 +85,12 @@ public class ReleaseOrderController {
     @GetMapping("/api/release-orders/{id}/evidence-chain")
     public ApiResponse<EvidenceChainView> evidenceChain(@PathVariable long id) {
         return ApiResponse.ok(service.evidenceChain(id), traceId());
+    }
+
+    /** 按 loanId 查询解除订单（前端/运营台定位事件建单结果；无订单 data=null）。 */
+    @GetMapping("/api/release-orders")
+    public ApiResponse<ReleaseOrderView> byLoan(@RequestParam long loanId) {
+        return ApiResponse.ok(service.findOrderByLoanId(loanId), traceId());
     }
 
     public record CreateRequest(long loanId, String loanSettledEvidenceRef) {

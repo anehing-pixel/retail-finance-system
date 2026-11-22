@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新车零售金融 · 运营控制台</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --ink: #1f2430; --muted: #6b7280;
+  --line: #e5e7eb; --brand: #1d4ed8; --ok: #15803d; --bad: #b91c1c; --warn: #b45309;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 14px/1.55 "Segoe UI", "Microsoft YaHei", sans-serif; }
+header { background: #111827; color: #f9fafb; padding: 14px 24px;
+         display: flex; align-items: baseline; gap: 16px; }
+header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+header .sub { color: #9ca3af; font-size: 12px; }
+nav.tabs { background: #1f2937; padding: 0 24px; display: flex; gap: 4px; }
+nav.tabs button { background: none; border: none; color: #9ca3af; padding: 10px 18px;
+                  cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; }
+nav.tabs button.active { color: #f9fafb; border-bottom-color: #60a5fa; }
+main { padding: 20px 24px 60px; max-width: 1080px; margin: 0 auto; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+        padding: 16px 18px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 6px; font-size: 15px; }
+.card .desc { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.act { background: var(--brand); color: #fff; border: none; border-radius: 6px;
+             padding: 7px 14px; cursor: pointer; font-size: 13px; }
+button.act:hover { filter: brightness(1.08); }
+button.act:disabled { background: #cbd5e1; cursor: not-allowed; }
+button.act.ghost { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
+button.act.danger { background: #fff; color: var(--bad); border: 1px solid var(--bad); }
+input, select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+                font-size: 13px; width: 150px; }
+input.wide { width: 240px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
+        border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+.chip.gray { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
+.step-ok { color: var(--ok); font-weight: 600; }
+.step-bad { color: var(--bad); font-weight: 600; }
+.step-note { color: var(--warn); }
+pre.result { background: #0f172a; color: #d1fae5; border-radius: 8px; padding: 10px 12px;
+             font-size: 12px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
+#log { position: fixed; right: 16px; bottom: 16px; width: 430px; max-height: 300px;
+       background: #111827; color: #9ae6b4; font: 11.5px/1.5 Consolas, monospace;
+       border-radius: 10px; padding: 10px 12px; overflow: auto; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+#log .head { color: #93c5fd; font-weight: 700; margin-bottom: 4px; }
+#log .err { color: #fca5a5; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 8px; }
+th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+th { background: #f9fafb; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 11px;
+         background: #dbeafe; color: #1e40af; }
+.summary { font-size: 13px; margin-top: 8px; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 8px 10px; }
+legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>新车零售金融 · 运营控制台</h1>
+  <span class="sub">前端验证页 · /gw→网关18081 · /svc→8098 · /cust→8092 · 本页端口 18082</span>
+</header>
+<nav class="tabs">
+  <button id="tab-staff" class="active" onclick="showTab('staff')">员工运营台</button>
+  <button id="tab-self" onclick="showTab('self')">客户自助</button>
+  <button id="tab-help" onclick="showTab('help')">说明</button>
+</nav>
+<main>
+  <!-- ============ 员工运营台 ============ -->
+  <section id="pane-staff">
+    <div class="card">
+      <h2>S1 · 员工登录</h2>
+      <div class="desc">POST /gw/api/auth/staff/login —— token 是后续所有步骤的前置。</div>
+      <div class="row">
+        <input id="staff-user" value="admin" placeholder="用户名">
+        <input id="staff-pass" value="admin123" type="password" placeholder="密码">
+        <button class="act" onclick="s1Login()">登录</button>
+        <span id="s1-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S2 · 客户注册（PII 加密落库）</h2>
+      <div class="desc">POST /gw/api/customers —— 电话号按时间戳自动生成，可改姓名。</div>
+      <div class="row">
+        <input id="cust-name" class="wide" value="山田太郎">
+        <input id="cust-kana" class="wide" value="ヤマダタロウ">
+        <button class="act" onclick="s2Register()">注册客户</button>
+        <span id="s2-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S3 · 身份核验（MANUAL 人工通道）</h2>
+      <div class="desc">发起 → 提交驾照材料 → 开始核验 → 人工审核通过 → VERIFIED。</div>
+      <div class="row">
+        <button class="act" onclick="s3All()">一键核验至 VERIFIED</button>
+        <span id="s3-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S4 · 征信同意取得</h2>
+      <div class="desc">POST /gw/api/consents（purpose=CREDIT_INQUIRY）→ 有效性查询。</div>
+      <div class="row">
+        <button class="act" onclick="s4Consent()">取得同意</button>
+        <span id="s4-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S5 · 申请提交（含幂等重放验证）</h2>
+      <div class="desc">POST /gw/api/applications，Idempotency-Key 重放应返回 replayed=true 与同一申请号。</div>
+      <div class="row">
+        <input id="app-price" value="1200000" title="车价（円）">
+        <input id="app-access" value="30000" title="用品（円）">
+        <button class="act" onclick="s5Apply()">提交申请</button>
+        <span id="s5-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S6 · 审查域（建案→征信→支付能力→APPROVED）</h2>
+      <div class="desc">G3 同意门禁真实生效；征信走 CIC 挡板；INQUIRY_DONE 由事件驱动（页面轮询案件状态）。</div>
+      <div class="row">
+        <button class="act" onclick="s6All()">一键审查至 APPROVED</button>
+        <span id="s6-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S7 · 合同域（书面交付→签订→冷静期→EFFECTIVE）</h2>
+      <div class="desc">两份法定书面留痕 → DOCUMENTS_DELIVERED → 签订 → 冷静期确认 → 查询代付门禁。</div>
+      <div class="row">
+        <button class="act" onclick="s7All()">合同四步至 EFFECTIVE</button>
+        <span id="s7-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S8 · 账务（建债权→还款计划→三门禁代付）</h2>
+      <div class="desc">G8 门禁 fail-closed：合同/审查任一不符即拒（页面含两个负例按钮）。</div>
+      <div class="row">
+        <button class="act" onclick="s8Loan()">建债权+还款计划</button>
+        <button class="act" onclick="s8Disburse()">执行代付（三门禁）</button>
+        <button class="act ghost" onclick="s8NegContract()">负例：假合同</button>
+        <span id="s8-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S9 · 还款（到期滚转 job → 逐期核销 → 余额对拍）</h2>
+      <div class="desc">schedule-due-rollup 滚至末期后逐期 POST /gw/api/payments，每期后刷新计划与余额。</div>
+      <div class="row">
+        <button class="act" onclick="s9All()">一键：滚转+逐期核销+对拍</button>
+        <span id="s9-state"></span>
+      </div>
+      <div id="s9-plan"></div>
+    </div>
+
+    <div class="card">
+      <h2>S10 · 结清（试算 → NORMAL settle）</h2>
+      <div class="desc">GET settlement-quote → POST settle → LOAN_SETTLED 事件驱动解押建单。</div>
+      <div class="row">
+        <button class="act" onclick="s10Settle()">结清</button>
+        <span id="s10-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S11 · 解押（保留登记 → 事件建单 → 文件四件套 → 外部回执闭环）</h2>
+      <div class="desc">代录（INTERNAL_WITNESS）≠ 完成；经销商自证被拒（X-10）；仅 EXTERNAL_REGISTRY 回执可闭环。</div>
+      <div class="row">
+        <button class="act" onclick="s11Register()">保留登记</button>
+        <button class="act" onclick="s11WaitOrder()">等事件建单</button>
+        <button class="act" onclick="s11All()">一键解押闭环</button>
+        <span id="s11-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>S12 · 贷后（DPD 快照 + 对拍）</h2>
+      <div class="desc">/svc/api/jobs/dpd-snapshot（直连段，与 e2e 同口径）+ /gw/api/recon/run。</div>
+      <div class="row">
+        <button class="act" onclick="s12All()">跑快照+对拍</button>
+        <span id="s12-state"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>全链路 · 一镜到底</h2>
+      <div class="desc">从登录到解押闭环顺序执行 S1–S12（幂等键用本次会话时间戳，可重复跑）。</div>
+      <div class="row">
+        <button class="act" id="btn-e2e" onclick="runAll()">▶ 一键全链路</button>
+        <button class="act ghost" onclick="resetRun()">重置会话</button>
+        <span id="all-state"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 客户自助 ============ -->
+  <section id="pane-self" style="display:none">
+    <div class="card">
+      <h2>客户登录（开发桥）</h2>
+      <div class="desc">POST /gw/api/auth/customer/login，用户名 = customerId（RETAIL_CUSTOMER_DEV_LOGIN=true）。</div>
+      <div class="row">
+        <input id="self-cust" placeholder="customerId（运营台注册后自动带入）">
+        <button class="act" onclick="selfLogin()">登录</button>
+        <span id="self-state"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>我的脱敏视图</h2>
+      <div class="desc">GET /cust/api/customer-self/me —— 姓名/电话脱敏返回，员工 token 访问会被拒（主体隔离）。</div>
+      <div class="row">
+        <button class="act" onclick="selfMe()">查询本人视图</button>
+        <button class="act danger" onclick="selfNegative()">负例：员工 token 访问</button>
+      </div>
+      <div id="self-view"></div>
+    </div>
+  </section>
+
+  <!-- ============ 说明 ============ -->
+  <section id="pane-help" style="display:none">
+    <div class="card">
+      <h2>这是什么</h2>
+      <p>本地验证用前端控制台：把 <code>e2e_w8.py</code> 的 98 断言链路做成可点击页面。
+      所有请求经本页（18082）同源代理转发：<code>/gw/**</code>→网关 18081，
+      <code>/svc/**</code>→servicing 8098，<code>/cust/**</code>→customer 8092（与 e2e 直连段口径一致）。</p>
+      <p>右下角日志面板记录每次请求的方法 / 路径 / 状态 / 耗时。</p>
+      <h2>口径提示</h2>
+      <p>① 幂等键每次会话唯一，可重复跑；② 事件驱动步骤（INQUIRY_DONE、解除建单）页面用轮询等待；
+      ③ 代录回执只到 MANUAL_RECORDED，保留态不变，必须外部登记回执才闭环（B-6 / C-11）。</p>
+    </div>
+  </section>
+</main>
+<div id="log"><div class="head">请求日志</div><div id="log-body"></div></div>
+<script src="app.js"></script>
+</body>
+</html>

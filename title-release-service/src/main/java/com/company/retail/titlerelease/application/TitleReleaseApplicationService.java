@@ -136,6 +136,11 @@ public class TitleReleaseApplicationService {
         return insertOrder(loanId, retention.titleId(), "MANUAL", null);
     }
 
+    /** 按 loanId 只读查询解除订单（供运营台/前端在事件建单后定位订单；无订单返回 null 而非 404）。 */
+    public ReleaseOrderView findOrderByLoanId(long loanId) {
+        return orderRepository.findByLoanId(loanId).map(this::toView).orElse(null);
+    }
+
     /** 事件驱动建单（第 1–2 步；消费幂等：uk_release_loan + 已存在即返回）。 */
     @Transactional
     public ReleaseOrderView createReleaseOrderFromEvent(long loanId, long settledEventId) {
