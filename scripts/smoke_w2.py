@@ -151,15 +151,20 @@ code, body = req("POST", DMZ + path,
 check("DMZ 未登记 partner → 403 RF_PTNR_003", code == 403 and "RF_PTNR_003" in body,
       "HTTP {} {}".format(code, body[:160]))
 
-# ---- 7. Flyway V1–V9 已执行（retail-core 唯一跑迁移）----
+# ---- 7. Flyway 迁移全部执行（retail-core 唯一跑迁移）----
 try:
     import subprocess
+    import glob as _glob
+    ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    expected_migrations = len(_glob.glob(os.path.join(ROOT, "infrastructure", "src",
+                                                    "main", "resources", "db", "migration", "V*.sql")))
     out = subprocess.run(
         ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-d", "retail_finance",
          "-tAc", "SELECT count(*) FROM flyway_schema_history WHERE success"],
         capture_output=True, text=True, timeout=15)
     migrated = out.stdout.strip()
-    check("Flyway V1–V9 全部执行（{} 条迁移记录）".format(migrated), migrated == "9", out.stdout + out.stderr)
+    check("Flyway 迁移全部执行（{} / {} 条）".format(migrated, expected_migrations),
+          migrated.isdigit() and int(migrated) >= expected_migrations, out.stdout + out.stderr)
     out2 = subprocess.run(
         ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-d", "retail_finance",
          "-tAc", "SELECT count(*) FROM information_schema.tables "

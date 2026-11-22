@@ -29,13 +29,13 @@ public final class FeignContracts {
      * 门禁判定结果：{@code allowed=false} 与 {@code reasonCode} 语义由提供方定义，
      * 调用方只认 {@code allowed==true} 且 HTTP 2xx；其余一律 fail-closed。
      */
-    record GateResult(boolean allowed, String reasonCode) {
+    public record GateResult(boolean allowed, String reasonCode) {
     }
 
     /** BC-5 合同门禁：合同已生效且法定书面文件已交付（RF_CTR_001 的判定前置）。 */
     @FeignClient(name = "contract-service", contextId = "contractGate",
             url = "${retail.clients.contract.url:}")
-    interface ContractGateClient {
+    public interface ContractGateClient {
 
         @GetMapping("/api/contracts/{contractId}/disbursement-gate")
         ApiResponseShape<GateResult> check(@PathVariable("contractId") long contractId);
@@ -44,7 +44,7 @@ public final class FeignContracts {
     /** BC-2 同意门禁：同意有效且未撤回（同意可秒级撤回，禁止缓存门禁结果）。 */
     @FeignClient(name = "customer-service", contextId = "consentGate",
             url = "${retail.clients.customer.url:}")
-    interface ConsentGateClient {
+    public interface ConsentGateClient {
 
         @GetMapping("/api/consents/{consentId}/disbursement-gate")
         ApiResponseShape<GateResult> check(@PathVariable("consentId") long consentId);
@@ -53,14 +53,14 @@ public final class FeignContracts {
     /** BC-3 审查门禁：审查已批准且未撤回。 */
     @FeignClient(name = "underwriting-service", contextId = "underwritingGate",
             url = "${retail.clients.underwriting.url:}")
-    interface UnderwritingGateClient {
+    public interface UnderwritingGateClient {
 
         @GetMapping("/api/underwriting/cases/{caseId}/disbursement-gate")
         ApiResponseShape<GateResult> check(@PathVariable("caseId") long caseId);
     }
 
     /** 门禁返回形状：与 {@code com.company.platform.response.ApiResponse} 同构（避免契约层再引依赖）。 */
-    class ApiResponseShape<T> {
+    public static class ApiResponseShape<T> {
         public String code;
         public String message;
         public T data;
