@@ -142,6 +142,14 @@ public class JdbcReleaseOrderRepository {
         return id == null ? 0 : id;
     }
 
+    /** 回填附件引用（W9-C：出具环节登记 core.attachments 后落引用位；不覆盖已登记值）。 */
+    public int attachDocument(long documentId, long attachmentId) {
+        return jdbc.update(
+                "UPDATE core.release_documents SET attachment_id = ?, updated_at = now() "
+                        + "WHERE document_id = ? AND attachment_id IS NULL",
+                attachmentId, documentId);
+    }
+
     public List<DocumentRow> findDocuments(long releaseOrderId) {
         return jdbc.query(
                 "SELECT * FROM core.release_documents WHERE release_order_id = ? ORDER BY document_id",
