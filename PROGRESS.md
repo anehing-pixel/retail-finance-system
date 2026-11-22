@@ -10,15 +10,15 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **S0 · 文档初始化**（2026-11-22） |
+| 轮次 | **S0 · 文档初始化（2026-11-22 完成）→ S1 · 工程地基进行中**：W1 中台 jar ✅ 完成（2026-11-22），W2 进行中 |
 | 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001` v2.0）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
 | 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/check_docs.py`、`scripts/normalize_terms.py` |
-| 代码 | **0 个 `.java`、0 个 `.sql` 迁移、0 个可启动进程** |
+| 代码 | S0 产物：0 代码；**S1-W1 产物：`../company-platform-contracts` 19 个主类 + 6 个测试类（34 用例全绿，`com.company:company-platform-contracts:1.0.0-SNAPSHOT` 已 install）**；RF 侧仍 0 代码 |
 | 验证 | `python scripts/check_docs.py` → **PASS 13 项 / FAIL 0 / EXIT 0**（真实实测，见 §6）；`normalize_terms.py --check` 幂等 0 变更 |
 | 业务阻塞 | ✅ **系统口径已全部定源（2026-11-22）**：`C-01` 用户签字（双形态并行，`ADR-RF-002` Accepted）；`C-02`~`C-12` 架构 AI 裁决（用户授权，见 `R01 §6`）；外部事实核实项标注假设 + 触发器，**不阻塞 S1** |
-| 外部依赖 | 中台 jar `company-platform-contracts` 尚未抽取；`R07 §7` 调研清单：**DMS 项 ✅ 已回填**（数据集成商模式，`ADR-RF-011`），集成商选型与其余通道（征信/银行/eKYC/登记代办/通知）未回填 |
-| 下一轮 | **S1 工程地基**（`R11 §3` W1/W2：中台 jar 抽取 + 父 pom + 12 服务骨架）；外部核实项与调研回填并行推进，不阻塞 S1 |
+| 外部依赖 | 中台 jar ✅ **已抽取**（W1 完成，见 §2）；`R07 §7` 调研清单：**DMS 项 ✅ 已回填**（数据集成商模式，`ADR-RF-011`），集成商选型与其余通道（征信/银行/eKYC/登记代办/通知）未回填 |
+| 下一轮 | **S1-W2**（`R11 §3`：父 pom + 12 服务骨架 + 契约冻结 + Flyway V1–V9 + `run-microservices.sh`，完成后打 tag `w2-frozen` → 开 W3/W4/W5 worktree 并行）；外部核实项与调研回填并行推进，不阻塞 |
 
 ### 本轮两项方向修正（已落实）
 
@@ -60,7 +60,7 @@
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 错误码前缀 | `RF_*` | `ADVANCE_*` / `CREDIT_*` 等 | 不冲突 ✅ |
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
-| 中台 jar | `company-platform-contracts`（**待抽取**） | 现为自身共享模块 | 📌 S1 前置 |
+| 中台 jar | `com.company:company-platform-contracts:1.0.0-SNAPSHOT`（**✅ 已抽取**，独立仓 `../company-platform-contracts`，`mvn install` 到本地仓；34 单测全绿；RF 依赖 ≥ 此版本） | floorplan 不强制迁移（继续用 `com.company.floorplan.*` 现网类，基线全绿未动） | ✅ W1 完成 |
 | Feign 契约 | `com.company.retail.common.contract`（**待冻结**） | `com.company.floorplan.common.contract` | 各自常量表 ✅ |
 
 > 变更记录：
@@ -120,6 +120,10 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-22 | `mvn -B clean package`（floorplan，W1 前基线） | **BUILD SUCCESS，EXIT 0**（1m14s），V-9 对拍基线确立 |
+| 2026-11-22 | `mvn -B clean install`（company-platform-contracts） | **BUILD SUCCESS**：34 用例 / 0 失败 / 0 错误，`1.0.0-SNAPSHOT` 已装本地仓（切断点 ①③ 单测覆盖） |
+| 2026-11-22 | grep 业务包引用（platform 仓） | **零命中**：不 import `com.company.floorplan.*` / `com.company.retail.*` |
+| 2026-11-22 | `git status`（floorplan） | **干净**：W1 未触碰 floorplan 任何文件，基线即终态（V-9 达成） |
 | 2026-11-22 | `python scripts/normalize_terms.py` | PASS：扫描 26 份 `.md`，重命名 3 个 ADR 文件，完成全仓日文术语 → 中文替换与引用同步，**残留假名 0** |
 | 2026-11-22 | `python scripts/normalize_terms.py --check` ×2 | PASS：连续两次 **0 变更 / 0 残留**，幂等已验证 |
 | 2026-11-22 | `python scripts/check_docs.py` | **PASS（13 项 / FAIL 0 / EXIT 0）**：编号连续唯一、索引引用可达、跨文档引用可达、`C-xx` 登记完整、端口不冲突、全文中文、禁用日文词零命中、微服务口径、R 三节 / ADR 四节、术语映射幂等、文件计数 29 |
