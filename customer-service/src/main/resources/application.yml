@@ -31,6 +31,11 @@ retail:
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
     secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+  pii:
+    # PII 字段加密密钥（R06 §5：与 JWT 密钥、账号加密密钥分离）；HMAC 检索密钥独立
+    data-key: ${RETAIL_PII_DATA_KEY:dev-only-retail-pii-data-key-change-me-in-prod-012345}
+    hmac-key: ${RETAIL_PII_HMAC_KEY:dev-only-retail-pii-hmac-key-change-me-in-prod-01234}
+    key-version: ${RETAIL_PII_KEY_VERSION:v1}
   clients:
     # Feign 门禁双模 URI（R09 §7.2）：空串回退 lb://，本地无注册中心用环境变量直连
     contract:

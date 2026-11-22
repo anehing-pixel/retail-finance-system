@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.customer")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class})
+@Import({RfSecurityConfig.class, RfOutboxConfig.class})
 public class CustomerServiceApplication {
 
     public static void main(String[] args) {

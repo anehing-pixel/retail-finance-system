@@ -1,0 +1,156 @@
+package com.company.retail.appservice.app;
+
+import com.company.platform.exception.BusinessException;
+import com.company.platform.idempotency.IdempotencyGuard;
+import com.company.retail.appservice.domain.Application;
+import com.company.retail.appservice.domain.ApplicationStatus;
+import com.company.retail.appservice.domain.DuplicateApplicationDetector;
+import com.company.retail.appservice.repo.ApplicationIdempotencyStore;
+import com.company.retail.appservice.repo.JdbcApplicationRepository;
+import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.domain.exception.RFErrorCode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * 申请受理用例（A-4）：提交幂等（platform IdempotencyGuard + DB 唯一索引双兜底，
+ * R09 §2/§6）→ 状态机推进 → APPLICATION_SUBMITTED 事件（payload 白名单，INV-4）。
+ */
+@Service
+public class ApplicationService {
+
+    private final JdbcApplicationRepository applications;
+    private final ApplicationIdempotencyStore idempotencyStore;
+    private final OutboxPublisher outbox;
+    private final Duration duplicateWindow;
+
+    public ApplicationService(JdbcApplicationRepository applications,
+                              ApplicationIdempotencyStore idempotencyStore,
+                              OutboxPublisher outbox,
+                              @Value("${retail.application.duplicate-window-hours:72}") long duplicateWindowHours) {
+        this.applications = applications;
+        this.idempotencyStore = idempotencyStore;
+        this.outbox = outbox;
+        this.duplicateWindow = Duration.ofHours(duplicateWindowHours);
+    }
+
+    public record SubmitCommand(long customerId, Long dealerPartnerId, String transactionScheme,
+                                String channel, Long consentId, Application.Item vehicle) {
+    }
+
+    /**
+     * 提交申请（受理，R05 §4 G1）：
+     * ① 幂等（同键同指纹=重放返回首次结果；同键异指纹=RF_CONFLICT_001）
+     * ② 重复申请去重（同一人+同一車+窗口期，RF_APP_001）
+     * ③ 领域提交守卫 → 落库 + 发事件同一本地事务。
+     */
+    @Transactional
+    public Result submit(SubmitCommand cmd, String idempotencyKey, String requestFingerprint, String traceId) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new BusinessException(RFErrorCode.RF_VALID_001,
+                    Map.of("reason", "Idempotency-Key 头必填（R09 §2）"));
+        }
+        // ① 幂等守卫（机制层，指纹冲突即 RF_CONFLICT_001）
+        var existing = IdempotencyGuard.checkOrThrow(
+                idempotencyStore, idempotencyKey, requestFingerprint, RFErrorCode.RF_CONFLICT_001);
+        if (existing.isPresent()) {
+            // 重放：返回首次受理结果，不重复执行业务
+            Application prior = applications.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow(() -> new BusinessException(RFErrorCode.RF_SYS_001,
+                            Map.of("reason", "幂等记录存在但申请缺失")));
+            return Result.of(prior, true);
+        }
+
+        // ② 领域提交守卫先行（必填项 / 双形态 / 同意 / 车辆齐备后才做去重与落库）
+        Application agg = Application.submit(cmd.customerId(), cmd.dealerPartnerId(),
+                cmd.transactionScheme(), cmd.channel(), cmd.consentId(), cmd.vehicle(), Instant.now());
+
+        // ③ 重复申请去重（同一人 + 同一車 + 窗口期）
+        applications.findPriorDuplicateSubmittedAt(cmd.customerId(), cmd.vehicle().vin())
+                .filter(priorAt -> DuplicateApplicationDetector.isDuplicate(priorAt, Instant.now(), duplicateWindow))
+                .ifPresent(priorAt -> {
+                    throw new BusinessException(RFErrorCode.RF_APP_001, Map.of(
+                            "customerId", String.valueOf(cmd.customerId()),
+                            "vin", cmd.vehicle().vin(),
+                            "windowHours", String.valueOf(duplicateWindow.toHours())));
+                });
+
+        // ④ 落库 + 发事件同一本地事务
+        String applicationNo = generateNo();
+        long applicationId = applications.insert(agg, applicationNo, cmd.vehicle(),
+                idempotencyKey, requestFingerprint, traceId);
+        agg.assignIdentity(applicationId, applicationNo);
+
+        // APPLICATION_SUBMITTED（聚合键 applicationId；payload 只带业务主键，禁 PII）
+        RfEventPayloads.publish(outbox, OutboxPublisher.APPLICATION_SUBMITTED,
+                "applicationId", String.valueOf(applicationId), traceId,
+                Map.of("status", agg.getStatus().name(),
+                        "scheme", agg.getTransactionScheme(),
+                        "idempotencyKey", idempotencyKey));
+        return Result.of(agg, false);
+    }
+
+    /** 撤回（客户动作；SUBMITTED → WITHDRAWN 终态）。 */
+    @Transactional
+    public void withdraw(long applicationId, String traceId) {
+        Application agg = applications.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
+                        Map.of("reason", "申请不存在", "applicationId", String.valueOf(applicationId))));
+        agg.withdraw();
+        applications.updateStatus(applicationId, agg.getStatus());
+    }
+
+    /** 系统初检 → 补件态（SUBMITTED → DOCUMENTS_PENDING）。 */
+    @Transactional
+    public void requestDocuments(long applicationId, String traceId) {
+        Application agg = applications.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
+                        Map.of("reason", "申请不存在", "applicationId", String.valueOf(applicationId))));
+        agg.requestDocuments();
+        applications.updateStatus(applicationId, agg.getStatus());
+    }
+
+    /** 领域推进（由后续用例调用：文件受理/审查决定等，目标受 R04 §3.1 表约束）。 */
+    @Transactional
+    public void transition(long applicationId, ApplicationStatus target, String traceId) {
+        Application agg = applications.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
+                        Map.of("reason", "申请不存在", "applicationId", String.valueOf(applicationId))));
+        agg.transitionTo(target);
+        applications.updateStatus(applicationId, agg.getStatus());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> get(long applicationId) {
+        Application agg = applications.findById(applicationId)
+                .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
+                        Map.of("reason", "申请不存在", "applicationId", String.valueOf(applicationId))));
+        return Map.of(
+                "applicationId", agg.getApplicationId(),
+                "applicationNo", agg.getApplicationNo(),
+                "customerId", agg.getCustomerId(),
+                "dealerPartnerId", String.valueOf(agg.getDealerPartnerId()),
+                "status", agg.getStatus().name(),
+                "transactionScheme", agg.getTransactionScheme(),
+                "channel", agg.getChannel());
+    }
+
+    private String generateNo() {
+        String ts = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+                .withZone(java.time.ZoneOffset.ofHours(9)).format(Instant.now());
+        return "AP" + ts + String.format("%04d", java.util.concurrent.ThreadLocalRandom.current().nextInt(10000));
+    }
+
+    /** 受理结果：replayed=true 表示幂等重放（返回首次结果）。 */
+    public record Result(long applicationId, String applicationNo, ApplicationStatus status,
+                         boolean replayed) {
+        static Result of(Application agg, boolean replayed) {
+            return new Result(agg.getApplicationId(), agg.getApplicationNo(), agg.getStatus(), replayed);
+        }
+    }
+}
