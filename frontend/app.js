@@ -66,7 +66,8 @@ async function call(method, path, body, opts) {
   try {
     const r = await fetch(path, {
       method: method, headers: headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      // GET/HEAD 不得携带 body（浏览器 fetch 规范强制）；null 视为无 body
+      body: body === undefined || body === null ? undefined : JSON.stringify(body),
     });
     code = r.status;
     text = await r.text();
