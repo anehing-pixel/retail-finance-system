@@ -17,7 +17,8 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.recon")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class})
+@Import({RfSecurityConfig.class, RfOutboxConfig.class,
+        com.company.retail.recon.config.ReconServiceConfig.class})
 public class ReconServiceApplication {
 
     public static void main(String[] args) {
