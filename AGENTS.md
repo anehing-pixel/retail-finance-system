@@ -80,7 +80,7 @@ gateway / external-api / 10 个业务服务
 | Nacos | 本地不启；`discovery.fail-fast=false` | 网关用 `ROUTE_*` 覆盖为直连 |
 | `SERVER__PORT` 坑 | 本机注入会覆盖 `server.port` | 启动一律 `env -u SERVER__PORT` |
 | 后台进程 | 随 shell 会话被回收 | 启动 + 测试 + 清理必须放**同一条命令**内 |
-| 进程数 | 网关 1 + DMZ 1 + 业务服务 10 = **12 个 JVM** | 用 `run-microservices.sh start/stop/smoke` 编排（📌 **S1/W2 交付，本轮尚未创建**） |
+| 进程数 | 网关 1 + DMZ 1 + 业务服务 10 = **12 个 JVM** | 用 `run-microservices.sh start/stop/smoke` 编排（✅ W2 已交付） |
 | 端口 | 业务 8090–8099 / 网关 18081 / DMZ 18091 | 与 floorplan 8080–8088 / 18080 / 18090 不冲突 |
 | Flyway | 只有 `retail-core` 跑迁移 | 避免重复迁移 |
 | VSCode Java 语言服务器 | 会锁 `target/classes` 导致 `mvn clean` 失败 | 勿误杀，改用增量 `package` |
