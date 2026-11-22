@@ -14,8 +14,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * {@code core.loans} 持久化（V6 表；权威写者 BC-6 retail-core，P-5）。
- * 账务并发口径（R06 §7）：代付路径走 {@code SELECT ... FOR UPDATE} 行锁。
+ * {@code core.loans} 持久化（V6 表 + V13 结清列；权威写者 BC-6 retail-core，P-5）。
+ * 账务并发口径（R06 §7）：代付/核销/结清路径一律 {@code SELECT ... FOR UPDATE} 行锁 +
+ * {@code version} 乐观锁双兜底（禁止无锁读-改-写，R00 §5）。
  */
 @Repository
 public class JdbcLoanRepository {
@@ -26,8 +27,13 @@ public class JdbcLoanRepository {
             LoanStatus.valueOf(rs.getString("status")),
             rs.getLong("principal"),
             rs.getLong("fee_amount"),
+            rs.getLong("interest_accrued"),
             rs.getLong("balance"),
             rs.getTimestamp("disbursed_at") == null ? null : rs.getTimestamp("disbursed_at").toInstant(),
+            rs.getTimestamp("settled_at") == null ? null : rs.getTimestamp("settled_at").toInstant(),
+            rs.getString("settlement_type"),
+            rs.getLong("waiver_amount"),
+            rs.getLong("settlement_fee"),
             rs.getInt("version"));
 
     private final JdbcTemplate jdbc;
@@ -63,6 +69,34 @@ public class JdbcLoanRepository {
                 loan.disbursedAt() == null ? null : Timestamp.from(loan.disbursedAt()),
                 loan.loanId(),
                 loan.version());
+    }
+
+    /** 还款计划生成：应计利息与余额同步入账（INV-2 利息侧，W6）。 */
+    public int updateAfterPlanGeneration(Loan loan) {
+        return jdbc.update(
+                "UPDATE core.loans SET interest_accrued = ?, balance = ?, version = version + 1, "
+                        + "updated_at = now() WHERE loan_id = ? AND version = ?",
+                loan.interestAccrued(), loan.balance(), loan.loanId(), loan.version());
+    }
+
+    /** 入金核销：状态（补救回 ACTIVE 口径）+ 余额乐观锁更新（W6；核销与余额同一本地事务）。 */
+    public int updateAfterAllocation(Loan loan) {
+        return jdbc.update(
+                "UPDATE core.loans SET status = ?, balance = ?, version = version + 1, updated_at = now() "
+                        + "WHERE loan_id = ? AND version = ?",
+                loan.status().name(), loan.balance(), loan.loanId(), loan.version());
+    }
+
+    /** 结清：终态 + 结清三要素 + settled_at（W6；G10 后唯一入口）。 */
+    public int updateAfterSettlement(Loan loan) {
+        return jdbc.update(
+                "UPDATE core.loans SET status = ?, balance = ?, settled_at = ?, settlement_type = ?, "
+                        + "waiver_amount = ?, settlement_fee = ?, version = version + 1, updated_at = now() "
+                        + "WHERE loan_id = ? AND version = ?",
+                loan.status().name(), loan.balance(),
+                loan.settledAt() == null ? null : Timestamp.from(loan.settledAt()),
+                loan.settlementType(), loan.waiverAmount(), loan.settlementFee(),
+                loan.loanId(), loan.version());
     }
 
     public Optional<Loan> findById(long loanId) {

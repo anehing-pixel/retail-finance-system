@@ -9,15 +9,26 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
-import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * {@code core.repayment_plans} / {@code core.schedule_items} 持久化（V6 表）。
+ * {@code core.repayment_plans} / {@code core.schedule_items} 持久化（V6 表 + V13 核销拆分列）。
  * uk_plan_loan_version：一个债权一个计划版本（本波次只落 version 1，改版归后续波次）。
+ *
+ * <p><b>schedule_items 状态唯一写者（W6）</b>：期次状态迁移只经本类的
+ * {@code updateItemAfterAllocation} / {@code updateItemAfterClosure} / {@code rollDue} /
+ * {@code rollOverdue} 四个口径，禁止散落 SQL 直接 SET status（R00 §5 / R04 §3.6）。</p>
  */
 @Repository
 public class JdbcRepaymentPlanRepository {
+
+    /** 期次核销快照（W6 核销/结清/对拍的行级视图，含 V13 拆分列）。 */
+    public record ItemRow(long itemId, long planId, int periodNo, java.time.LocalDate dueDate,
+                          long amountDue, long principalDue, long interestDue,
+                          String status, long paidAmount, long paidInterest,
+                          long paidPrincipal, long waivedAmount, int version) {
+    }
 
     private static final RowMapper<ScheduleItem> ITEM_MAPPER = (rs, i) -> new ScheduleItem(
             rs.getInt("period_no"),
@@ -27,6 +38,21 @@ public class JdbcRepaymentPlanRepository {
             rs.getLong("interest_due"),
             rs.getString("status"),
             rs.getLong("paid_amount"));
+
+    private static final RowMapper<ItemRow> ITEM_ROW_MAPPER = (rs, i) -> new ItemRow(
+            rs.getLong("item_id"),
+            rs.getLong("plan_id"),
+            rs.getInt("period_no"),
+            rs.getDate("due_date").toLocalDate(),
+            rs.getLong("amount_due"),
+            rs.getLong("principal_due"),
+            rs.getLong("interest_due"),
+            rs.getString("status"),
+            rs.getLong("paid_amount"),
+            rs.getLong("paid_interest"),
+            rs.getLong("paid_principal"),
+            rs.getLong("waived_amount"),
+            rs.getInt("version"));
 
     private final JdbcTemplate jdbc;
 
@@ -80,9 +106,67 @@ public class JdbcRepaymentPlanRepository {
                 "SELECT * FROM core.schedule_items WHERE plan_id = ? ORDER BY period_no", ITEM_MAPPER, planId);
     }
 
+    /** 核销用期次快照（含 item_id 与 V13 拆分列），期次顺序（period_no 升序）。 */
+    public List<ItemRow> findItemRows(long planId) {
+        return jdbc.query(
+                "SELECT * FROM core.schedule_items WHERE plan_id = ? ORDER BY period_no", ITEM_ROW_MAPPER, planId);
+    }
+
     public boolean planExistsForLoan(long loanId) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM core.repayment_plans WHERE loan_id = ?", Integer.class, loanId);
         return count != null && count > 0;
+    }
+
+    /** uk_plan_loan_version：取 version 1 计划（本波次单版本）。 */
+    public Optional<Long> findPlanIdByLoanId(long loanId) {
+        List<Long> rows = jdbc.queryForList(
+                "SELECT plan_id FROM core.repayment_plans WHERE loan_id = ? ORDER BY plan_version DESC LIMIT 1",
+                Long.class, loanId);
+        return rows.stream().findFirst();
+    }
+
+    /**
+     * 核销后更新期次：paid_interest / paid_principal 拆分入账，paid_amount 同步，
+     * 状态经 {@code ScheduleItemStatus.afterPayment} 判定后传入（唯一写者口径）。乐观锁兜底并发。
+     */
+    public int updateItemAfterAllocation(long itemId, long paidInterestTotal, long paidPrincipalTotal,
+                                         String nextStatus, int version) {
+        return jdbc.update(
+                "UPDATE core.schedule_items SET paid_interest = ?, paid_principal = ?, "
+                        + "paid_amount = paid_interest + paid_principal, status = ?, "
+                        + "version = version + 1, updated_at = now() "
+                        + "WHERE item_id = ? AND version = ?",
+                paidInterestTotal, paidPrincipalTotal, nextStatus, itemId, version);
+    }
+
+    /**
+     * 结清关闭期次：实收本金 + 豁免一次落定；状态由调用方按 {@code SettlementCalculator} 关闭结果
+     * 传入（有实收 → PAID；全额豁免 → WAIVED——提前结清对未到期期次的合法终态，R04 §3.6）。
+     */
+    public int updateItemAfterClosure(long itemId, long paidPrincipalTotal, long waivedTotal,
+                                      String nextStatus, int version) {
+        return jdbc.update(
+                "UPDATE core.schedule_items SET paid_principal = ?, "
+                        + "paid_amount = paid_interest + paid_principal, waived_amount = ?, status = ?, "
+                        + "version = version + 1, updated_at = now() "
+                        + "WHERE item_id = ? AND version = ?",
+                paidPrincipalTotal, waivedTotal, nextStatus, itemId, version);
+    }
+
+    /** 到期批量（W6 唯一写者）：OPEN 且 due_date ≤ bizDate → DUE。返回行数。 */
+    public int rollDue(java.time.LocalDate bizDate) {
+        return jdbc.update(
+                "UPDATE core.schedule_items SET status = 'DUE', version = version + 1, updated_at = now() "
+                        + "WHERE status = 'OPEN' AND due_date <= ?",
+                Date.valueOf(bizDate));
+    }
+
+    /** 到期批量：DUE 且 due_date < bizDate → OVERDUE（逾期按自然日）。返回行数。 */
+    public int rollOverdue(java.time.LocalDate bizDate) {
+        return jdbc.update(
+                "UPDATE core.schedule_items SET status = 'OVERDUE', version = version + 1, updated_at = now() "
+                        + "WHERE status = 'DUE' AND due_date < ?",
+                Date.valueOf(bizDate));
     }
 }

@@ -37,7 +37,7 @@ public class RepaymentPlanApplicationService {
     @Transactional
     public PlanView generate(long loanId, String method, int installmentCount, LocalDate firstDueDate,
                              int monthlyRateBp, Integer bonusMonth, String traceId) {
-        var loan = loanRepository.findById(loanId)
+        var loan = loanRepository.findByIdForUpdate(loanId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "债权不存在", java.util.Map.of("loanId", String.valueOf(loanId))));
         RepaymentMethod repaymentMethod = parseMethod(method);
@@ -68,11 +68,19 @@ public class RepaymentPlanApplicationService {
         long planId = planRepository.insertPlan(loanId, repaymentMethod.name(), installmentCount,
                 firstDueDate, bonusMonth, traceId);
         planRepository.insertItems(planId, items, traceId);
+
+        // W6：应计利息入账（INV-2 的 interest_accrued 侧；计划与余额同一本地事务）
+        long totalInterestDue = items.stream().mapToLong(ScheduleItem::interestDue).sum();
+        loan.accrueInterest(totalInterestDue);
+        if (loanRepository.updateAfterPlanGeneration(loan) == 0) {
+            throw new BusinessException(RFErrorCode.RF_CONFLICT_001, "债权并发更新冲突（乐观锁 version）");
+        }
+
         return new PlanView(planId, loanId, repaymentMethod.name(), installmentCount,
                 firstDueDate, bonusMonth, monthlyRateBp,
                 items.stream().mapToLong(ScheduleItem::amountDue).sum(),
                 items.stream().mapToLong(ScheduleItem::principalDue).sum(),
-                items.stream().mapToLong(ScheduleItem::interestDue).sum());
+                totalInterestDue);
     }
 
     public PlanItemsView items(long loanId) {
