@@ -1,0 +1,41 @@
+server:
+  port: 8096
+
+spring:
+  application:
+    name: contract-service
+  datasource:
+    # 第一版共库（ADR-RF-009 / R02 §3.1 范式 4）：core | pii | integration | audit 按 schema 分区
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/retail_finance}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: false
+  jackson:
+    time-zone: Asia/Tokyo
+    default-property-inclusion: non_null
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        fail-fast: false
+
+retail:
+  auth:
+    # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
+    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+    token-hours: ${RETAIL_TOKEN_HOURS:8}
+  customer-auth:
+    # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
+    secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+  clients:
+    # Feign 门禁双模 URI（R09 §7.2）：空串回退 lb://，本地无注册中心用环境变量直连
+    contract:
+      url: ${RETAIL_CLIENTS_CONTRACT_URL:}
+    customer:
+      url: ${RETAIL_CLIENTS_CUSTOMER_URL:}
+    underwriting:
+      url: ${RETAIL_CLIENTS_UNDERWRITING_URL:}

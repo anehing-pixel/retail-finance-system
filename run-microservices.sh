@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# ============================================================================
+# 微服务一键编排（本地验证用）—— S1-W2 交付（R11 §3 W2 / R02 §3）
+#
+# 起 12 个进程 + 数据库，网关 18081 作为统一入口按路径切流；
+# 外部 DMZ 18091 独立进程（/external/** 不走网关，R02 §3.1 范式 2）。
+#
+# 三个本地环境障碍及处理（对齐 floorplan run-microservices.sh）：
+#   1) WorkBuddy 注入 SERVER__PORT，Spring 宽松绑定会覆盖 yml 端口 → env -u 清掉；
+#   2) 没起 Nacos：各服务 fail-fast=false，路由用 ROUTE_* / RETAIL_CLIENTS_* 直连覆盖；
+#   3) 只有 retail-core 跑 Flyway（R00 §7），其余服务 flyway.enabled=false。
+#
+# 端口分配（R00 §6）：retail-core=8090 auth=8091 customer=8092 application=8093
+#   underwriting=8094 bureau=8095 contract=8096 title-release=8097
+#   servicing=8098 recon=8099 网关=18081 DMZ=18091 DB=5435
+#
+# 用法：
+#   ./run-microservices.sh start   # 启动全部并前台保活；Ctrl+C 停止
+#   ./run-microservices.sh stop    # 另开窗口停止全部
+#   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 → 自动清理，一条命令完成
+#   ./run-microservices.sh db      # 只确保数据库容器运行（幂等）
+# ============================================================================
+set -u
+cd "$(dirname "$0")"
+ROOT="$PWD"
+PIDDIR="$ROOT/.microservice-pids"
+LOGDIR="$ROOT/logs/microservices"
+mkdir -p "$PIDDIR" "$LOGDIR"
+
+# 冒烟解释器：Windows/Git Bash 常只有 python（无 python3），缺一不可跑冒烟
+PYTHON="${PYTHON:-python3}"
+command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
+# stdout 重定向/管道下 Python 输出编码回落本地代码页（cp936），冒烟含中文必崩——强制 utf-8
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+
+DB_CONTAINER=retail-finance-db
+export RETAIL_CUSTOMER_DEV_LOGIN="${RETAIL_CUSTOMER_DEV_LOGIN:-true}"   # 冒烟要用客户开发桥；生产默认 false
+
+JAR() { echo "$ROOT/$1/target/$2-1.0.0-SNAPSHOT.jar"; }
+
+# Feign 门禁本地直连（R09 §7.2 双模 URI：给了 url 就直连，不给回退 lb://）
+export RETAIL_CLIENTS_CONTRACT_URL=http://127.0.0.1:8096
+export RETAIL_CLIENTS_CUSTOMER_URL=http://127.0.0.1:8092
+export RETAIL_CLIENTS_UNDERWRITING_URL=http://127.0.0.1:8094
+
+ensure_db() {
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$DB_CONTAINER"; then
+    echo "[数据库] $DB_CONTAINER 已运行"
+  elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$DB_CONTAINER"; then
+    docker start "$DB_CONTAINER" >/dev/null && echo "[数据库] $DB_CONTAINER 已启动"
+  else
+    echo "[数据库] 创建 $DB_CONTAINER（postgres:16-alpine，宿主 5435，独立实例不与 floorplan 共库）"
+    docker run -d --name "$DB_CONTAINER" \
+      -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=retail_finance \
+      -p 5435:5432 postgres:16-alpine >/dev/null
+  fi
+  # 等 PG 就绪（首次建库要初始化，最多 60s）
+  for i in $(seq 1 60); do
+    if docker exec "$DB_CONTAINER" pg_isready -U postgres -d retail_finance >/dev/null 2>&1; then
+      echo "[数据库] 就绪（retail_finance:5435）"; return 0
+    fi
+    sleep 1
+  done
+  echo "[错误] 数据库 60s 未就绪"; return 1
+}
+
+start_one() {
+  local name="$1" jar="$2"; shift 2
+  if [ ! -f "$jar" ]; then echo "[跳过] $jar 不存在，请先 mvn -B clean package"; return 1; fi
+  # env -u SERVER__PORT 是关键：否则端口被 WorkBuddy 注入值覆盖
+  env -u SERVER__PORT java -Dfile.encoding=UTF-8 -jar "$jar" "$@" > "$LOGDIR/$name.log" 2>&1 &
+  echo $! > "$PIDDIR/$name.pid"
+  echo "[启动] $name pid=$(cat "$PIDDIR/$name.pid")"
+}
+
+wait_one() {
+  local name="$1" marker="$2" port="$3"
+  local i
+  for i in $(seq 1 90); do
+    if grep -q "$marker" "$LOGDIR/$name.log" 2>/dev/null; then
+      echo "[就绪] $name (port $port, ${i}s)"; return 0
+    fi
+    if grep -qE "APPLICATION FAILED TO START|Application run failed" "$LOGDIR/$name.log" 2>/dev/null; then
+      echo "[失败] $name 启动异常，最后 30 行："; tail -30 "$LOGDIR/$name.log"; return 1
+    fi
+    sleep 1
+  done
+  echo "[超时] $name 90s 未就绪，最后 30 行："; tail -30 "$LOGDIR/$name.log"; return 1
+}
+
+port_in_use() {
+  netstat -ano 2>/dev/null | grep -q ":$1 .*LISTENING"
+}
+
+do_start() {
+  ensure_db || return 1
+  local busy=""
+  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091; do
+    port_in_use "$p" && busy="$busy $p"
+  done
+  if [ -n "$busy" ]; then
+    echo "[错误] 端口已被占用:$busy —— 请先执行 stop，或关闭占用进程后重试"
+    return 1
+  fi
+
+  echo "=== 启动 10 业务服务 + DMZ（retail-core 最先，唯一跑 Flyway）==="
+  start_one retail-core "$(JAR retail-core retail-core)" || { do_stop; exit 1; }
+  wait_one retail-core "Started CoreServiceApplication" 8090 || { do_stop; exit 1; }
+
+  start_one auth-service "$(JAR auth-service retail-auth-service)"
+  start_one customer-service "$(JAR customer-service retail-customer-service)"
+  start_one application-service "$(JAR application-service retail-application-service)"
+  start_one underwriting-service "$(JAR underwriting-service retail-underwriting-service)"
+  start_one bureau-service "$(JAR bureau-service retail-bureau-service)"
+  start_one contract-service "$(JAR contract-service retail-contract-service)"
+  start_one title-release-service "$(JAR title-release-service retail-title-release-service)"
+  start_one servicing-service "$(JAR servicing-service retail-servicing-service)"
+  start_one recon-service "$(JAR recon-service retail-recon-service)"
+  start_one external-api "$(JAR external-api retail-external-api)"
+
+  wait_one auth-service "Started AuthServiceApplication" 8091 || { do_stop; exit 1; }
+  wait_one customer-service "Started CustomerServiceApplication" 8092 || { do_stop; exit 1; }
+  wait_one application-service "Started ApplicationServiceApplication" 8093 || { do_stop; exit 1; }
+  wait_one underwriting-service "Started UnderwritingServiceApplication" 8094 || { do_stop; exit 1; }
+  wait_one bureau-service "Started BureauServiceApplication" 8095 || { do_stop; exit 1; }
+  wait_one contract-service "Started ContractServiceApplication" 8096 || { do_stop; exit 1; }
+  wait_one title-release-service "Started TitleReleaseServiceApplication" 8097 || { do_stop; exit 1; }
+  wait_one servicing-service "Started ServicingServiceApplication" 8098 || { do_stop; exit 1; }
+  wait_one recon-service "Started ReconServiceApplication" 8099 || { do_stop; exit 1; }
+  wait_one external-api "Started ExternalApiApplication" 18091 || { do_stop; exit 1; }
+
+  echo "=== 启动网关（ROUTE_* 直连覆盖 lb://）==="
+  env -u SERVER__PORT \
+    ROUTE_CORE=http://127.0.0.1:8090 \
+    ROUTE_AUTH=http://127.0.0.1:8091 \
+    ROUTE_CUSTOMER=http://127.0.0.1:8092 \
+    ROUTE_APPLICATION=http://127.0.0.1:8093 \
+    ROUTE_UNDERWRITING=http://127.0.0.1:8094 \
+    ROUTE_BUREAU=http://127.0.0.1:8095 \
+    ROUTE_CONTRACT=http://127.0.0.1:8096 \
+    ROUTE_TITLE_RELEASE=http://127.0.0.1:8097 \
+    ROUTE_SERVICING=http://127.0.0.1:8098 \
+    ROUTE_RECON=http://127.0.0.1:8099 \
+    java -jar "$(JAR gateway retail-api-gateway)" > "$LOGDIR/gateway.log" 2>&1 &
+  echo $! > "$PIDDIR/gateway.pid"
+  wait_one gateway "Started GatewayApplication" 18081 || { do_stop; exit 1; }
+
+  echo ""
+  echo "全部就绪。内部网关: http://127.0.0.1:18081   外部 DMZ: http://127.0.0.1:18091"
+  echo "跑冒烟: bash run-microservices.sh smoke"
+}
+
+do_stop() {
+  echo "=== 停止全部服务 ==="
+  for pf in "$PIDDIR"/*.pid; do
+    [ -f "$pf" ] || continue
+    pid=$(cat "$pf")
+    name=$(basename "$pf" .pid)
+    if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null && echo "[停止] $name $pid"; else echo "[已停] $name"; fi
+    rm -f "$pf"
+  done
+}
+
+case "${1:-}" in
+  start)
+    do_start || { do_stop; exit 1; }
+    echo ""
+    echo "服务已就绪并保持运行。按 Ctrl+C 停止全部服务。"
+    trap 'echo; do_stop; exit 0' INT TERM
+    wait
+    ;;
+  smoke)
+    do_start || { do_stop; exit 1; }
+    echo "=== 通过网关 18081 跑冒烟 ==="
+    SMOKE_GATEWAY=http://127.0.0.1:18081 SMOKE_DMZ=http://127.0.0.1:18091 \
+      DB_CONTAINER=$DB_CONTAINER "$PYTHON" scripts/smoke_w2.py
+    RC=$?
+    echo "=== 冒烟退出码: $RC ==="
+    do_stop
+    exit $RC
+    ;;
+  stop)
+    do_stop
+    ;;
+  db)
+    ensure_db
+    ;;
+  *)
+    echo "用法: $0 {start|stop|smoke|db}"; exit 1
+    ;;
+esac

@@ -10,15 +10,15 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **S0 · 文档初始化（2026-11-22 完成）→ S1 · 工程地基进行中**：W1 中台 jar ✅ 完成（2026-11-22），W2 进行中 |
-| 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001` v2.0）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
+| 轮次 | **S1 · 工程地基 W1+W2 完成（2026-11-22）**：W1 中台 jar ✅ · W2 工程地基 ✅（12 服务骨架全绿 + 走网关冒烟 26/26，tag `w2-frozen`）→ **下一轮：S2 并行窗口 W3‖W4‖W5（worktree 方案见 `R11 §4.2`）** |
+| 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001`）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
-| 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/check_docs.py`、`scripts/normalize_terms.py` |
-| 代码 | S0 产物：0 代码；**S1-W1 产物：`../company-platform-contracts` 19 个主类 + 6 个测试类（34 用例全绿，`com.company:company-platform-contracts:1.0.0-SNAPSHOT` 已 install）**；RF 侧仍 0 代码 |
-| 验证 | `python scripts/check_docs.py` → **PASS 13 项 / FAIL 0 / EXIT 0**（真实实测，见 §6）；`normalize_terms.py --check` 幂等 0 变更 |
-| 业务阻塞 | ✅ **系统口径已全部定源（2026-11-22）**：`C-01` 用户签字（双形态并行，`ADR-RF-002` Accepted）；`C-02`~`C-12` 架构 AI 裁决（用户授权，见 `R01 §6`）；外部事实核实项标注假设 + 触发器，**不阻塞 S1** |
-| 外部依赖 | 中台 jar ✅ **已抽取**（W1 完成，见 §2）；`R07 §7` 调研清单：**DMS 项 ✅ 已回填**（数据集成商模式，`ADR-RF-011`），集成商选型与其余通道（征信/银行/eKYC/登记代办/通知）未回填 |
-| 下一轮 | **S1-W2**（`R11 §3`：父 pom + 12 服务骨架 + 契约冻结 + Flyway V1–V9 + `run-microservices.sh`，完成后打 tag `w2-frozen` → 开 W3/W4/W5 worktree 并行）；外部核实项与调研回填并行推进，不阻塞 |
+| 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/`（check_docs / normalize_terms / gen_w2_services / smoke_w2）；`run-microservices.sh`；`.github/workflows/docs-check.yml` |
+| 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——父 pom + 四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
+| 验证 | `mvn -B clean package` → **BUILD SUCCESS**；`bash run-microservices.sh smoke` → **26 断言 PASS / 0 FAIL / EXIT 0**（走网关 18081 + DMZ 18091 实测，见 §6）；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰（`git status` 干净） |
+| 业务阻塞 | ✅ 系统口径已全部定源（`C-01` 用户签；`C-02`~`C-12` AI 裁决，`R01 §6`）；外部核实项不阻塞 |
+| 外部依赖 | 中台 jar ✅；`R07 §7`：DMS ✅ 回填（`ADR-RF-011`）；集成商选型与其余通道未回填（**不阻塞 S2 并行窗口**） |
+| 下一轮 | **S2 并行窗口**：按 `R11 §4.2` 打 `wt/w3` / `wt/w4` / `wt/w5` 三个 worktree 并行开发（纪律 5 条 + 共享禁区 `w2-frozen`）；各自完成先到先合，三包全合后才开 W6 |
 
 ### 本轮两项方向修正（已落实）
 
@@ -61,7 +61,7 @@
 | 错误码前缀 | `RF_*` | `ADVANCE_*` / `CREDIT_*` 等 | 不冲突 ✅ |
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
 | 中台 jar | `com.company:company-platform-contracts:1.0.0-SNAPSHOT`（**✅ 已抽取**，独立仓 `../company-platform-contracts`，`mvn install` 到本地仓；34 单测全绿；RF 依赖 ≥ 此版本） | floorplan 不强制迁移（继续用 `com.company.floorplan.*` 现网类，基线全绿未动） | ✅ W1 完成 |
-| Feign 契约 | `com.company.retail.common.contract`（**待冻结**） | `com.company.floorplan.common.contract` | 各自常量表 ✅ |
+| Feign 契约 | `com.company.retail.common.contract`（**✅ W2 已冻结**：`FeignContracts` 代付前 3 门禁契约（contract/consent/underwriting，fail-closed）+ `OutboxPublisher` 17 事件常量 + `EventPayloadGuard` 白名单；`w2-frozen` 后并行包只读） | `com.company.floorplan.common.contract` | 各自常量表 ✅ |
 
 > 变更记录：
 > - 2026-11-22：业务端口段由 8090–8098 扩为 **8090–8099**（新增 `recon-service :8099`），
@@ -85,17 +85,17 @@
 
 **S0（业务定源）**
 - [x] C-01 交易形态 —— ✅ 已裁决（2026-11-22 业务方：双形态并行；适用法规与登记形态仍属 C-02 法务意见书）
-- [ ] C-02 适用法规清单与经营资质登记形态
-- [ ] C-03 总量规制 / 支付能力预估额 的适用与算法口径
-- [ ] C-04 所有权保留登记范围
-- [ ] C-05 征信机构加盟组合与报送周期、异议申诉时限
-- [ ] C-06 使用目的、向第三方提供同意、保留期限、查阅请求流程
-- [ ] C-07 身份核验 / 线上核验 / 反社会势力排查落地方式
-- [ ] C-08 法定书面文件与冷静期
-- [ ] C-09 收款渠道组合与首期兜底
-- [ ] C-10 提前结清计算与解除触发
-- [ ] C-11 所有权解除的确认权威方与回执效力
-- [ ] C-12 销售店主数据共享方式与加盟店合同口径
+- [x] C-02 适用法规清单与经营资质登记形态 —— 🟦 AI 裁决（双登记建模 + 缺证禁用兜底）
+- [x] C-03 总量规制 / 支付能力预估额 的适用与算法口径 —— 🟦 AI 裁决（A 预估额框架 / B 除外贷付）
+- [x] C-04 所有权保留登记范围 —— 🟦 AI 裁决：REGISTERED
+- [x] C-05 征信机构加盟组合与报送周期、异议申诉时限 —— 🟦 AI 裁决（CIC+JICC / T+1 / 30 日）
+- [x] C-06 使用目的、向第三方提供同意、保留期限、查阅请求流程 —— 🟦 AI 裁决（APPI 5 年 + 单独同意）
+- [x] C-07 身份核验 / 线上核验 / 反社会势力排查落地方式 —— 🟦 AI 裁决（文件+人工起步）
+- [x] C-08 法定书面文件与冷静期 —— 🟦 AI 裁决（模板可配 + 8 日占位）
+- [x] C-09 收款渠道组合与首期兜底 —— 🟦 AI 裁决（账户自动扣款主 + 缴款单兜底 / 60 日）
+- [x] C-10 提前结清计算与解除触发 —— 🟦 AI 裁决（剩余本金 − 减免额 + 手续费）
+- [x] C-11 所有权解除的确认权威方与回执效力 —— 🟦 AI 裁决（外部回执唯一权威）
+- [x] C-12 销售店主数据共享方式与加盟店合同口径 —— 🟦 AI 裁决（共享主数据、隔离角色账户）
 - [x] `R07 §7` 外部方调研清单 —— **DMS 项 ✅ 已回填**（2026-11-22：数据集成商模式 + 四类接口 + 技术规范，`ADR-RF-011`）；集成商选型与其余通道（征信 / 银行 / 身份核验 / 登记代办 / 通知）仍待回填
 
 **S1–S4**：见 `R11 §3` 工作包 W1–W8，本表不重复罗列（避免第二份会过期的清单）。
@@ -121,6 +121,9 @@
 | 日期 | 命令 | 结果 |
 |---|---|---|
 | 2026-11-22 | `mvn -B clean package`（floorplan，W1 前基线） | **BUILD SUCCESS，EXIT 0**（1m14s），V-9 对拍基线确立 |
+| 2026-11-22 | `mvn -B clean package`（RF 全仓 16 模块，W2） | **BUILD SUCCESS**：父 pom + 四层共享 + 10 业务服务 + 网关 + DMZ；单测 16（common）+ 4（external-api）全绿 |
+| 2026-11-22 | `bash run-microservices.sh smoke`（W2） | **26 断言 PASS / 0 FAIL / EXIT 0**：网关 10 路由段切流、DMZ 健康、员工登录（admin/admin123 BCrypt + core.users 种子）、whoami 三态（无 token 401 / 员工 200 / 客户 token 401）、伪造 token 401、X-Request-Id 贯穿、DMZ 验签四态（合法 200 / 篡改 401 / 过期 401 / 未登记 403）、Flyway V1–V9 = 9 条迁移记录、四 schema 49 张表、种子员工存在 |
+| 2026-11-22 | Flyway 实测（retail_finance:5435，独立容器 retail-finance-db） | **V1–V9 9 条迁移全部 success**；期间修复 V1 `retail_audit_ins` LOGIN+NOLOGIN 冲突选项（SQL 修正后重建容器重跑） |
 | 2026-11-22 | `mvn -B clean install`（company-platform-contracts） | **BUILD SUCCESS**：34 用例 / 0 失败 / 0 错误，`1.0.0-SNAPSHOT` 已装本地仓（切断点 ①③ 单测覆盖） |
 | 2026-11-22 | grep 业务包引用（platform 仓） | **零命中**：不 import `com.company.floorplan.*` / `com.company.retail.*` |
 | 2026-11-22 | `git status`（floorplan） | **干净**：W1 未触碰 floorplan 任何文件，基线即终态（V-9 达成） |
@@ -129,8 +132,7 @@
 | 2026-11-22 | `python scripts/check_docs.py` | **PASS（13 项 / FAIL 0 / EXIT 0）**：编号连续唯一、索引引用可达、跨文档引用可达、`C-xx` 登记完整、端口不冲突、全文中文、禁用日文词零命中、微服务口径、R 三节 / ADR 四节、术语映射幂等、文件计数 29 |
 | 2026-11-22 | C-01 定源落地 | **PASS**：`ADR-RF-002` Proposed→Accepted（双形态并行）；`R00`、`R01 §2 §6 §7`、`R02`、`R04`、`R10`、`R11`、`README`、`00` 全部同步；`check_docs.py` 复跑 PASS |
 | 2026-11-22 | DMS 对接定源落地 | **PASS**：新增 `ADR-RF-011`（数据集成商起步 / 核心直连演进，Accepted）；`R07 §0 §2.1 §3 §4(I-11/I-12) §6 §7 §8 §9` 回填；`R06` 增假名姓名加密列；`check_docs.py` 升级为 11 ADR / 30 项并复跑 PASS |
-| — | `mvn -B clean package` | **不适用**：本轮 0 个 `.java` / 0 个 `.sql`；S1 起成为硬门槛 |
-| — | `bash run-microservices.sh smoke` | **不适用**：编排脚本由 W2 交付，本轮尚未创建、无任何进程；S2 起成为硬门槛 |
+| — | `check_docs.py` 接入 CI | **已落地**：`.github/workflows/docs-check.yml`（check_docs + normalize --check 两步） |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 

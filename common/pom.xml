@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.company</groupId>
+    <artifactId>retail-finance-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>retail-common</artifactId>
+  <name>Retail Finance :: Common</name>
+  <description>跨服务共用基础设施：Feign 门禁契约（冻结）、双主体 JWT 验签、JWT 透传、事件 payload 白名单、Web 装配</description>
+
+  <dependencies>
+    <!-- 语义层：RF_* 错误码 / 权限点常量 -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>retail-domain</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- 中台机制层：ApiResponse / BusinessException / PlatformJwtAuthInterceptor / TokenVerifier 端口 -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>company-platform-contracts</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- Feign 门禁契约（R09 §7）：W2 冻结，并行包只消费不新增 -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-openfeign</artifactId>
+    </dependency>
+    <!-- 双主体 JWT 验签（HS256，密钥来自 RETAIL_JWT_SECRET / RETAIL_CUSTOMER_JWT_SECRET） -->
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-impl</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-jackson</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- BCryptPasswordEncoder（登录口令散列）；只要 crypto 模块，不引完整 Spring Security 过滤链 -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-crypto</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- 测试用 MockHttpServletRequest（透传拦截器单测） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

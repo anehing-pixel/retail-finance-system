@@ -1,0 +1,22 @@
+# W2 交付：check_docs.py 接入 CI（R11 §3 W2）
+# 文档一致性是硬门槛：编号唯一、索引可达、跨文档引用可达、C-xx 登记完整、
+# 端口不冲突、全文中文、微服务口径、术语映射幂等——任何一项 FAIL 都不得合并。
+name: docs-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 文档一致性自检（check_docs.py）
+        run: python scripts/check_docs.py
+      - name: 术语规范化幂等校验（normalize_terms.py --check）
+        run: python scripts/normalize_terms.py --check

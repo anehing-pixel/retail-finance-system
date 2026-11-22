@@ -1,0 +1,67 @@
+server:
+  port: 18081                    # 内部网关统一入口（R00 §6：与 floorplan 18080 不冲突）
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        fail-fast: false          # 本地无 Nacos 也能启动（路由用 ROUTE_* 直连覆盖）
+    gateway:
+      discovery:
+        locator:
+          enabled: false          # 不自动按服务名暴露路由，全部显式声明
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: [GET, POST, PUT, DELETE, OPTIONS]
+            allowedHeaders: "*"
+      routes:
+        # ---------------- 精确路由在前（首个匹配即命中），兜底 retail-core 在后 ----------------
+        # 路由段预分配（R11 §4.1：并行包只填自己那段，不改他人段）
+        - id: auth
+          uri: ${ROUTE_AUTH:lb://auth-service}
+          predicates:
+            - Path=/api/auth/**
+        - id: customer
+          uri: ${ROUTE_CUSTOMER:lb://customer-service}
+          predicates:
+            - Path=/api/customers/**,/api/identity-verifications/**,/api/consents/**,/api/pii/**
+        - id: application
+          uri: ${ROUTE_APPLICATION:lb://application-service}
+          predicates:
+            - Path=/api/applications/**,/api/dealer-partners/**
+        - id: underwriting
+          uri: ${ROUTE_UNDERWRITING:lb://underwriting-service}
+          predicates:
+            - Path=/api/underwriting/**,/api/rules/**
+        - id: bureau
+          uri: ${ROUTE_BUREAU:lb://bureau-service}
+          predicates:
+            - Path=/api/credit-inquiries/**,/api/bureau-reports/**,/api/bureau-disputes/**
+        - id: contract
+          uri: ${ROUTE_CONTRACT:lb://contract-service}
+          predicates:
+            - Path=/api/contracts/**
+        - id: title-release
+          uri: ${ROUTE_TITLE_RELEASE:lb://title-release-service}
+          predicates:
+            - Path=/api/title-retentions/**,/api/release-orders/**
+        - id: servicing
+          uri: ${ROUTE_SERVICING:lb://servicing-service}
+          predicates:
+            - Path=/api/collection-cases/**
+        - id: recon
+          uri: ${ROUTE_RECON:lb://recon-service}
+          predicates:
+            - Path=/api/recon/**
+
+        # ---------------- 核心账务兜底：loans / disbursements / repayment-plans / payments /
+        # settle / audit 等（债权、还款、代付、核销、结清留在 retail-core，本地事务红线）----------------
+        - id: core
+          uri: ${ROUTE_CORE:lb://retail-core}
+          predicates:
+            - Path=/api/**

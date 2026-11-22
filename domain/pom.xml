@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.company</groupId>
+    <artifactId>retail-finance-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>retail-domain</artifactId>
+  <name>Retail Finance :: Domain</name>
+  <description>领域层：零 Spring。错误码 RF_*、权限点、聚合模型的唯一语义层（R00 §3.5 §3.7）</description>
+
+  <dependencies>
+    <!-- 中台错误码接口形状（机制层）：RF_* 枚举实现 com.company.platform.exception.ErrorCode。
+         中台无业务语义（W1 切断点验收），语义层在本模块；不含任何 Spring。 -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>company-platform-contracts</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

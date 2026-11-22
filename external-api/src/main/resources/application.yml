@@ -1,0 +1,21 @@
+server:
+  port: 18091                    # 外部 DMZ 独立端口（R00 §6：/external/** 不经过内部网关 18081）
+
+spring:
+  application:
+    name: external-api
+  jackson:
+    time-zone: Asia/Tokyo
+    default-property-inclusion: non_null
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        fail-fast: false
+
+retail:
+  integration:
+    partners:
+      # dev partner 密钥：生产真相源是 integration.partner_credentials.secret_ref（不明文、走密钥管理设施）
+      DMS-DEV-01:
+        secret: ${RETAIL_PARTNER_DMS_SECRET:dev-dms-partner-secret-0123456789}
