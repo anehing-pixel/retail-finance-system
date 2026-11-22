@@ -3,7 +3,8 @@
 # 微服务一键编排（本地验证用）—— S1-W2 交付（R11 §3 W2 / R02 §3）
 #
 # 起 12 个进程 + 数据库，网关 18081 作为统一入口按路径切流；
-# 外部 DMZ 18091 独立进程（/external/** 不走网关，R02 §3.1 范式 2）。
+# 外部 DMZ 18091 独立进程（/external/** 不走网关，R02 §3.1 范式 2）；
+# 前端控制台 18082（serve.py，静态 + 同源代理，W-FE）。
 #
 # 三个本地环境障碍及处理（对齐 floorplan run-microservices.sh）：
 #   1) WorkBuddy 注入 SERVER__PORT，Spring 宽松绑定会覆盖 yml 端口 → env -u 清掉；
@@ -12,13 +13,14 @@
 #
 # 端口分配（R00 §6）：retail-core=8090 auth=8091 customer=8092 application=8093
 #   underwriting=8094 bureau=8095 contract=8096 title-release=8097
-#   servicing=8098 recon=8099 网关=18081 DMZ=18091 DB=5435
+#   servicing=8098 recon=8099 网关=18081 DMZ=18091 前端=18082 DB=5435
 #
 # 用法：
 #   ./run-microservices.sh start   # 启动全部并前台保活；Ctrl+C 停止
 #   ./run-microservices.sh stop    # 另开窗口停止全部
-#   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 → 自动清理，一条命令完成
+#   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 + 前端页面冒烟 → 自动清理，一条命令完成
 #   ./run-microservices.sh db      # 只确保数据库容器运行（幂等）
+#   # 浏览器点击级 E2E（可选，需 playwright + 系统 Edge）：python frontend/browser_e2e.py
 # ============================================================================
 set -u
 cd "$(dirname "$0")"
@@ -146,8 +148,22 @@ do_start() {
   echo $! > "$PIDDIR/gateway.pid"
   wait_one gateway "Started GatewayApplication" 18081 || { do_stop; exit 1; }
 
+  echo "=== 启动前端控制台（serve.py:18082，静态 + 同源代理 /gw /svc /cust）==="
+  if port_in_use 18082; then
+    echo "[跳过] 18082 已有前端在跑"
+  else
+    "$PYTHON" "$ROOT/frontend/serve.py" > "$LOGDIR/frontend.log" 2>&1 &
+    echo $! > "$PIDDIR/frontend.pid"
+    for i in $(seq 1 15); do
+      if curl -s -m 2 "http://127.0.0.1:18082/" >/dev/null 2>&1; then
+        echo "[就绪] frontend (port 18082, ${i}s)"; break
+      fi
+      sleep 1
+    done
+  fi
+
   echo ""
-  echo "全部就绪。内部网关: http://127.0.0.1:18081   外部 DMZ: http://127.0.0.1:18091"
+  echo "全部就绪。内部网关: http://127.0.0.1:18081   外部 DMZ: http://127.0.0.1:18091   前端: http://127.0.0.1:18082"
   echo "跑冒烟: bash run-microservices.sh smoke"
 }
 
@@ -176,6 +192,11 @@ case "${1:-}" in
     SMOKE_GATEWAY=http://127.0.0.1:18081 SMOKE_DMZ=http://127.0.0.1:18091 \
       DB_CONTAINER=$DB_CONTAINER "$PYTHON" scripts/smoke_w2.py
     RC=$?
+    if [ $RC -eq 0 ]; then
+      echo "=== 前端页面冒烟（经 18082 代理走真实链路）==="
+      "$PYTHON" frontend/smoke_frontend.py
+      RC=$?
+    fi
     echo "=== 冒烟退出码: $RC ==="
     do_stop
     exit $RC

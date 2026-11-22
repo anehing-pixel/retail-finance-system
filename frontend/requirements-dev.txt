@@ -1,0 +1,1 @@
+playwright==1.65.2  # 浏览器点击级 E2E（frontend/browser_e2e.py）；驱动系统 Edge，免下载 chromium
