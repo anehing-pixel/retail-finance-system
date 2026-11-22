@@ -1,0 +1,70 @@
+# ---- Java / Maven ----
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+.classpath
+.project
+.settings/
+*.code-workspace
+
+# ---- Python（文档自检 / 后续脚本） ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- 日志与运行时 ----
+logs/
+*.log
+*.pid
+.microservice-pids/
+app-run.log
+app.log
+
+# ---- 本地数据 / 附件（继续用本地文件系统，但绝不入库） ----
+data/
+!data/.gitkeep
+attachments/
+uploads/
+tmp/
+*.sql.gz
+*.csv
+*.xlsx
+*.xls
+
+# ---- 密钥与凭据（硬红线） ----
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.jks
+*.key
+secrets/
+**/application-local.yml
+**/application-prod.yml
+
+# ---- 含个人信息的导出/夹具（APPI） ----
+**/fixtures/pii/
+**/testdata/*real*.*
+pii-export*.*
+
+# ---- OS ----
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ---- WorkBuddy 项目数据（非临时缓存，保留） ----
+# .workbuddy/ 目录本身不忽略
