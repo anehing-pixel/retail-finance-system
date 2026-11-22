@@ -31,6 +31,12 @@ retail:
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
     secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+  contract:
+    # C-08：法定书面文件模板可配（签订前必须交付留痕的类型清单）+ 冷静期 8 日占位；
+    # 口径变更走配置不改代码（P-12）。只做交付留痕与状态记录，不实现效力判断
+    required-doc-types: ${RETAIL_CONTRACT_REQUIRED_DOC_TYPES:PRE_CONTRACT_STATEMENT,CONTRACT_DOCUMENT}
+    cooling-off-enabled: ${RETAIL_CONTRACT_COOLING_OFF_ENABLED:true}
+    cooling-off-days: ${RETAIL_CONTRACT_COOLING_OFF_DAYS:8}
   clients:
     # Feign 门禁双模 URI（R09 §7.2）：空串回退 lb://，本地无注册中心用环境变量直连
     contract:
