@@ -9,8 +9,10 @@ import com.company.retail.titlerelease.domain.ReleaseOrder;
 import com.company.retail.titlerelease.domain.ReleaseOrderStatus;
 import com.company.retail.titlerelease.domain.TitleRetention;
 import com.company.retail.titlerelease.domain.TitleRetentionStatus;
+import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
 import com.company.retail.titlerelease.persistence.JdbcReleaseOrderRepository;
 import com.company.retail.titlerelease.persistence.JdbcTitleRepository;
+import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,15 +42,21 @@ public class TitleReleaseApplicationService {
 
     private final JdbcTitleRepository titleRepository;
     private final JdbcReleaseOrderRepository orderRepository;
+    private final JdbcAttachmentRepository attachmentRepository;
+    private final LocalStorageAttachmentStorage attachmentStorage;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
 
     public TitleReleaseApplicationService(JdbcTitleRepository titleRepository,
                                           JdbcReleaseOrderRepository orderRepository,
+                                          JdbcAttachmentRepository attachmentRepository,
+                                          LocalStorageAttachmentStorage attachmentStorage,
                                           OutboxPublisher outbox,
                                           ObjectMapperHolder mapperHolder) {
         this.titleRepository = titleRepository;
         this.orderRepository = orderRepository;
+        this.attachmentRepository = attachmentRepository;
+        this.attachmentStorage = attachmentStorage;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
     }
@@ -198,6 +206,10 @@ public class TitleReleaseApplicationService {
         order.issueDocuments(); // 文件出具 ≠ 解押完成（不改保留状态，两态分离）
         updateOrderStatus(order);
 
+        // W9-C：解押文件落本地存储并登记 core.attachments（ADR-RF-008）——
+        // 出具时点生成文件本体；已有 attachmentId（人工上传路径）不覆盖。
+        storeReleaseDocuments(releaseOrderId, docs, traceId);
+
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("releaseOrderId", releaseOrderId);
         payload.put("loanId", order.loanId());
@@ -206,6 +218,62 @@ public class TitleReleaseApplicationService {
         outbox.publish(OutboxPublisher.RELEASE_DOCUMENTS_ISSUED, String.valueOf(releaseOrderId),
                 mapperHolder.writeJson(payload));
         return reloadView(releaseOrderId);
+    }
+
+    // ---------- W9-C：解押文件本体落本地存储 + core.attachments 登记 ----------
+
+    /**
+     * 出具时点把每份解押文件写入本地存储（ADR-RF-008，{@code retail.attachments.base-dir}）
+     * 并登记 {@code core.attachments}（biz_type=biz_id=release_order 关联），
+     * 回填 release_documents.attachment_id——W6 缺口收口：引用位落到实体附件。
+     *
+     * <p>幂等：已登记（attachmentId 非空）的文件不重复生成/覆盖。
+     * 文件内容为文本版解押凭证（阶段实现），只含订单/债权标识与状态，不含客户 PII。</p>
+     */
+    private void storeReleaseDocuments(long releaseOrderId,
+                                       List<JdbcReleaseOrderRepository.DocumentRow> docs,
+                                       String traceId) {
+        for (JdbcReleaseOrderRepository.DocumentRow doc : docs) {
+            if (doc.attachmentId() != null) {
+                continue;
+            }
+            byte[] content = renderReleaseDocument(releaseOrderId, doc, traceId);
+            String objectKey = LocalStorageAttachmentStorage.buildObjectKey(
+                    "release-order", String.valueOf(releaseOrderId), doc.docType(), ".txt");
+            String sha256 = attachmentStorage.put(objectKey, content);
+            long attachmentId = attachmentRepository.insert("release_order",
+                    String.valueOf(releaseOrderId), objectKey, sha256, content.length,
+                    uploadedBy(), traceId);
+            orderRepository.attachDocument(doc.documentId(), attachmentId);
+            log.info("解押文件已落本地存储 orderId={} docType={} attachmentId={} sha256={}",
+                    releaseOrderId, doc.docType(), attachmentId, sha256);
+        }
+    }
+
+    /** 文本版解押文件渲染（不含客户 PII：只有订单/债权标识、状态、交付留痕）。 */
+    private static byte[] renderReleaseDocument(long releaseOrderId,
+                                                JdbcReleaseOrderRepository.DocumentRow doc,
+                                                String traceId) {
+        String body = "RELEASE DOCUMENT\n"
+                + "docType=" + doc.docType() + "\n"
+                + "releaseOrderId=" + releaseOrderId + "\n"
+                + "documentId=" + doc.documentId() + "\n"
+                + "status=DOCUMENTS_ISSUED\n"
+                + "deliveredTo=" + doc.deliveredTo() + "\n"
+                + "issuedAt=" + (doc.issuedAt() == null ? "" : doc.issuedAt().toInstant().toString()) + "\n"
+                + "traceId=" + traceId + "\n";
+        return body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** 审计 actor 取验签身份（B-9 同构；无请求上下文按 SYSTEM）。 */
+    private static String uploadedBy() {
+        var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return "SYSTEM";
+        }
+        Object subject = attrs.getAttribute("authSubject",
+                org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST);
+        return subject == null || String.valueOf(subject).isBlank() ? "SYSTEM" : String.valueOf(subject);
     }
 
     // ---------- 第 5 步：外部提交（POST /api/release-orders/{id}/external-submission） ----------

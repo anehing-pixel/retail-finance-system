@@ -39,3 +39,8 @@ retail:
       url: ${RETAIL_CLIENTS_CUSTOMER_URL:}
     underwriting:
       url: ${RETAIL_CLIENTS_UNDERWRITING_URL:}
+  attachments:
+    # 附件本地文件系统存储（ADR-RF-008：只用本地实现，不引入 S3/MinIO）
+    base-dir: ${RETAIL_ATTACHMENTS_BASE_DIR:data/attachments}
+    max-size-bytes: ${RETAIL_ATTACHMENTS_MAX_SIZE_BYTES:10485760}
+    token-secret: ${RETAIL_ATTACHMENTS_TOKEN_SECRET:dev-only-local-attachment-token}

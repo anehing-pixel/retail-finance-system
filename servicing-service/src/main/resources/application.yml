@@ -39,3 +39,8 @@ retail:
       url: ${RETAIL_CLIENTS_CUSTOMER_URL:}
     underwriting:
       url: ${RETAIL_CLIENTS_UNDERWRITING_URL:}
+  jobs:
+    # 日批调度开关（W9-C；retail.jobs.* 统一命名，与 retail-core 同风格）
+    schedule-enabled: ${RETAIL_JOBS_SCHEDULE_ENABLED:false}
+    schedule-cron: ${RETAIL_JOBS_SCHEDULE_CRON:0 30 3 * * *}
+    stale-minutes: ${RETAIL_JOBS_STALE_MINUTES:30}
