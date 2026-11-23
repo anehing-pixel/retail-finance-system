@@ -2,6 +2,7 @@ package com.company.retail.core.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.core.application.statemachine.LoanTransitionService;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.domain.PaymentAllocationPlanner;
 import com.company.retail.core.domain.ScheduleItemStatus;
@@ -36,19 +37,23 @@ public class PaymentTxExecutor {
     private final ReconciliationApplicationService reconciliation;
     private final OutboxPublisher outbox;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
+    /** 债权状态迁移入口（Spring StateMachine 引擎驱动；领域为状态图唯一事实源）。 */
+    private final LoanTransitionService loanTransitions;
 
     public PaymentTxExecutor(LoanRepository loanRepository,
                              RepaymentPlanRepository planRepository,
                              PaymentRepository paymentRepository,
                              ReconciliationApplicationService reconciliation,
                              OutboxPublisher outbox,
-                             DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
+                             DisbursementTxExecutor.ObjectMapperHolder mapperHolder,
+                             LoanTransitionService loanTransitions) {
         this.loanRepository = loanRepository;
         this.planRepository = planRepository;
         this.paymentRepository = paymentRepository;
         this.reconciliation = reconciliation;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
+        this.loanTransitions = loanTransitions;
     }
 
     /**
@@ -106,7 +111,8 @@ public class PaymentTxExecutor {
         long totalAllocated = plan.feePart() + plan.interestTotal() + plan.principalTotal();
         loan.applyAllocation(totalAllocated);
         if (loan.status() == com.company.retail.core.domain.LoanStatus.DELINQUENT) {
-            loan.cureFromDelinquent();
+            // 引擎迁移：DELINQUENT → ACTIVE（入金补救）
+            loanTransitions.cure(loan);
         }
 
         // ⑥ 核销记录（uk_alloc_payment 一笔入金只核销一次）

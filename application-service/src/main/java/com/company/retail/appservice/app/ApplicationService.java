@@ -55,7 +55,7 @@ public class ApplicationService {
      * 提交申请（受理，R05 §4 G1）：
      * ① 幂等（同键同指纹=重放返回首次结果；同键异指纹=RF_CONFLICT_001）
      * ② 领域提交守卫
-     * ③ 分布式锁串行化同客户同 VIN 的并发受理（ADR-RF-013）
+     * ③ 分布式锁串行化同客户同 VIN 的并发受理（ADR-RF-015）
      * ④ 锁内重查去重窗口（RF_APP_001）→ 落库 + 发事件同一本地事务。
      */
     @Transactional
@@ -79,7 +79,7 @@ public class ApplicationService {
         Application agg = Application.submit(cmd.customerId(), cmd.dealerPartnerId(),
                 cmd.transactionScheme(), cmd.channel(), cmd.consentId(), cmd.vehicle(), Instant.now());
 
-        // ③ 并发窗口：分布式锁（ADR-RF-013）——同客户同 VIN 的并发受理串行化。
+        // ③ 并发窗口：分布式锁（ADR-RF-015）——同客户同 VIN 的并发受理串行化。
         //    锁在事务提交后释放（RedissonLockManager 的 afterCompletion），锁内重查去重窗口。
         return locks.callWithLock(
                 LockKeys.applicationDedup(cmd.customerId(), cmd.vehicle().vin()), lockWait,
@@ -90,7 +90,7 @@ public class ApplicationService {
      * 锁内受理：重复申请去重 → 落库 → 发事件（受理写入与事件发布同一本地事务）。
      *
      * <p>去重查询必须在拿到锁之后重做：锁外的查询看不到并发请求刚提交的申请，
-     * 这正是「先查后插」竞态的成因（ADR-RF-013）。</p>
+     * 这正是「先查后插」竞态的成因（ADR-RF-015）。</p>
      */
     private Result submitUnderLock(Application agg, SubmitCommand cmd, String idempotencyKey,
                                     String requestFingerprint, String traceId) {

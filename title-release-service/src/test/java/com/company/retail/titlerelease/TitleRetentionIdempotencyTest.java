@@ -4,8 +4,12 @@ import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.EventPayloadGuard;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.common.lock.InProcessLockManager;
+import com.company.retail.statemachine.StateMachineFactories;
 import com.company.retail.titlerelease.application.TitleReleaseApplicationService;
 import com.company.retail.titlerelease.application.TitleRepositoryPort;
+import com.company.retail.titlerelease.application.statemachine.ReleaseOrderStateMachineConfigurer;
+import com.company.retail.titlerelease.application.statemachine.ReleaseTransitionService;
+import com.company.retail.titlerelease.application.statemachine.TitleRetentionStateMachineConfigurer;
 import com.company.retail.titlerelease.persistence.AttachmentRepository;
 import com.company.retail.titlerelease.persistence.ReleaseOrderRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
@@ -144,8 +148,20 @@ class TitleRetentionIdempotencyTest {
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
-                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-013）
+                releaseTransitions(),
+                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-015）
                 3000L);
+    }
+
+    /** 测试用状态机装配（与生产同款引擎配置，仅工厂在测试内构建）。 */
+    private static ReleaseTransitionService releaseTransitions() {
+        try {
+            return new ReleaseTransitionService(
+                    StateMachineFactories.create(new ReleaseOrderStateMachineConfigurer()),
+                    StateMachineFactories.create(new TitleRetentionStateMachineConfigurer()));
+        } catch (Exception e) {
+            throw new IllegalStateException("测试用状态机装配失败", e);
+        }
     }
 
     // ---------- 用例 ----------

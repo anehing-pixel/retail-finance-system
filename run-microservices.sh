@@ -42,11 +42,11 @@ command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 
 DB_CONTAINER=retail-finance-db
-# 分布式锁专用 Redis 容器（ADR-RF-013）：与缓存/限流用的 retail-finance-redis（6382）分端口分容器名
+# 分布式锁专用 Redis 容器（ADR-RF-015）：与缓存/限流用的 retail-finance-redis（6382）分端口分容器名
 LOCK_REDIS_CONTAINER=retail-finance-lock-redis
 REDIS_CONTAINER=retail-finance-redis
 export RETAIL_CUSTOMER_DEV_LOGIN="${RETAIL_CUSTOMER_DEV_LOGIN:-true}"   # 冒烟要用客户开发桥；生产默认 false
-# 分布式锁（ADR-RF-013）：Redis 地址注入给 application/title-release/external-api 三个服务
+# 分布式锁（ADR-RF-015）：Redis 地址注入给 application/title-release/external-api 三个服务
 export RETAIL_LOCK_REDIS_ADDRESS="${RETAIL_LOCK_REDIS_ADDRESS:-redis://127.0.0.1:6381}"
 # Redis 连接参数（W-CACHE / W-RL 引入）：L2 分布式缓存 + 网关令牌桶共用同一实例
 export REDIS_HOST="${REDIS_HOST:-localhost}"
@@ -102,7 +102,7 @@ ensure_redis() {
   echo "[错误] Redis 30s 未就绪"; return 1
 }
 
-# Redis（分布式锁依赖，ADR-RF-013）：独立容器 + 独立端口（6381），
+# Redis（分布式锁依赖，ADR-RF-015）：独立容器 + 独立端口（6381），
 # 与缓存/限流 Redis（6382）互不影响；锁不可达即 fail-closed 拒绝写（绝不进临界区）。
 ensure_lock_redis() {
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$LOCK_REDIS_CONTAINER"; then
@@ -288,6 +288,11 @@ case "${1:-}" in
     if [ $RC -eq 0 ]; then
       echo "=== 前端页面冒烟（经 18082 代理走真实链路）==="
       "$PYTHON" frontend/smoke_frontend.py
+      RC=$?
+    fi
+    if [ $RC -eq 0 ]; then
+      echo "=== MQ 通道冒烟（默认关闭 = 零回归；开启态见 MqEnvelopeLiveTest）==="
+      SMOKE_GATEWAY=http://127.0.0.1:18081 DB_CONTAINER=$DB_CONTAINER "$PYTHON" scripts/smoke_mq.py
       RC=$?
     fi
     echo "=== 冒烟退出码: $RC ==="

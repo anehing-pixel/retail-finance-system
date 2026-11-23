@@ -46,4 +46,15 @@ public enum LoanStatus {
     public boolean canTransitionTo(LoanStatus target) {
         return ALLOWED.get(this).contains(target);
     }
+
+    /**
+     * 领域状态图（<b>唯一事实源</b>）：状态 → 允许迁移到的后继状态集合。
+     *
+     * <p>供 Spring StateMachine 引擎生成迁移边——引擎侧不再另写一份状态图，
+     * 因此不存在「两份图漂移」的可能。本方法只暴露既有迁移表，<b>零 Spring 依赖</b>
+     * （domain 层纪律：零 Spring 注解、纯 JUnit 可跑）。</p>
+     */
+    public static Map<LoanStatus, Set<LoanStatus>> graph() {
+        return ALLOWED;
+    }
 }

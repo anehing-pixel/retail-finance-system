@@ -45,4 +45,14 @@ public enum ReleaseOrderStatus {
     public boolean canTransitionTo(ReleaseOrderStatus target) {
         return ALLOWED.get(this).contains(target);
     }
+
+    /**
+     * 领域状态图（<b>唯一事实源</b>）：状态 → 允许迁移到的后继状态集合。
+     *
+     * <p>供 Spring StateMachine 引擎生成迁移边（引擎侧不另写一份状态图）；
+     * 零 Spring 依赖，domain 层纪律不变。</p>
+     */
+    public static Map<ReleaseOrderStatus, Set<ReleaseOrderStatus>> graph() {
+        return ALLOWED;
+    }
 }

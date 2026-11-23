@@ -2,6 +2,7 @@ package com.company.retail.core.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.core.application.statemachine.LoanTransitionService;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.domain.ScheduleItemStatus;
 import com.company.retail.core.domain.SettlementCalculator;
@@ -42,6 +43,8 @@ public class SettlementTxExecutor {
     private final ReconciliationApplicationService reconciliation;
     private final OutboxPublisher outbox;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
+    /** 债权状态迁移入口（Spring StateMachine 引擎驱动；领域为状态图唯一事实源）。 */
+    private final LoanTransitionService loanTransitions;
 
     public SettlementTxExecutor(LoanRepository loanRepository,
                                 RepaymentPlanRepository planRepository,
@@ -49,7 +52,8 @@ public class SettlementTxExecutor {
                                 SettlementAdjustmentRepository adjustmentRepository,
                                 ReconciliationApplicationService reconciliation,
                                 OutboxPublisher outbox,
-                                DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
+                                DisbursementTxExecutor.ObjectMapperHolder mapperHolder,
+                                LoanTransitionService loanTransitions) {
         this.loanRepository = loanRepository;
         this.planRepository = planRepository;
         this.paymentRepository = paymentRepository;
@@ -57,6 +61,7 @@ public class SettlementTxExecutor {
         this.reconciliation = reconciliation;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
+        this.loanTransitions = loanTransitions;
     }
 
     @Transactional
@@ -75,7 +80,8 @@ public class SettlementTxExecutor {
             assertNoUnpaidItems(request.loanId());
             loan.assertSettlementAllowed();
             quote = 0;
-            loan.settle(false, settledAt);
+            // 引擎迁移：ACTIVE / DELINQUENT → SETTLED（B-7 终态之一）
+            loanTransitions.settle(loan, false, settledAt);
         } else {
             // 提前结清（C-10）：剩余本金 − 减免额 + 手续费
             List<RepaymentPlanRepository.ItemRow> unpaidRows = loadUnpaidRows(request.loanId());
@@ -98,7 +104,8 @@ public class SettlementTxExecutor {
             loan.applyWaiver(closure.waivedTotal());
             loan.recordSettlementTerms(request.waiverAmount(), request.settlementFee());
             loan.assertSettlementAllowed();
-            loan.settle(true, settledAt);
+            // 引擎迁移：ACTIVE / DELINQUENT → EARLY_SETTLED（B-7 终态之一，与 SETTLED 不可合并）
+            loanTransitions.settle(loan, true, settledAt);
 
             // ④ 结清入金（uk_payment_account_txn：account_ref=SETTLEMENT + transaction_id=STL-<loanId> 唯一）
             long paymentId;

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Redisson 分布式锁适配器（ADR-RF-013）。
+ * Redisson 分布式锁适配器（ADR-RF-015）。
  *
  * <p><b>fail-closed</b>：Redis 不可达 → 抛 {@code RF_LOCK_002}（503）拒绝写；
  * 等待超时（并发冲突）→ 抛 {@code RF_LOCK_001}（409）。两者都<b>不降级放行</b>——

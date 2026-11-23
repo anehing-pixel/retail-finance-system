@@ -16,6 +16,8 @@
     <module>application</module>
     <module>infrastructure</module>
     <module>common</module>
+    <!-- 状态机引擎底座（Spring StateMachine；领域为状态图唯一事实源） -->
+    <module>statemachine</module>
     <!-- 10 个业务服务（端口 8090–8099） -->
     <module>retail-core</module>
     <module>auth-service</module>
@@ -44,8 +46,15 @@
     <platform-contracts.version>1.0.0-SNAPSHOT</platform-contracts.version>
     <!-- 持久层：MyBatis（Spring Boot 3.2 兼容线 3.0.x） -->
     <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
-    <!-- 分布式锁：Redisson（ADR-RF-012；锁服务不可用即 fail-closed 拒绝写） -->
+    <!-- 分布式锁：Redisson（ADR-RF-015；锁服务不可用即 fail-closed 拒绝写） -->
     <redisson.version>3.27.2</redisson.version>
+    <!-- 状态机引擎：4.0.0 是唯一与本仓 Spring Framework 6.1.x 兼容的版本
+         （4.0.1/4.0.2 基于 Spring 6.2.x 会与本仓 BOM 打架；3.x 线是 Spring 5.3 老线） -->
+    <spring-statemachine.version>4.0.0</spring-statemachine.version>
+    <!-- MQ：RocketMQ 客户端（ADR-RF-014）。只用 rocketmq-client，不引 rocketmq-spring-boot-starter
+         —— 后者在 Boot 3.2 组合下的自动装配与本仓「精确装配」纪律不咬合；
+         生产者/消费者生命周期由 infrastructure 自管，依赖面最小。 -->
+    <rocketmq-client.version>5.0.0</rocketmq-client.version>
     <jjwt.version>0.12.5</jjwt.version>
     <!-- 缓存与限流基础设施：Redis（分布式缓存 L2 + 令牌桶）+ Caffeine（本地缓存 L1）。
          版本随 Boot BOM；此处显式登记便于审计。边界与被拒方案见 docs/adr/ADR-RF-012。 -->
@@ -96,11 +105,23 @@
         <artifactId>mybatis-spring-boot-starter</artifactId>
         <version>${mybatis-spring-boot.version}</version>
       </dependency>
-      <!-- 分布式锁客户端（ADR-RF-012）：版本与 Spring Boot 3.2.5 的 Netty 线对齐 -->
+      <!-- 分布式锁客户端（ADR-RF-015）：版本与 Spring Boot 3.2.5 的 Netty 线对齐 -->
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
         <version>${redisson.version}</version>
+      </dependency>
+      <!-- 状态机引擎（进程内引擎底座，不引外部中间件） -->
+      <dependency>
+        <groupId>org.springframework.statemachine</groupId>
+        <artifactId>spring-statemachine-core</artifactId>
+        <version>${spring-statemachine.version}</version>
+      </dependency>
+      <!-- MQ：RocketMQ 客户端（ADR-RF-014） -->
+      <dependency>
+        <groupId>org.apache.rocketmq</groupId>
+        <artifactId>rocketmq-client</artifactId>
+        <version>${rocketmq-client.version}</version>
       </dependency>
       <dependency>
         <groupId>io.jsonwebtoken</groupId>

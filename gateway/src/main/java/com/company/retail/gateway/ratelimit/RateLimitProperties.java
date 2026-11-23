@@ -27,6 +27,16 @@ public class RateLimitProperties {
     /** Redis 键前缀。 */
     private String keyPrefix = "rf:rl:";
 
+    /**
+     * 可信代理网段（逗号分隔的 CIDR）。
+     *
+     * <p><b>为空 = 不采信任何转发头</b>（默认行为，与上线前一致）：此时客户端 IP 取 TCP 直连地址。
+     * 生产在网关前置边缘代理（如 {@code nginx/} 目录的可选形态）时，
+     * 填入代理网段后才采信 {@code X-Forwarded-For}——否则所有调用方会被算成同一个 IP。
+     * 安全口径：直连来源不在可信网段内时<b>一律忽略</b>转发头，防止「换一个头就重置限流」。</p>
+     */
+    private String trustedProxyCidrs = "";
+
     /** 规则列表；命中最具体（pattern 最长）的一条。 */
     private List<Rule> rules = new ArrayList<>();
 
@@ -60,6 +70,14 @@ public class RateLimitProperties {
 
     public void setKeyPrefix(String keyPrefix) {
         this.keyPrefix = keyPrefix;
+    }
+
+    public String getTrustedProxyCidrs() {
+        return trustedProxyCidrs;
+    }
+
+    public void setTrustedProxyCidrs(String trustedProxyCidrs) {
+        this.trustedProxyCidrs = trustedProxyCidrs == null ? "" : trustedProxyCidrs;
     }
 
     public List<Rule> getRules() {

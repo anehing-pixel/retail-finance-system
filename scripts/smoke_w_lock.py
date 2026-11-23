@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """W-LOCK 分布式锁专项冒烟（真实 Redis + 真实 PG，全走网关 18081）。
 
-对应 ADR-RF-013 / R10 I 组断言：
-  A37 并发同客户同车进件 -> 只受理一条（库内 1 行、事件 1 条）
-  A38 同幂等键并发 -> 后到者重放返回首次结果（库内 1 行）
-  A39 Redis 不可达 -> fail-closed 拒绝写（503 / RF_LOCK_002），不落库；恢复后可写
-  A40 同一业务回执重复投递（外部方换 nonce 重推）-> 幂等（库内 1 行、事件 1 条）
+对应 ADR-RF-015 / R10 J 组断言：
+  A39 并发同客户同车进件 -> 只受理一条（库内 1 行、事件 1 条）
+  A40 同幂等键并发 -> 后到者重放返回首次结果（库内 1 行）
+  A41 Redis 不可达 -> fail-closed 拒绝写（503 / RF_LOCK_002），不落库；恢复后可写
+  A42 同一业务回执重复投递（外部方换 nonce 重推）-> 幂等（库内 1 行、事件 1 条）
 
 环境变量：
   SMOKE_GATEWAY（默认 http://127.0.0.1:18081）
@@ -187,7 +187,7 @@ def app_body(vin):
             "cashPrice": CASH, "accessoriesAmount": 0}
 
 
-# ---------- A. 并发进件去重（A37 / A38）----------
+# ---------- A. 并发进件去重（A39 / A40）----------
 N = 5
 
 
@@ -202,24 +202,24 @@ with ThreadPoolExecutor(max_workers=N) as pool:
 ok_codes = [r for r in results if r[0] == 200]
 conflict_codes = [r for r in results if r[0] == 409]
 winner = ok_codes[0] if ok_codes else None
-check("A37 并发 {} 条同客户同车进件 -> 恰好受理 1 条".format(N),
+check("A39 并发 {} 条同客户同车进件 -> 恰好受理 1 条".format(N),
       len(ok_codes) == 1 and len(conflict_codes) == N - 1,
       "codes={}".format([r[0] for r in results]))
-check("A37 其余并发请求被 RF_APP_001 拒绝（去重窗口）",
+check("A39 其余并发请求被 RF_APP_001 拒绝（去重窗口）",
       all("RF_APP_001" in r[2] for r in conflict_codes),
       "texts={}".format([r[2][:120] for r in conflict_codes[:2]]))
 app_id = (winner[1] or {}).get("applicationId") if winner else None
-check("A37 受理工单带 applicationId 与申请编号",
+check("A39 受理工单带 applicationId 与申请编号",
       bool(app_id) and bool((winner[1] or {}).get("applicationNo")) if winner else False,
       "winner={}".format(str(winner[1])[:160] if winner else "none"))
 row_n = psql("SELECT count(*) FROM core.applications a "
              "JOIN core.application_items i ON i.application_id = a.application_id "
              "WHERE a.customer_id={} AND i.vin='{}'".format(customer_id, VIN))
-check("A37 库内该客户该车申请行数 = 1", row_n == "1", "rows={}".format(row_n))
+check("A39 库内该客户该车申请行数 = 1", row_n == "1", "rows={}".format(row_n))
 ev_n = count_event("APPLICATION_SUBMITTED", str(app_id)) if app_id else -1
-check("A37 APPLICATION_SUBMITTED 事件数 = 1（不重复发事件）", ev_n == 1, "events={}".format(ev_n))
+check("A39 APPLICATION_SUBMITTED 事件数 = 1（不重复发事件）", ev_n == 1, "events={}".format(ev_n))
 
-# 同幂等键并发 -> 重放（A38）
+# 同幂等键并发 -> 重放（A40）
 same_key = TAG + "-same-key"
 with ThreadPoolExecutor(max_workers=2) as pool:
     futures = [pool.submit(submit_once, i, VIN2, same_key) for i in range(2)]
@@ -227,23 +227,23 @@ with ThreadPoolExecutor(max_workers=2) as pool:
 same_ok = [r for r in same_results if r[0] == 200]
 ids = set((r[1] or {}).get("applicationId") for r in same_ok)
 replayed = [r for r in same_ok if (r[1] or {}).get("replayed") is True]
-check("A38 同幂等键并发 -> 都返回 200 且同一申请号", len(same_ok) == 2 and len(ids) == 1,
+check("A40 同幂等键并发 -> 都返回 200 且同一申请号", len(same_ok) == 2 and len(ids) == 1,
       "codes={} ids={}".format([r[0] for r in same_results], ids))
-check("A38 后到者标记 replayed=true（重放不重复受理）", len(replayed) >= 1,
+check("A40 后到者标记 replayed=true（重放不重复受理）", len(replayed) >= 1,
       "replayed={}".format(len(replayed)))
 row_n2 = psql("SELECT count(*) FROM core.applications WHERE idempotency_key='{}'".format(same_key))
-check("A38 同幂等键库内行数 = 1", row_n2 == "1", "rows={}".format(row_n2))
+check("A40 同幂等键库内行数 = 1", row_n2 == "1", "rows={}".format(row_n2))
 
-# ---------- B. 锁不可用 fail-closed（A39）----------
+# ---------- B. 锁不可用 fail-closed（A41）----------
 docker("stop", LOCK_REDIS)
 time.sleep(1)
 VIN3 = "LOCKVIN3-" + TAG
 code, data, text = api("POST", "/api/applications", app_body(VIN3), token=staff_token,
                        idem=TAG + "-redis-down", timeout=60)
-check("A39 Redis 不可达 -> 503 RF_LOCK_002（fail-closed 拒写）",
+check("A41 Redis 不可达 -> 503 RF_LOCK_002（fail-closed 拒写）",
       code == 503 and "RF_LOCK_002" in text, "HTTP {} {}".format(code, text[:200]))
 row_n3 = psql("SELECT count(*) FROM core.application_items WHERE vin='{}'".format(VIN3))
-check("A39 拒写期间未落库（行数 = 0）", row_n3 == "0", "rows={}".format(row_n3))
+check("A41 拒写期间未落库（行数 = 0）", row_n3 == "0", "rows={}".format(row_n3))
 docker("start", LOCK_REDIS)
 for _ in range(30):
     if docker("exec", LOCK_REDIS, "redis-cli", "ping").stdout.strip() == "PONG":
@@ -259,10 +259,10 @@ for attempt in range(6):
     if code == 200:
         break
     time.sleep(5)
-check("A39 Redis 恢复后写路径恢复（200）", code == 200,
+check("A41 Redis 恢复后写路径恢复（200）", code == 200,
       "HTTP {} {}".format(code, text[:200]))
 
-# ---------- C. 回执幂等（A40）----------
+# ---------- C. 回执幂等（A42）----------
 LOAN_ID = 990000 + (TS % 1000)
 code, data, text = api("POST", "/api/title-retentions",
                        {"loanId": LOAN_ID, "vin": "LOCK-TITLE-" + TAG, "contractualOnly": False},
@@ -289,19 +289,19 @@ if order_id:
     code, data, text = api("POST", "/api/release-orders/{}/receipts".format(order_id),
                            {"authority": "EXTERNAL_REGISTRY", "receiptRef": receipt_ref,
                             "verifiedBy": "admin", "rawRef": "raw-1-" + TAG}, token=staff_token)
-    check("A40 首次外部回执登记成功（订单闭环）",
+    check("A42 首次外部回执登记成功（订单闭环）",
           code == 200 and (data or {}).get("status") == "CLOSED",
           "HTTP {} {}".format(code, text[:200]))
     code2, data2, text2 = api("POST", "/api/release-orders/{}/receipts".format(order_id),
                               {"authority": "EXTERNAL_REGISTRY", "receiptRef": receipt_ref,
                                "verifiedBy": "admin", "rawRef": "raw-2-" + TAG}, token=staff_token)
-    check("A40 同一业务回执重复投递 -> 幂等返回（不报错）", code2 == 200,
+    check("A42 同一业务回执重复投递 -> 幂等返回（不报错）", code2 == 200,
           "HTTP {} {}".format(code2, text2[:200]))
     r_n = psql("SELECT count(*) FROM core.registration_receipts "
                "WHERE release_order_id={}".format(order_id))
-    check("A40 库内回执行数 = 1（不重复落库）", r_n == "1", "rows={}".format(r_n))
+    check("A42 库内回执行数 = 1（不重复落库）", r_n == "1", "rows={}".format(r_n))
     ev2 = count_event("TITLE_RELEASE_REGISTERED", str(order_id))
-    check("A40 TITLE_RELEASE_REGISTERED 事件数 = 1（不重复发事件）", ev2 == 1,
+    check("A42 TITLE_RELEASE_REGISTERED 事件数 = 1（不重复发事件）", ev2 == 1,
           "events={}".format(ev2))
 
     # DMZ 入站：外部方换 nonce 重推同一业务回执
@@ -321,13 +321,13 @@ if order_id:
                     "X-Signature": signature}, body_text.encode(), timeout=60)
 
     dcode, dtext = dmz_push("a", "raw-dmz-1-" + TAG)
-    check("A40 DMZ 入站首次回执回调受理", dcode == 200, "HTTP {} {}".format(dcode, dtext[:200]))
+    check("A42 DMZ 入站首次回执回调受理", dcode == 200, "HTTP {} {}".format(dcode, dtext[:200]))
     dcode2, dtext2 = dmz_push("b", "raw-dmz-2-" + TAG)
-    check("A40 DMZ 换 nonce 重推同一回执 -> 幂等（200）", dcode2 == 200,
+    check("A42 DMZ 换 nonce 重推同一回执 -> 幂等（200）", dcode2 == 200,
           "HTTP {} {}".format(dcode2, dtext2[:200]))
     r_n2 = psql("SELECT count(*) FROM core.registration_receipts "
                 "WHERE release_order_id={}".format(order_id))
-    check("A40 DMZ 重推后库内回执行数仍 = 1", r_n2 == "1", "rows={}".format(r_n2))
+    check("A42 DMZ 重推后库内回执行数仍 = 1", r_n2 == "1", "rows={}".format(r_n2))
 
 print("")
 print("=" * 60)

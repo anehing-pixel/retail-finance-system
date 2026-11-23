@@ -79,7 +79,7 @@ public class ApplicationRepository {
         return rows.isEmpty() ? Optional.empty() : Optional.of(toAggregate(rows.get(0)));
     }
 
-    /** 按幂等键读请求指纹（并发同键冲突时判定「重放」还是「冲突」，ADR-RF-013）。 */
+    /** 按幂等键读请求指纹（并发同键冲突时判定「重放」还是「冲突」，ADR-RF-015）。 */
     public Optional<String> findFingerprintByIdempotencyKey(String idempotencyKey) {
         List<Map<String, Object>> rows = mapper.findFingerprintByIdempotencyKey(idempotencyKey);
         return rows.isEmpty() ? Optional.empty()

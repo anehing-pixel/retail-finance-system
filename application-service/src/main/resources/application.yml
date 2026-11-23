@@ -37,7 +37,7 @@ retail:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
     secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
   lock:
-    # 分布式锁（ADR-RF-013）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
+    # 分布式锁（ADR-RF-015）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
     redis:
       address: ${RETAIL_LOCK_REDIS_ADDRESS:redis://127.0.0.1:6381}
       connect-timeout-ms: ${RETAIL_LOCK_CONNECT_TIMEOUT_MS:3000}

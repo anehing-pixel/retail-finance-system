@@ -3,7 +3,11 @@ package com.company.retail.titlerelease;
 import com.company.retail.common.contract.EventPayloadGuard;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.common.lock.InProcessLockManager;
+import com.company.retail.statemachine.StateMachineFactories;
 import com.company.retail.titlerelease.application.TitleReleaseApplicationService;
+import com.company.retail.titlerelease.application.statemachine.ReleaseOrderStateMachineConfigurer;
+import com.company.retail.titlerelease.application.statemachine.ReleaseTransitionService;
+import com.company.retail.titlerelease.application.statemachine.TitleRetentionStateMachineConfigurer;
 import com.company.retail.titlerelease.application.TitleRepositoryPort;
 import com.company.retail.titlerelease.mapper.ReleaseOrderMapper;
 import com.company.retail.titlerelease.persistence.AttachmentRepository;
@@ -36,8 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ② 同一回执重复登记（外部方换 nonce 重推）→ 幂等返回，不重复落库、不重复推进状态、
  * 不重复发事件；③ 并发投递同一回执 → 只落一条回执、只发一次事件。</p>
  *
- * <p>幂等三道闸（ADR-RF-013）：分布式锁（串行化）→ 锁内重查既有回执 →
- * {@code uk_receipt_order_authority_ref} 唯一索引（最终权威，ON CONFLICT DO NOTHING）。</p>
+ * <p>幂等两道闸（ADR-RF-013）：写入前查既有回执（快路径）→
+ * {@code uk_receipt_order_authority_ref} 唯一索引（最终权威，ON CONFLICT DO NOTHING）。
+ * <b>不引入分布式锁</b>——唯一索引才是正确性来源。</p>
  */
 class RegistryReceiptIdempotencyTest {
 
@@ -123,8 +128,12 @@ class RegistryReceiptIdempotencyTest {
             return List.of();
         }
 
+        /**
+         * 模拟 PostgreSQL 唯一索引的<b>原子</b>冲突判定：synchronized 保证
+         * 「检查 + 写入」不可分割——真实库由唯一索引保证同一语义。
+         */
         @Override
-        public int insertReceipt(Map<String, Object> params) {
+        public synchronized int insertReceipt(Map<String, Object> params) {
             long orderId = ((Number) params.get("releaseOrderId")).longValue();
             String authority = String.valueOf(params.get("authority"));
             String ref = params.get("receiptRef") == null ? "" : String.valueOf(params.get("receiptRef"));
@@ -249,8 +258,20 @@ class RegistryReceiptIdempotencyTest {
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
-                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-013）
+                releaseTransitions(),
+                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-015）
                 3000L);
+    }
+
+    /** 测试用状态机装配（与生产同款引擎配置，仅工厂在测试内构建）。 */
+    private static ReleaseTransitionService releaseTransitions() {
+        try {
+            return new ReleaseTransitionService(
+                    StateMachineFactories.create(new ReleaseOrderStateMachineConfigurer()),
+                    StateMachineFactories.create(new TitleRetentionStateMachineConfigurer()));
+        } catch (Exception e) {
+            throw new IllegalStateException("测试用状态机装配失败", e);
+        }
     }
 
     // ---------- 用例 ----------

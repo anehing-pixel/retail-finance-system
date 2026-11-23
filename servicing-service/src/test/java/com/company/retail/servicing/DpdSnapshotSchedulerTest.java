@@ -26,8 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DpdSnapshotSchedulerTest {
 
-    private static final LocalDate BIZ_DATE = LocalDate.parse("2026-11-23");
-
     @Test
     void scheduleDisabledByDefault_noSchedulerBeans() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
@@ -58,11 +56,15 @@ class DpdSnapshotSchedulerTest {
     void claimSuccess_runsAsSystem() {
         RecordingDpdService dpdService = new RecordingDpdService();
         ScriptedGuard guard = new ScriptedGuard(true);
+        // 调度器取「当日」业务日（LocalDate.now()）：按执行前后区间断言，不把固定日期钉死
+        LocalDate dayBeforeRun = LocalDate.now();
 
         new DpdSnapshotScheduler(dpdService, guard, 30).runScheduled();
 
+        LocalDate dayAfterRun = LocalDate.now();
         assertEquals(1, dpdService.calls.get());
-        assertEquals(BIZ_DATE, dpdService.lastBizDate);
+        assertFalse(dpdService.lastBizDate.isBefore(dayBeforeRun), "业务日不应早于执行开始日");
+        assertFalse(dpdService.lastBizDate.isAfter(dayAfterRun), "业务日不应晚于执行结束日");
         // 调度上下文无请求 → actor=SYSTEM（B-9）
         assertEquals("SYSTEM", dpdService.lastActor);
         assertEquals(0, guard.finishedStatuses.size()); // 终态由 run() 自己留痕

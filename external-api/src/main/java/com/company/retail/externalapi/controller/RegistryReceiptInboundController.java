@@ -96,7 +96,7 @@ public class RegistryReceiptInboundController {
             throw new BusinessException(RFErrorCode.RF_PTNR_003,
                     Map.of("reason", "INVALID_PAYLOAD"));
         }
-        // 回调幂等（ADR-RF-013）：外部方「换 nonce 重推」同一业务回执时，DMZ 的 nonce 关
+        // 回调幂等（ADR-RF-013 / ADR-RF-015）：外部方「换 nonce 重推」同一业务回执时，DMZ 的 nonce 关
         // （只挡同一 nonce 重放）挡不住 —— 按业务键（订单 + 回执号）加分布式锁串行化转发。
         // 锁在临界区结束即释放（DMZ 无本地事务）；下游 title-release 另有回执登记锁 + 唯一索引兜底。
         return locks.callWithLock(LockKeys.dmzCallback(releaseOrderId, receiptRef), lockWait,

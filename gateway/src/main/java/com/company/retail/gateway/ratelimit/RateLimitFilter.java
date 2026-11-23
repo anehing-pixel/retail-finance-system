@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,6 +40,8 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
     private final RateLimitRuleMatcher matcher;
     private final TokenBucketLimiter limiter;
     private final ObjectMapper mapper;
+    /** 客户端 IP 解析（可信代理网段为空时不采信转发头，行为与上线前一致）。 */
+    private final ClientIpResolver clientIpResolver;
 
     public RateLimitFilter(RateLimitProperties props, RateLimitRuleMatcher matcher,
                             TokenBucketLimiter limiter, ObjectMapper mapper) {
@@ -48,6 +49,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         this.matcher = matcher;
         this.limiter = limiter;
         this.mapper = mapper;
+        this.clientIpResolver = new ClientIpResolver(props.getTrustedProxyCidrs());
     }
 
     @Override
@@ -62,7 +64,7 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         }
         String clientKey = RateLimitKeyResolver.resolve(
                 exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION),
-                remoteAddress(exchange), props.getKeyBy());
+                clientIpResolver.resolve(exchange.getRequest()), props.getKeyBy());
         String key = props.getKeyPrefix() + rule.getPath() + ":" + clientKey;
 
         return limiter.tryAcquire(key, rule.getBurstCapacity(), rule.getReplenishRate())
@@ -101,14 +103,6 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                     .getBytes(StandardCharsets.UTF_8);
         }
         return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
-    }
-
-    private static String remoteAddress(ServerWebExchange exchange) {
-        InetSocketAddress addr = exchange.getRequest().getRemoteAddress();
-        if (addr == null || addr.getAddress() == null) {
-            return null;
-        }
-        return addr.getAddress().getHostAddress();
     }
 
     @Override

@@ -82,6 +82,9 @@ retail:
       fail-open: ${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:true}
       # 限流键维度：auth_or_ip（Authorization 头哈希，退化到 IP）/ ip
       key-by: ${RETAIL_GATEWAY_RATE_LIMIT_KEY_BY:auth_or_ip}
+      # 可信代理网段（逗号分隔 CIDR）：为空 = 不采信 X-Forwarded-For（默认）；
+      # 网关前置边缘代理（nginx/ 为可选部署形态）时填入代理网段，否则调用方会被算成同一个 IP
+      trusted-proxy-cidrs: ${RETAIL_GATEWAY_RATE_LIMIT_TRUSTED_PROXY_CIDRS:}
       key-prefix: "rf:rl:"
       rules:
         # 进件类路径：收紧（防外部刷单）

@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 分布式锁机制件单测（ADR-RF-013）。
+ * 分布式锁机制件单测（ADR-RF-015）。
  *
  * <p>覆盖：锁键命名（用途分域 + 不落明文业务标识）、单进程锁的互斥与超时语义、
  * Redisson 适配器的 fail-closed 与「锁在事务提交后释放」时序。</p>

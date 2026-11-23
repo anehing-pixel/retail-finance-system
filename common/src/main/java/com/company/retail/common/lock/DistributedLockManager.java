@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 /**
- * 分布式锁端口（横切机制层，{@code common}；ADR-RF-013）。
+ * 分布式锁端口（横切机制层，{@code common}；ADR-RF-015）。
  *
  * <p><b>定位</b>：锁只负责<b>串行化并发窗口</b>，<b>不是正确性来源</b>——
  * 幂等的最终权威仍是数据库唯一索引与业务唯一键（{@code AGENTS.md} §2）。

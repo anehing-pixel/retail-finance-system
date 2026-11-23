@@ -19,7 +19,7 @@ import java.util.Map;
  * 写入后由仓储从入参 Map 的 {@code applicationId} 键读取；冲突/未插入时该键为 null
  * （等价原 RETURNING 返回空集），仓储按「未插入」处理。</p>
      *
-     * <p><b>并发口径（ADR-RF-013）</b>：同幂等键并发写由 {@code uk_app_idempotency}
+     * <p><b>并发口径（ADR-RF-015）</b>：同幂等键并发写由 {@code uk_app_idempotency}
      * 唯一索引兜底，插入走 {@code ON CONFLICT DO NOTHING}——不捕获唯一键异常，
      * 避免 PostgreSQL「唯一键错误即整笔事务 aborted」。</p>
  */
