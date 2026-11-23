@@ -11,8 +11,6 @@ target/
 # ---- IDE ----
 .idea/
 *.iml
-.vscode/*
-!.vscode/settings.json
 .classpath
 .project
 .settings/
@@ -24,8 +22,7 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
-.vscode/
-.workbuddy/
+
 # ---- 日志与运行时 ----
 logs/
 *.log
@@ -67,6 +64,8 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
-# ---- WorkBuddy 项目数据（非临时缓存，保留） ----
-# .workbuddy/ 目录本身不忽略
-
+# ---- 本地 IDE / 项目数据（不入库，本地保留） ----
+# .vscode 是 IDE 本地设置；.workbuddy 存项目记忆与工作日志（非临时缓存，不得删除物理目录）。
+# 两者均从 git 索引移除（git rm --cached），本地文件保留。
+.vscode/
+.workbuddy/
