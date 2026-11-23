@@ -320,17 +320,17 @@
 
 ## 9. 并行路线合并裁决清单（W-MERGE · 2026-11-23 · 待执行）
 
-> **状态**：**尚未合并**。4 条并行路线的分支**零提交**，工作区仍是未提交 WIP，
-> 且对应会话**至今仍在写入**（判活依据：文件 mtime）。
+> **状态**：**尚未合并**。2026-11-23 22:38 实测：`wt/lock` 已自行提交 **1** 个、`wt/ratelimit` 已自行提交 **2** 个，`wt/mq` / `wt/statemachine` 仍为未提交 WIP；
+> 但 **4 条分支的工作区全部仍在持续写入**（提交后仍改文件，判活依据：文件 mtime）→ 属**中间态**，本轮只做冲突量化与裁决回写，**不执行实际 merge**。
 > **本节是合并执行的基线**，不是已完成记录——合入前每条都要走 `AGENTS.md §5` 全量验收。
 
 ### 9.1 四条路线的归属与判活
 
 | 分支 | worktree | 归属会话（peer，非本会话子会话） | 提交 | 判活 |
 |---|---|---|---|---|
-| `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **0** | 活跃 |
+| `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **1**（`1b97244`） | 活跃（提交后仍写入） |
 | `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **0** | 活跃 |
-| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **0** | 活跃 |
+| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **2**（`ec9fcf3` + `0ec3fc1`） | 活跃（提交后仍写入） |
 | `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **0** | 活跃 |
 
 分支创建于 2026-11-23 21:29–21:41（基线 `1422b55`），master 随后提交 `3c46876`（W-CACHE/W-RL）。
@@ -346,10 +346,37 @@
 | `wt/mq` | 引 MQ **直接违反 `AGENTS.md` B-10**；改写 `ADR-RF-008` §4（master 口径仍是「不引 MQ」）；改 `AGENTS.md` / `scripts/check_docs.py` 等共享禁区文件（45/7 行） | **不合 MQ 本身** | ①MQ 客户端、`common/messaging`、`*Envelope*`、密文信封投递**全部不合**（与 master 的本地附件存储 ADR-RF-008 冲突）；②`EventConsumptionService` 与 master 既有 `core.event_consumptions` + outbox 消费幂等**重复**，不合；③**不得**用该分支的 `AGENTS.md` / `check_docs.py` 覆盖 master 本轮改动 |
 | `wt/statemachine` | 新增独立 Maven 模块 `statemachine/`；改 `LoanStatus` / `ReleaseOrderStatus` / `TitleRetentionStatus` 与 retail-core 三个 TxExecutor | **可合（架构不冲突）** | ①该路线把 **Spring StateMachine 引擎与手写领域状态机解耦**（引擎置于独立模块 `com.company.retail.statemachine`，`domain` 包仍零 Spring 依赖、仍可纯 JUnit 跑），不违反 `AGENTS §2` 分层纪律 → **具备并入条件**；②但它改了 `retail-core` 三个 TxExecutor 与三个状态枚举，与 master 本轮的 `RepaymentPlanApplicationService` 改动同区域，需**逐文件解冲突**；③合入后必须重跑全量构建 + 冒烟 + E2E |
 
+### 9.2.1 合并冲突实测（2026-11-23 22:38 · `git merge-tree --write-tree` 只读预演，未触碰工作区）
+
+| 分支 | 提交 | 冲突文件数 | 冲突文件 | 自动合并成功（无冲突） |
+|---|---|---|---|---|
+| `wt/lock` | 1（`1b97244`） | **13** | `AGENTS.md` · `PROGRESS.md` · `README.md` · `common/pom.xml` · `docs/00-文档索引.md` · `docs/R00` · `docs/R10` · `domain/RFErrorCode.java` · `interview/`×3 · `run-microservices.sh` | **`V19__callback_receipt_idempotency.sql` · 改号后的 Redisson ADR（013，文件在分支侧） · `common/lock/*` · application/title-release/external-api 的 Java 改动 · `pom.xml` · `docs/R06` 均无冲突** |
+| `wt/ratelimit` | 2（`ec9fcf3` + `0ec3fc1`） | **13** | `PROGRESS.md` · `README.md` · `docs/00` · `docs/R00` · `docs/R02` · `docs/R07` · `docs/R10` · `gateway/pom.xml` · **`gateway/.../RateLimitFilter.java`（add/add）** · **`gateway/.../RateLimitProperties.java`（add/add）** · `interview/`×3 | `nginx/`·`scripts/smoke_ratelimit.py`·其余 10 个限流类均无冲突 |
+
+**两条由此确认的事实**：
+
+1. `wt/lock` **已按裁决改号**——迁移从 V18 改为 **`V19__callback_receipt_idempotency.sql`**，ADR 从 012 改为**下一个可用号（013）**（该 ADR 文件目前只在分支侧，落盘后才进入 master 的 `docs/adr/`，故本节不写全称以免 `check_docs.py` C4 判越界），且新增文件与 master **零冲突**；
+   冲突全部落在共享文档与共享配置，**可按「以 master 为底、只挑增量」手工解**。
+2. `wt/ratelimit` 为规避撞名**重命名了大部分类**（`RateLimitConfiguration` / `RateLimitPolicy` / `RateLimitPolicyResolver` / `RateLimitRegistry` / `RateLimitRule` / `RateLimitDecision` / `ClientIpResolver` / `TokenBucket`），
+   但 **`RateLimitFilter.java` 与 `RateLimitProperties.java` 仍与 master 同名 → add/add 冲突**。
+   因此该分支**不可整体 merge**：master 这两个文件必须保留分支外的版本（分支版实现与 master 版口径不同）。
+   按 §9.2 裁决，该分支只吸收：`nginx/`（可选部署形态）· `scripts/smoke_ratelimit.py`（独立冒烟脚本）· `ClientIpResolver` 的**可信代理 IP 提取口径**（master 键解析无头退路目前只取 `getRemoteAddress()`，可作增量）。
+
+> ⚠️ **两套限流实现并存的后果**（须在合并时避免）：分支重命名后的 12 个类与 master 的 6 个类**类名不冲突但语义重叠**，
+> 且都用 `gateway/.../ratelimit/` 同一包 → 若整体合入，网关将出现**两套限流配置键与两套过滤器**。
+> 裁决不变：**master 实现保留，分支实现不合入**，只取上述三项增量。
+
 ### 9.3 合并执行前置条件（缺一不可）
 
+0. **🔴 当前阻塞：master 主工作区被他人未提交 WIP 占用**（`docs/R11-演进路线图与开工门禁.md` +128 行生产就绪审计、
+   `external-api/src/main/resources/application.yml` 2 行号段注释）——`git merge` 会因「本地修改将被覆盖」被拒。
+   **处置**：该 WIP 由其所有者会话自行提交后，master 工作区恢复干净，合并方可进行；
+   **不得**用 `stash` / `checkout` 绕过（= 动或覆盖他人 WIP，违反 `AGENTS.md §7`）。
 1. **各会话自行提交**：分支出现提交后（`git log master..<branch>` 非空）才进入评估，
    **不得**代提交他人未完成的工作区状态（`AGENTS.md §7`）。
+   **附加判据**：分支**提交后仍持续写入**（文件 mtime 持续变化）时视为**中间态**，此时合入的是半成品——
+   2026-11-23 22:38 实测：4 条分支全部仍在写入（`wt/lock` 提交后 1 分钟仍在改 `RedissonLockManager` 与其测试），
+   故本轮只做冲突量化与裁决回写，**不执行实际 merge**。
 2. **号段与编号让位**：ADR 编号 `012` 归 master；`wt/lock` 的 ADR 走 `013`（`wt/mq` 若不合则 `013` 让出）。
    迁移号：master `V18` **已执行**（18/18 success，字节不可改），`wt/lock` 的回调幂等索引走 **`V19`**；
    `wt/mq` 的 `V20__mq_envelope_channel.sql` 若不合 MQ 则**整条弃用**。
@@ -363,6 +390,6 @@
 
 ### 9.4 当前 master 状态
 
-- master HEAD `3c46876`（W-CACHE/W-RL），**领先 `origin/master` 2 个提交，未推送**（推送属对外可见动作，需用户明示）。
+- master HEAD `1a7a31d`（W-MERGE 裁决清单登记；代码主体为 `3c46876`），**领先 `origin/master` 3 个提交，未推送**（推送属对外可见动作，需用户明示）。
 - 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**。
 - **本节登记时 4 个 worktree 仍在写入**；合并动作应在它们各自收口后由收口轮执行。
