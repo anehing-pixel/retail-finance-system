@@ -338,11 +338,14 @@
 
 ---
 
-## 9. 并行路线合并裁决清单（W-MERGE · 2026-11-23 · 待执行）
+## 9. 并行路线合并裁决清单（W-MERGE · 2026-11-23 · 已执行）
 
-> **状态**：**已合并（2026-11-23 23:20 收口）**。四条路线会话全部收口并把落地成果写入 master 工作区，
+> **状态**：**已合并并完成全量验收（2026-11-23 23:20 合并收口 · 23:30 验收收口）**。四条路线会话全部收口并把落地成果写入 master 工作区，
 > 23:18 复核：4 条分支均已停止写入（7–22 分钟无改动），会话状态 idle → 判定为**已收口**，进入合并执行。
-> **本节是合并执行的基线**，不是已完成记录——合入前每条都要走 `AGENTS.md §5` 全量验收。
+> **本节保留裁决原文作为合并依据**；实际执行结果与实测数据见 **§6 验证记录（W-MERGE 行）**——
+> 代码合并提交 `cf78529`、收口回灌提交 `be856e6`，验收判据 = `mvn -B -o package`（434 测试 0 失败）·
+> 走网关冒烟 33/33 · 前端页面 46/46 · `scripts/e2e_w8.py` 104/104 · `scripts/check_docs.py` PASS 15/15 EXIT 0 ·
+> Flyway V1–V19 共 19 条全部 success、四 schema 61 表。
 
 ### 9.1 四条路线的归属与判活
 
@@ -357,12 +360,12 @@
 **用户裁决（2026-11-23）**：①**等各会话自己跑完并提交后，再逐条评估合并**（不打断在跑的会话、不合半成品）；
 ②**冲突处以 master 现有口径为准，只并入不冲突的部分**。
 
-### 9.2 逐条裁决（合并时按此执行）
+### 9.2 逐条裁决（合并已按此执行，结果见 §6 验收记录）
 
 | 路线 | 冲突点 | 裁决 | 处置动作 |
 |---|---|---|---|
 | `wt/ratelimit` | 6 个类**同名同路径**（`gateway/.../ratelimit/*`）；限流键口径不同：分支用**客户端 IP**，master 用 **Authorization 头 SHA-256 哈希** | **保留 master 实现**（哈希键按调用方限流，IP 键在 NAT/代理下会把不同调用方挤在一起；且 master 版本已过 33/33 冒烟 + 104/104 E2E） | ①master 6 个类**整体保留**，分支版本不并入；②**吸收**分支的 `RateLimitFilterTest`（master 缺过滤器级测试，需按 master 实现改写后并入）；③`nginx/` 目录为**可选部署形态**，不默认启用，可作为独立目录并入 |
-| `wt/lock` | ①ADR-RF-012 **与 master 同号**；②`V18__callback_receipt_idempotency.sql` **与 master 已执行的 V18 同号**；③引 Redisson 与 ADR-RF-012「本轮不引入 Redisson」冲突 | **拆开裁决**：**回调幂等能力合入**，**Redisson 不合** | ①**吸收**回调幂等唯一索引 `uk_receipt_order_authority_ref`（外部方换 nonce 重推同一回执，DMZ nonce 关挡不住，由唯一索引兜底——这是真实业务缺口，且用数据库唯一索引，与 master「唯一键幂等走 `ON CONFLICT`」口径一致）；迁移号改 **V19**（master V18 已执行，字节不动）；②**不合** `RedissonLockManager` 与 Redisson 依赖（正确性仍由唯一索引 + 乐观锁保证，ADR-RF-012 已写「Redis 锁不作正确性来源」）；③`DistributedLockManager` 端口 + `InProcessLockManager` **待评估**（与 master 已有的到期批量抢占锁是否重复）；④ADR 编号**顺延到 `docs/adr/` 下一个可用号**（012 已归 master 的 Redis 缓存/限流 ADR；合并时以目录实际占用为准，不在本节预占编号） |
+| `wt/lock` | ①ADR-RF-012 **与 master 同号**；②`V18__callback_receipt_idempotency.sql` **与 master 已执行的 V18 同号**；③引 Redisson 与 ADR-RF-012「本轮不引入 Redisson」冲突 | **拆开裁决**：**回调幂等能力合入**，**Redisson 不合** | ①**吸收**回调幂等唯一索引 `uk_receipt_order_authority_ref`（外部方换 nonce 重推同一回执，DMZ nonce 关挡不住，由唯一索引兜底——这是真实业务缺口，且用数据库唯一索引，与 master「唯一键幂等走 `ON CONFLICT`」口径一致）；迁移号改 **V19**（master V18 已执行，字节不动）；②**不合** `RedissonLockManager` 与 Redisson 依赖（正确性仍由唯一索引 + 乐观锁保证，ADR-RF-012 已写「Redis 锁不作正确性来源」）；③`DistributedLockManager` 端口 + `InProcessLockManager` **已决：本轮不并入**（与 master 已有的到期批量抢占锁重复；正确性由唯一索引兜底，见 `ADR-RF-013`）；④ADR 编号**顺延到 `docs/adr/` 下一个可用号**（012 已归 master 的 Redis 缓存/限流 ADR；合并时以目录实际占用为准，不在本节预占编号） |
 | `wt/mq` | 引 MQ **直接违反 `AGENTS.md` B-10**；改写 `ADR-RF-008` §4（master 口径仍是「不引 MQ」）；改 `AGENTS.md` / `scripts/check_docs.py` 等共享禁区文件（45/7 行） | **不合 MQ 本身** | ①MQ 客户端、`common/messaging`、`*Envelope*`、密文信封投递**全部不合**（与 master 的本地附件存储 ADR-RF-008 冲突）；②`EventConsumptionService` 与 master 既有 `core.event_consumptions` + outbox 消费幂等**重复**，不合；③**不得**用该分支的 `AGENTS.md` / `check_docs.py` 覆盖 master 本轮改动 |
 | `wt/statemachine` | 新增独立 Maven 模块 `statemachine/`；改 `LoanStatus` / `ReleaseOrderStatus` / `TitleRetentionStatus` 与 retail-core 三个 TxExecutor | **可合（架构不冲突）** | ①该路线把 **Spring StateMachine 引擎与手写领域状态机解耦**（引擎置于独立模块 `com.company.retail.statemachine`，`domain` 包仍零 Spring 依赖、仍可纯 JUnit 跑），不违反 `AGENTS §2` 分层纪律 → **具备并入条件**；②但它改了 `retail-core` 三个 TxExecutor 与三个状态枚举，与 master 本轮的 `RepaymentPlanApplicationService` 改动同区域，需**逐文件解冲突**；③合入后必须重跑全量构建 + 冒烟 + E2E |
 
@@ -388,7 +391,13 @@
 
 ### 9.3 合并执行前置条件（缺一不可）
 
-0. **🔴 当前阻塞：master 主工作区被他人未提交 WIP 占用**（`docs/R11-演进路线图与开工门禁.md` +128 行生产就绪审计、
+> **执行结果（2026-11-23）**：以下 5 项前置条件**全部满足**——第 0 项的 WIP 已由其所有者会话自行提交（`483f6a7`），
+> 工作区恢复干净（**未用 `stash` / `checkout` 绕过**）；第 1 项四条分支各自提交并收口；
+> 第 2 项号段与编号让位已定（见下条第 2 条的订正）；第 3 项共享禁区文件已逐个手工合（**以 master 为底、只挑增量**，未整文件覆盖）；
+> 第 4 项全量验收已跑通（§6 W-MERGE 行）；第 5 项合并顺序按 `wt/lock` → `wt/statemachine` → `wt/ratelimit` → `wt/mq` 执行。
+> 以下条目**保留原文**作为当时的执行依据，冲突处以本节执行结果与 §6 为准。
+
+0. **🔴 当时的阻塞（已解除）**：master 主工作区被他人未提交 WIP 占用（`docs/R11-演进路线图与开工门禁.md` +128 行生产就绪审计、
    `external-api/src/main/resources/application.yml` 2 行号段注释）——`git merge` 会因「本地修改将被覆盖」被拒。
    **处置**：该 WIP 由其所有者会话自行提交后，master 工作区恢复干净，合并方可进行；
    **不得**用 `stash` / `checkout` 绕过（= 动或覆盖他人 WIP，违反 `AGENTS.md §7`）。
@@ -396,20 +405,22 @@
    **不得**代提交他人未完成的工作区状态（`AGENTS.md §7`）。
    **附加判据**：分支**提交后仍持续写入**（文件 mtime 持续变化）时视为**中间态**，此时合入的是半成品——
    2026-11-23 22:38 实测：4 条分支全部仍在写入（`wt/lock` 提交后 1 分钟仍在改 `RedissonLockManager` 与其测试），
-   故本轮只做冲突量化与裁决回写，**不执行实际 merge**。
-2. **号段与编号让位**：ADR 编号 `012` 归 master；`wt/lock` 的 ADR 走 `013`（`wt/mq` 若不合则 `013` 让出）。
+   故**该轮**只做冲突量化与裁决回写、**不执行实际 merge**——**其后 23:20 四条分支收口，已按本节裁决实际执行合并**（结果见本节执行结果与 §6 验收行）。
+2. **号段与编号让位**：ADR 编号 `012` 归 master；`wt/lock` 的 ADR 走 `013`（`wt/mq` 若不合则 `013` 让出）
+   ——**已落地**：`docs/adr/ADR-RF-013-回调幂等唯一索引与不引入分布式锁.md`（`wt/mq` 不合，013 未让出）。
    迁移号：master `V18` **已执行**（18/18 success，字节不可改），`wt/lock` 的回调幂等索引走 **`V19`**；
    `wt/mq` 的 `V20__mq_envelope_channel.sql` 若不合 MQ 则**整条弃用**。
-   ⚠️ **V19 存在两个候选用途**：`R06 §3.2` 的 G-DB-7 审计写入授权调整，与 `wt/lock` 的回调幂等唯一索引——**先落地者占用 V19**，
-   后落地者顺延到下一个空号（V20 及以后须先查 `PROGRESS §2` 号段占用表）。
+   ✅ **V19 已定（2026-11-23 实测落地）**：**V19 = `wt/lock` 的回调幂等唯一索引** `uk_receipt_order_authority_ref`
+   （`infrastructure/src/main/resources/db/migration/V19__callback_receipt_idempotency.sql`，实测 19 条全 success、该索引已在库中存在）；
+   `R06 §3.2` 的 **G-DB-7 审计写入授权调整顺延 V20**（`R06 §6` 与 `PROGRESS §2` 号段占用表均已登记）。
 3. **共享禁区文件逐个手工合**：父 `pom.xml` / `common/pom.xml` / `run-microservices.sh` / `scripts/check_docs.py` / `AGENTS.md` / `docs/00-文档索引.md`
    ——**以 master 版本为底**，只挑拣需要的增量，不整文件覆盖。
 4. **全量验收**：`mvn -B clean package`（0 失败）· `run-microservices.sh smoke` · `scripts/e2e_w8.py` · `python scripts/check_docs.py`；
    **C2（ADR 编号连续唯一）与 C14（迁移号段 == 磁盘脚本数）必须仍 PASS**。
 5. **合并顺序建议**：`wt/lock`（回调幂等，V19）→ `wt/statemachine`（独立模块，冲突最少）→ `wt/ratelimit`（仅取测试与 `nginx/`）→ `wt/mq`（预期不合，仅留 ADR 留痕）。
 
-### 9.4 当前 master 状态
+### 9.4 合并后的 master 状态（2026-11-23 23:33 复核）
 
-- master HEAD `1a7a31d`（W-MERGE 裁决清单登记；代码主体为 `3c46876`），**领先 `origin/master` 3 个提交，未推送**（推送属对外可见动作，需用户明示）。
-- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**。
-- **本节登记时 4 个 worktree 仍在写入**；合并动作应在它们各自收口后由收口轮执行。
+- master HEAD `be856e6`（**收口回灌**：PROGRESS §6 验收行 + §7 教训 + R06 V19 口径订正），代码主体为 `cf78529`（**合并 58 个文件**：V19 回调幂等迁移 + 新增 `statemachine` 模块 + 网关可信代理 IP + `nginx/` + `ADR-RF-013`），**领先 `origin/master` 7 个提交，未推送**（推送属对外可见动作，需用户明示）。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**；Flyway **V1–V19 共 19 条全部 success**、四 schema **61 张表**。
+- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
