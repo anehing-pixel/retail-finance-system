@@ -495,8 +495,9 @@
    **C2（ADR 编号连续唯一）与 C14（迁移号段 == 磁盘脚本数）必须仍 PASS**。
 5. **合并顺序建议**：`wt/lock`（回调幂等，V19）→ `wt/statemachine`（独立模块，冲突最少）→ `wt/ratelimit`（仅取测试与 `nginx/`）→ `wt/mq`（预期不合，仅留 ADR 留痕）。
 
-### 9.4 合并后的 master 状态（2026-11-23 23:33 复核）
+### 9.4 合并后的 master 状态（2026-11-24 00:5x 复核）
 
-- master HEAD `7663bd4`（W-MQ 合入 + Windows 行尾纪律固化），此前主体为 `cf78529`（合并 58 个文件：V19 回调幂等迁移 + 新增 `statemachine` 模块 + 网关可信代理 IP + `nginx/` + `ADR-RF-013`）、`be856e6`（收口回灌）；**领先 `origin/master` 8 个提交，未推送**（推送属对外可见动作，需用户明示）。
-- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
-- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
+- master HEAD `af9869d`（**W-LOCK Redisson 分布式锁合入 master**，合并提交；父提交 `7663bd4` = W-MQ 合入 + Windows 行尾纪律固化，再往前为 `cf78529` 合并 58 文件与 `be856e6` 收口回灌）；**领先 `origin/master` 14 个提交，未推送**（推送属对外可见动作，需用户明示）。
+- 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 484）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
+- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**保留待清理**。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
