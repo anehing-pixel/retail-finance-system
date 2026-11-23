@@ -39,7 +39,11 @@ command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 
 DB_CONTAINER=retail-finance-db
+REDIS_CONTAINER=retail-finance-redis
 export RETAIL_CUSTOMER_DEV_LOGIN="${RETAIL_CUSTOMER_DEV_LOGIN:-true}"   # 冒烟要用客户开发桥；生产默认 false
+# Redis 连接参数（W-CACHE / W-RL 引入）：L2 分布式缓存 + 网关令牌桶共用同一实例
+export REDIS_HOST="${REDIS_HOST:-localhost}"
+export REDIS_PORT="${REDIS_PORT:-6382}"
 
 JAR() { echo "$ROOT/$1/target/$2-1.0.0-SNAPSHOT.jar"; }
 
@@ -68,6 +72,27 @@ ensure_db() {
     sleep 1
   done
   echo "[错误] 数据库 60s 未就绪"; return 1
+}
+
+# Redis（W-CACHE / W-RL）：两级缓存的 L2 + 网关令牌桶限流。
+# 不用持久化：缓存可重建、限流状态丢了重算即可，落盘没有价值。
+ensure_redis() {
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$REDIS_CONTAINER"; then
+    echo "[缓存] $REDIS_CONTAINER 已运行"
+  elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$REDIS_CONTAINER"; then
+    docker start "$REDIS_CONTAINER" >/dev/null && echo "[缓存] $REDIS_CONTAINER 已启动"
+  else
+    echo "[缓存] 创建 $REDIS_CONTAINER（redis:7-alpine，宿主 $REDIS_PORT，不持久化）"
+    docker run -d --name "$REDIS_CONTAINER" \
+      -p "$REDIS_PORT:6379" redis:7-alpine --save "" --appendonly no >/dev/null
+  fi
+  for i in $(seq 1 30); do
+    if docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep -q PONG; then
+      echo "[缓存] 就绪（redis:$REDIS_PORT，${i}s）"; return 0
+    fi
+    sleep 1
+  done
+  echo "[错误] Redis 30s 未就绪"; return 1
 }
 
 start_one() {
@@ -133,8 +158,9 @@ port_in_use() {
 
 do_start() {
   ensure_db || return 1
+  ensure_redis || return 1
   local busy=""
-  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091 18100; do
+  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091 18100 6382; do
     port_in_use "$p" && busy="$busy $p"
   done
   if [ -n "$busy" ]; then
@@ -245,6 +271,7 @@ case "${1:-}" in
     ;;
   db)
     ensure_db
+    ensure_redis
     ;;
   *)
     echo "用法: $0 {start|stop|smoke|db}"; exit 1

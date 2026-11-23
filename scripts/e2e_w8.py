@@ -469,14 +469,57 @@ if require(ctx, "contract_id", "S8 账务") and require(ctx, "case_id", "S8 账�
               "HTTP {} {}".format(code, text[:250]))
         ctx["loan_id"] = loan_id
 
+        # 产品档位（W-CACHE）：建档位 → 按档位生成计划 → 快照落库 → 改档位后历史计划不变
+        e2e_product_code = "E2E" + RUN_TAG
+        code, data, text = api("POST", "/api/financial-products",
+                               {"productCode": e2e_product_code, "productName": "E2E 档位 v1",
+                                "scheme": "MONEY_LENDING", "termCount": 3, "rateBp": 0,
+                                "bonusMonth": None, "waiverCapBp": None, "effectiveFrom": TODAY},
+                               token=staff_token)
+        check("S8 建产品档位（3 期 0 息）→ 版本 1",
+              code == 200 and (data or {}).get("productCode") == e2e_product_code
+              and (data or {}).get("productVersion") == 1,
+              "HTTP {} {}".format(code, text[:250]))
+
         code, data, text = api("POST", "/api/repayment-plans",
                                {"loanId": loan_id, "method": "EQUAL_PAYMENT",
                                 "installmentCount": 3, "firstDueDate": TODAY,
-                                "monthlyRateBp": 0, "bonusMonth": None},
+                                "monthlyRateBp": 0, "bonusMonth": None,
+                                "productCode": e2e_product_code},
                                token=staff_token)
         check("S8 还款计划 EQUAL_PAYMENT×3（0 利率）→ 总额=本金",
               code == 200 and (data or {}).get("totalAmountDue") == PRINCIPAL,
               "HTTP {} {}".format(code, text[:250]))
+        check("S8 计划落档位快照（productCode/productVersion/rateBp）",
+              code == 200 and (data or {}).get("productCode") == e2e_product_code
+              and (data or {}).get("productVersion") == 1
+              and (data or {}).get("monthlyRateBp") == 0,
+              "HTTP {} {}".format(code, text[:250]))
+
+        # 改档位：旧版本封口停用 + 新版本插入（同一事务），提交后失效两级缓存
+        code, data, text = api("PUT", "/api/financial-products/" + e2e_product_code,
+                               {"productCode": e2e_product_code, "productName": "E2E 档位 v2",
+                                "scheme": "MONEY_LENDING", "termCount": 3, "rateBp": 100,
+                                "bonusMonth": None, "waiverCapBp": None, "effectiveFrom": TODAY},
+                               token=staff_token)
+        check("S8 改档位 → 新版本 2 生效（rateBp=100）",
+              code == 200 and (data or {}).get("productVersion") == 2
+              and (data or {}).get("rateBp") == 100,
+              "HTTP {} {}".format(code, text[:250]))
+        code, data, text = api("GET", "/api/financial-products/" + e2e_product_code,
+                               token=staff_token)
+        check("S8 改档位后当前生效版本 = 2（缓存已主动失效）",
+              code == 200 and (data or {}).get("productVersion") == 2
+              and (data or {}).get("rateBp") == 100,
+              "HTTP {} {}".format(code, text[:250]))
+        # 关键口径：改配置不得改历史计划 —— 快照仍是 version 1 / rate_bp 0
+        snap = psql("SELECT product_version || '|' || rate_bp FROM core.repayment_plans "
+                    "WHERE loan_id = {}".format(loan_id))
+        check("S8 改档位后历史计划快照不变（1|0）", snap == "1|0", snap)
+        interest_sum = psql("SELECT COALESCE(SUM(interest_due),0) FROM core.schedule_items "
+                            "WHERE plan_id = (SELECT plan_id FROM core.repayment_plans "
+                            "WHERE loan_id = {})".format(loan_id))
+        check("S8 改档位后历史期次利息仍为 0（不重算存量）", interest_sum == "0", interest_sum)
 
         # 三门禁全过：合同 EFFECTIVE + 审查 APPROVED（+ 同意有效已在 G3 验证）→ PAID
         code, data, text = api("POST", "/api/disbursements",

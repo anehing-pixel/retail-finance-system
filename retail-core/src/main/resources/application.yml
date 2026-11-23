@@ -19,6 +19,16 @@ spring:
   jackson:
     time-zone: Asia/Tokyo
     default-property-inclusion: non_null
+  data:
+    redis:
+      # L2 分布式缓存 + 网关令牌桶共用同一实例（端口登记见 PROGRESS §2）
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6382}
+      connect-timeout: 2s
+      timeout: 2s
+      lettuce:
+        pool:
+          enabled: false
   cloud:
     nacos:
       discovery:
@@ -31,6 +41,13 @@ mybatis:
     # 避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存的旧行
     local-cache-scope: STATEMENT
 retail:
+  cache:
+    # 两级缓存：L1 Caffeine（短 TTL）+ L2 Redis（主动失效为主，TTL 兜底）
+    enabled: ${RETAIL_CACHE_ENABLED:true}
+    key-prefix: "rf:"
+    l1-ttl: 10s
+    l2-ttl: 60s
+    l1-max-size: 1000
   core:
     # 银行代付网关双模（W-SIM2，P-09）：空=挡板（同步假成功），非空=HTTP 对端（机构模拟器/真实银行）
     bank-pay-url: ${RETAIL_CORE_BANK_PAY_URL:}

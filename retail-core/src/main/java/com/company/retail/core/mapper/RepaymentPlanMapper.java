@@ -22,8 +22,9 @@ import java.util.Map;
 public interface RepaymentPlanMapper {
 
     @Insert("INSERT INTO core.repayment_plans (loan_id, method, installment_count, first_due_date, "
-            + "bonus_month, plan_version, trace_id) "
-            + "VALUES (#{loanId}, #{method}, #{installmentCount}, #{firstDueDate}, #{bonusMonth}, 1, #{traceId})")
+            + "bonus_month, plan_version, product_code, product_version, rate_bp, trace_id) "
+            + "VALUES (#{loanId}, #{method}, #{installmentCount}, #{firstDueDate}, #{bonusMonth}, 1, "
+            + "#{productCode}, #{productVersion}, #{rateBp}, #{traceId})")
     @Options(useGeneratedKeys = true, keyProperty = "planId", keyColumn = "plan_id")
     int insertPlan(Map<String, Object> params);
 

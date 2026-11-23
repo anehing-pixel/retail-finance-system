@@ -34,6 +34,15 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+    <!-- 缓存两级：Redis（L2 分布式）+ Caffeine（L1 本地）；common 侧为 optional，此处显式声明 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
     <!-- 服务注册发现；本地无 Nacos 时 fail-fast=false，路由用 ROUTE_* 直连覆盖 -->
     <dependency>
       <groupId>com.alibaba.cloud</groupId>

@@ -4,6 +4,13 @@ server:
 spring:
   application:
     name: api-gateway
+  data:
+    redis:
+      # 令牌桶限流共用实例（端口登记见 PROGRESS §2）；连接失败按 fail-open 放行
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6382}
+      connect-timeout: 2s
+      timeout: 2s
   cloud:
     nacos:
       discovery:
@@ -65,3 +72,31 @@ spring:
           uri: ${ROUTE_CORE:lb://retail-core}
           predicates:
             - Path=/api/**
+
+retail:
+  gateway:
+    rate-limit:
+      # 网关令牌桶限流（Redis + Lua 原子扣减）
+      enabled: ${RETAIL_GATEWAY_RATE_LIMIT_ENABLED:true}
+      # Redis 不可用时放行（保护层不拖垮主链路）；生产可切 false 变 fail-closed
+      fail-open: ${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:true}
+      # 限流键维度：auth_or_ip（Authorization 头哈希，退化到 IP）/ ip
+      key-by: ${RETAIL_GATEWAY_RATE_LIMIT_KEY_BY:auth_or_ip}
+      key-prefix: "rf:rl:"
+      rules:
+        # 进件类路径：收紧（防外部刷单）
+        - path: /api/applications/**
+          replenish-rate: 20
+          burst-capacity: 40
+        # 征信查询类路径：更严（外部成本高 + 合规敏感）
+        - path: /api/credit-inquiries/**
+          replenish-rate: 10
+          burst-capacity: 20
+        # 限流探针路径：极严额度，供冒烟断言令牌桶生效
+        - path: /api/rate-limit-probe/**
+          replenish-rate: 1
+          burst-capacity: 2
+        # 全局兜底：宽松额度（正常业务不受影响）
+        - path: /api/**
+          replenish-rate: 500
+          burst-capacity: 1000

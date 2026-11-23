@@ -45,6 +45,9 @@
     <!-- 持久层：MyBatis（Spring Boot 3.2 兼容线 3.0.x） -->
     <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
     <jjwt.version>0.12.5</jjwt.version>
+    <!-- 缓存与限流基础设施：Redis（分布式缓存 L2 + 令牌桶）+ Caffeine（本地缓存 L1）。
+         版本随 Boot BOM；此处显式登记便于审计。边界与被拒方案见 docs/adr/ADR-RF-012。 -->
+    <caffeine.version>3.1.8</caffeine.version>
   </properties>
 
   <dependencyManagement>
@@ -107,6 +110,18 @@
         <artifactId>jjwt-jackson</artifactId>
         <version>${jjwt.version}</version>
         <scope>runtime</scope>
+      </dependency>
+      <!-- Redis（L2 分布式缓存 + 网关令牌桶限流）；版本与 Boot BOM 一致 -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-redis</artifactId>
+        <version>${spring-boot.version}</version>
+      </dependency>
+      <!-- Caffeine（L1 本地缓存） -->
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

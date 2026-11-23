@@ -4,7 +4,9 @@
 断言口径：不把「进程起来了」当「链路通了」（反模式 A-16 / A-1）——
 每条断言都打网关 18081（或 DMZ 18091）真实 HTTP，验证认证/主体隔离/验签语义。
 环境变量：SMOKE_GATEWAY（默认 http://127.0.0.1:18081）、SMOKE_DMZ（http://127.0.0.1:18091）、
-DB_CONTAINER（retail-finance-db，用于核对 Flyway V1–V9）。
+DB_CONTAINER（retail-finance-db，用于核对 Flyway V1–V18）。
+
+覆盖新增能力：网关 Redis 令牌桶限流（429 + 统一错误码）、产品档位目录与还款计划快照列。
 """
 import base64
 import hashlib
@@ -179,8 +181,50 @@ try:
          "-tAc", "SELECT count(*) FROM core.users WHERE username='admin'"],
         capture_output=True, text=True, timeout=15)
     check("种子员工 admin 存在（登录链路数据面）", out3.stdout.strip() == "1", out3.stdout + out3.stderr)
+    # 产品档位目录（V18）：建表 + 种子档位
+    out4 = subprocess.run(
+        ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-d", "retail_finance",
+         "-tAc", "SELECT count(*) FROM core.financial_products"],
+        capture_output=True, text=True, timeout=15)
+    check("产品档位目录已建并含种子档位（{} 条）".format(out4.stdout.strip()),
+          out4.stdout.strip().isdigit() and int(out4.stdout.strip()) >= 2,
+          out4.stdout + out4.stderr)
+    # 还款计划快照列（V18）：配置变更不影响历史计划的前提
+    out5 = subprocess.run(
+        ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-d", "retail_finance",
+         "-tAc", "SELECT count(*) FROM information_schema.columns "
+                 "WHERE table_schema='core' AND table_name='repayment_plans' "
+                 "AND column_name IN ('product_code','product_version','rate_bp')"],
+        capture_output=True, text=True, timeout=15)
+    check("还款计划快照列已加（product_code/product_version/rate_bp）",
+          out5.stdout.strip() == "3", out5.stdout + out5.stderr)
 except FileNotFoundError:
     check("Flyway 迁移核对", False, "docker 不可用，无法核对迁移记录")
+
+# ---- 8. 网关限流（Redis 令牌桶；探针路径用独立 Authorization 头拿独立桶）----
+probe_auth = "Bearer rl-probe-{}".format(int(time.time() * 1000))
+probe_results = []
+for _ in range(10):
+    probe_results.append(req("GET", GATEWAY + "/api/rate-limit-probe/x",
+                             headers={"Authorization": probe_auth}))
+probe_codes = [c for c, _ in probe_results]
+check("网关令牌桶限流触发 429", 429 in probe_codes, "codes={}".format(probe_codes))
+check("限流首个请求放行（桶初始为满）", probe_codes[0] != 429, "codes={}".format(probe_codes))
+limited_body = next((b for c, b in probe_results if c == 429), "")
+check("限流响应体含统一错误码 RF_GATEWAY_001", "RF_GATEWAY_001" in limited_body,
+      limited_body[:160])
+
+# ---- 9. 产品档位目录（读接口走两级缓存：L1 Caffeine → L2 Redis → 库）----
+code, body = req("GET", GATEWAY + "/api/financial-products/AUTO_LOAN_36_0",
+                 headers={"Authorization": "Bearer " + staff_token})
+check("读产品档位（36 期 0 息）",
+      code == 200 and "AUTO_LOAN_36_0" in body and '"rateBp":0' in body.replace(" ", ""),
+      "HTTP {} {}".format(code, body[:160]))
+
+code, body = req("GET", GATEWAY + "/api/financial-products/AUTO_LOAN_36_0",
+                 headers={"Authorization": "Bearer " + staff_token})
+check("产品档位二次读走缓存（结果一致）",
+      code == 200 and "AUTO_LOAN_36_0" in body, "HTTP {} {}".format(code, body[:160]))
 
 print("")
 print("=" * 60)

@@ -36,13 +36,18 @@ public class RepaymentPlanRepository {
     }
 
     public long insertPlan(long loanId, String method, int installmentCount, LocalDate firstDueDate,
-                           Integer bonusMonth, String traceId) {
+                           Integer bonusMonth, String productCode, Integer productVersion, int rateBp,
+                           String traceId) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("loanId", loanId);
         params.put("method", method);
         params.put("installmentCount", installmentCount);
         params.put("firstDueDate", firstDueDate);
         params.put("bonusMonth", bonusMonth);
+        // 快照三件套：档位码 / 档位版本 / 实际采用的利率（配置变更不影响历史计划）
+        params.put("productCode", productCode);
+        params.put("productVersion", productVersion);
+        params.put("rateBp", rateBp);
         params.put("traceId", traceId);
         mapper.insertPlan(params);
         Object id = params.get("planId");

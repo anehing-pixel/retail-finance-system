@@ -35,15 +35,17 @@ public class RepaymentPlanController {
                 org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes());
     }
 
-    public record GeneratePlanRequest(long loanId, String method, int installmentCount,
-                                      LocalDate firstDueDate, int monthlyRateBp, Integer bonusMonth) {
+    public record GeneratePlanRequest(long loanId, String method, Integer installmentCount,
+                                      LocalDate firstDueDate, Integer monthlyRateBp, Integer bonusMonth,
+                                      String productCode) {
     }
 
     @RequirePermission(Permission.CONTRACT_ISSUE)
     @PostMapping("/api/repayment-plans")
     public ApiResponse<PlanView> generate(@RequestBody GeneratePlanRequest req) {
         return ApiResponse.ok(service.generate(req.loanId(), req.method(), req.installmentCount(),
-                        req.firstDueDate(), req.monthlyRateBp(), req.bonusMonth(), traceId()),
+                        req.firstDueDate(), req.monthlyRateBp(), req.bonusMonth(), req.productCode(),
+                        traceId()),
                 traceId());
     }
 
