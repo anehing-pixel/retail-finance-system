@@ -24,7 +24,8 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
-
+.vscode/
+.workbuddy/
 # ---- 日志与运行时 ----
 logs/
 *.log
