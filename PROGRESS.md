@@ -472,9 +472,9 @@
 | 分支 | worktree | 归属会话（peer，非本会话子会话） | 提交 | 判活 |
 |---|---|---|---|---|
 | `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **4**（`1b97244` + `5dff59f` + `a788505` + 合入 master `7663bd4`） | ✅ 已收口并**合入 master**（2026-11-24 用户「提交吧」）；**worktree 与分支已清理**（2026-11-24） |
-| `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **1**（`a3e9057`） | ✅ 已收口（**不合并**，违 B-10） |
-| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **4**（`ec9fcf3` + `0ec3fc1` + `b7a3852` + `8d1a6de`） | ✅ 已收口 → **2026-11-24 已整支合入 master**（用户改口径：两套限流实现 + 一个开关，不再「只取增量」） |
-| `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **2**（`b815d3e` + `a5c7fbb`） | ✅ 已收口（**已合并**） |
+| `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **1**（`a3e9057`） | ✅ 已收口（**已按用户指令改口径合入 master**，见 §2 W-MQ 行与 `ADR-RF-014`）；**worktree 与分支已清理**，留痕 tag `archived-wt-mq`（2026-11-24） |
+| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **4**（`ec9fcf3` + `0ec3fc1` + `b7a3852` + `8d1a6de`） | ✅ 已收口 → **2026-11-24 已整支合入 master**（用户改口径：两套限流实现 + 一个开关，不再「只取增量」）；**worktree 与分支保留**（所属会话仍在其 worktree 推进 Docker 形态验收，按 `AGENTS.md` §7 不代他人清理） |
+| `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **2**（`b815d3e` + `a5c7fbb`） | ✅ 已收口（**已合并**）；**分支已清理**（其 worktree 已由所属会话先行移除），留痕 tag `archived-wt-statemachine`（2026-11-24） |
 
 分支创建于 2026-11-23 21:29–21:41（基线 `1422b55`），master 随后提交 `3c46876`（W-CACHE/W-RL）。
 **用户裁决（2026-11-23）**：①**等各会话自己跑完并提交后，再逐条评估合并**（不打断在跑的会话、不合半成品）；
@@ -546,7 +546,7 @@
 > 以 `git merge --no-ff` 合入 master（限流实现**双轨** + `retail.gateway.rate-limit.mode` 开关 + 互斥装配）。
 > §9.2 其余裁决（`wt/lock` 只取回调幂等、`wt/mq` 不合、`wt/statemachine` 合入）**仍然有效**。
 
-- master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交），**未推送**（推送属对外可见动作，需用户明示）。
+- master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**该行记录时领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交）。**当前 master HEAD `bba6c8b`（2026-11-24 清理轮实测），领先 `origin/master` 1 个提交**，**未推送**（推送属对外可见动作，需用户明示）。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
 - 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 504）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
-- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**已于 2026-11-24 清理完毕**（worktree 已移除 + 分支已删除；master 侧锁实现 `common/lock/*` · `ADR-RF-015` · `scripts/smoke_w_lock.py` 保留不变）。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
+- 4 条分支的合并动作均已由收口轮执行完毕（工作区干净）；**清理状态（2026-11-24，用户指令「清理吧」）**——`wt/lock` / `wt/mq` / `wt/statemachine` 三条的 worktree 与分支**已清理完毕**（`wt/mq` 与 `wt/statemachine` 的尖端非 master 祖先，故先打归档 tag `archived-wt-mq` / `archived-wt-statemachine` 留痕再删；`wt/statemachine` 的 worktree 已由所属会话先行移除），`wt/ratelimit` **保留**（所属会话仍在其 worktree 推进，按 `AGENTS.md` §7 不代他人动）；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**已于 2026-11-24 清理完毕**（worktree 已移除 + 分支已删除；master 侧锁实现 `common/lock/*` · `ADR-RF-015` · `scripts/smoke_w_lock.py` 保留不变）。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
