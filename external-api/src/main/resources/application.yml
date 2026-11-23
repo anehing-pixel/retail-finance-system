@@ -14,7 +14,7 @@ spring:
     hikari:
       maximum-pool-size: 5
   flyway:
-    enabled: false               # 迁移由部署脚本按序执行（V1–V17），服务启动不接管
+    enabled: false               # 迁移由部署脚本按序执行（条数以 infrastructure 迁移目录为准），服务启动不接管
   jackson:
     time-zone: Asia/Tokyo
     default-property-inclusion: non_null
