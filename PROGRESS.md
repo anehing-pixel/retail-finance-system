@@ -471,7 +471,7 @@
 
 | 分支 | worktree | 归属会话（peer，非本会话子会话） | 提交 | 判活 |
 |---|---|---|---|---|
-| `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **4**（`1b97244` + `5dff59f` + `a788505` + 合入 master `7663bd4`） | ✅ 已收口并**合入 master**（2026-11-24 用户「提交吧」） |
+| `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **4**（`1b97244` + `5dff59f` + `a788505` + 合入 master `7663bd4`） | ✅ 已收口并**合入 master**（2026-11-24 用户「提交吧」）；**worktree 与分支已清理**（2026-11-24） |
 | `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **1**（`a3e9057`） | ✅ 已收口（**不合并**，违 B-10） |
 | `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **4**（`ec9fcf3` + `0ec3fc1` + `b7a3852` + `8d1a6de`） | ✅ 已收口 → **2026-11-24 已整支合入 master**（用户改口径：两套限流实现 + 一个开关，不再「只取增量」） |
 | `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **2**（`b815d3e` + `a5c7fbb`） | ✅ 已收口（**已合并**） |
@@ -549,4 +549,4 @@
 - master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交），**未推送**（推送属对外可见动作，需用户明示）。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
 - 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 504）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
-- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**保留待清理**。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
+- 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**已于 2026-11-24 清理完毕**（worktree 已移除 + 分支已删除；master 侧锁实现 `common/lock/*` · `ADR-RF-015` · `scripts/smoke_w_lock.py` 保留不变）。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
