@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V20（62 表）· 构建 484 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V20（62 表）· 构建 504 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -50,6 +50,7 @@
 | 14 | **并行路线合并收口**（W-MERGE，用户裁决「等各会话跑完提交后逐条评估合并」+「冲突处以 master 口径为准，只并入不冲突部分」） | 按 `PROGRESS §9` 裁决落地：①**`wt/lock` → 只吸收回调幂等**——迁移 **V19** 表达式唯一索引 `uk_receipt_order_authority_ref` + `ADR-RF-013`「回调幂等：以数据库唯一索引为权威，**不引入分布式锁**」，**Redisson 与 `common/lock` 不合入**；②**`wt/statemachine` → 合入**——新增独立 Maven 模块 `statemachine`（Spring StateMachine 4.0.0 引擎底座；**领域状态图仍是唯一事实源**，`domain` 零 Spring 注解不变），接线只放 retail-core / title-release 的 `*.application.statemachine` 包；③**`wt/ratelimit` → 只吸收三项增量**——`nginx/`（边缘层可选部署形态）、`ClientIpResolver`（可信代理 IP 提取口径）、`RateLimitFilterTest`（过滤器级测试），**master 的 Redis 令牌桶实现整体保留**（限流键仍用 Authorization 头哈希，不引入 IP 键）；④**`wt/mq` → 不合**（引 MQ 违反 `AGENTS` B-10，其 `V20__mq_envelope_channel.sql` 整条弃用） | `PROGRESS §9`、`ADR-RF-013`、`AGENTS.md` §2 与 B-13、§6 验证记录 |
 | 13 | **产品档位配置化 + 多级缓存 + 网关限流**（用户裁决「配置化完整落地 + Caffeine L1 + Redis L2」+「网关限流补 Redis 令牌桶」） | ①**V18** 新增 `core.financial_products`（同码多版本 + 生效区间 + 乐观锁 + `uk_fin_product_ver`，种子 2 档位 `AUTO_LOAN_36_0` / `INSTALMENT_36_200`）与 `core.repayment_plans` **快照三件套**；参数合成优先级**授信覆盖 > 档位默认**（纯领域 `ProductTermsResolver`，零 Spring 依赖）；改档位 = 旧版封口停用 + 新版插入（同一本地事务 + **afterCommit** 缓存失效），乐观锁冲突 `RF_CONFLICT_001`；**改配置不回改历史计划**；②共享 `common` 两级缓存机制件 `TwoLevelCache`（Caffeine L1 + Redis L2 + 空值哨兵 + 降级直读 + 按前缀失效）；③网关 **Redis 令牌桶限流**（Lua 原子扣减 + 429 + `Retry-After` + `RF_GATEWAY_001`，Redis 不可用 fail-open）；④新增 **ADR-RF-012** 固化 Redis 用途白名单 | `ADR-RF-012`、`R00 §3.3 §6 §7`、`R02 §5`、`R06 §4.3 §6`、`AGENTS.md` B-13、`PROGRESS §2` 共享资源登记、`§6` 验证记录 |
 | 15 | **Windows 行尾纪律固化**（用户指示「把解决的办法写到 agents.md 里」） | ①`AGENTS.md` 新增 **§4.1**：CRLF 现象 / WSL 活体复现的报错原文 / 根因（转换发生在检出期，**blob 本身是 LF**）/ 三层修复（`.gitattributes` → 本仓 `core.autocrlf=input` → 工作区重新检出）/ 判定命令 / 写入纪律；②`.gitattributes` 扩到 `*.py text eol=lf`（shebang 直接执行同样会被 CRLF 打死）；③新增反模式 **A-21**、§5 提交前行尾门禁、§11 检查单 | `AGENTS.md` §4.1 §5 §9 §11、`.gitattributes`、`PROGRESS §2` 变更记录、`§6` 验证记录 |
+| 17 | **W-RL 网关限流双模式合入**（用户指令「把当前分支合并到 master」+「两套限流实现都合并，用一个配置作为开关，来采用哪种限流方式」） | ①**合并 `wt/ratelimit`**（`git merge --no-ff`，16 个冲突全部按「master 为底 + 只挑增量」手工解）；②**限流实现双轨 + 一个开关**：`retail.gateway.rate-limit.mode` = `redis`（**缺省**，Redis 令牌桶 `RateLimitFilter`）／`memory`（进程内令牌桶 `InMemoryRateLimitFilter`，零依赖、单实例口径），两套**互斥装配**（互补 `@ConditionalOnProperty`，同一时刻只注册一个限流过滤器 → **不双重限流**），新增 `RateLimitModeSwitchTest` 在**装配期**钉死互斥；③分支的 12 个独有文件（策略注册表 / 进程内令牌桶 / 2 个测试 / 3 个边缘验收脚本）并入，**类名去冲突**（`InMemory*` 前缀，参数前缀 `retail.gateway.rate-limit.memory.*`）；④`ADR-RF-012` 增补第 12/13 条（双模式 + 边缘 Nginx 为可选部署形态）；⑤`R02` 新增 **§3.3 限流设计（两层 + 双模式 + 一个开关）**、`R10` 新增 **K 组 A43–A49**、`R00 §3.8` 登记新配置键与边缘端口、`R07` 订正 partner 限流归属、`AGENTS.md` B-13 补互斥口径 | `ADR-RF-012` §12 §13、`R02 §3.3`、`R10` K 组、`R00 §3.8`、`AGENTS.md` B-13、`PROGRESS §2` 共享资源登记、`§6` 验证记录 |
 | 16 | **W-MQ MQ 削峰与密文信封合入**（用户裁决「改口径合并 wt/mq」，推翻 `AGENTS.md` B-10 原「不引入 MQ」红线） | ①**红线改写**：B-10 改为「不引 Seata / 分布式事务 / 对象存储；**MQ 已引入**（`ADR-RF-014`）作 outbox 之上的**削峰缓冲层**」（**不参与事务、不做真相源**），新增 **B-15**（MQ 上只允许密文信封）、反模式 **A-18~A-20**；②**ADR 顺延**：MQ 的 ADR 由 013 顺延为 **ADR-RF-014**（013 归回调幂等，既有含义不动）；③**迁移**：**V20 = MQ 密文信封通道**（`integration.mq_envelope_inbox` + `core.outbox_events.relayed_at` + 索引，新增 1 张表），**G-DB-7 审计写入授权顺延 V21**（V1–V19 字节全部未动）；④**代码**（`git merge --squash wt/mq`，64 文件自动合并 + 16 冲突手工解，master 为底只挑增量）：`common/messaging` 9 机制件（AES-GCM 密文信封 + 8 键载荷白名单 + `NoopEnvelopePublisher`）、`infrastructure` 8 机制件（`MqOutboxRelay` / `RocketMqEnvelopePublisher` / `MqEnvelopeDispatcher` / `MqEventRelayConsumer` / `MqEnvelopeInboxMapper` / `EventConsumptionService`）、5 个服务的 MQ 接线与消费者、`scripts/smoke_mq.py`（11 断言）；⑤**默认关闭**（`retail.mq.enabled=false` → 走同步路径，行为与现网逐字一致，冒烟零回归） | `ADR-RF-014`、`AGENTS.md` §3 与 B-10/B-15、§9 A-18~A-20、`R00 §7`、`R02`、`R06 §6`、`PROGRESS §2` 共享资源与号段登记、`§6` 验证记录 |
 
 ---
@@ -64,6 +65,7 @@
 | 外部机构模拟器端口 | **18100**（external-simulator/simulator.js，W-SIM；有 node 时编排自动拉起并将 CIC 出站切至模拟器） | — | 不冲突 ✅（用户 2026-11-23 指示「模拟一个外部服务回应你」） |
 | 内部网关 | 18081 | 18080 | 不冲突 ✅ |
 | 外部 DMZ | 18091 | 18090 | 不冲突 ✅ |
+| 边缘入口（可选 Nginx 形态） | **18076**（前置内部网关）/ **18077**（前置外部 DMZ）；配置 `nginx/nginx.conf` | — | 不冲突 ✅（floorplan 无边缘层；**默认不启用**，W-RL 引入） |
 | 数据库宿主端口 | 5435 | 5434 | 不冲突 ✅ |
 | Redis（缓存 / 限流） | **6382**（容器 `retail-finance-redis`）：L2 只读配置缓存 + 网关限流状态 | — | 不冲突 ✅（6379 被本机 WSL 侧进程占用，未复用；用途白名单见 `ADR-RF-012` §2 / `AGENTS.md` B-13） |
 | RocketMQ（削峰缓冲层） | **9876**（namesrv）/ **10911**（broker，本地单节点；`ADR-RF-014`） | — | 不冲突 ✅（本轮引入；**默认不启用**，`retail.mq.enabled=false` → 走同步路径） |
@@ -71,6 +73,7 @@
 | 数据库实例 | `retail_finance`（独立） | `floorplan`（独立） | 物理隔离 ✅ |
 | Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 起预留**（G-DB-7 审计授权调整顺延至 V21） | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
+| 网关限流配置键 | `retail.gateway.rate-limit.mode`（`redis` 缺省 / `memory`）+ `retail.gateway.rate-limit.*`（redis 模式）+ `retail.gateway.rate-limit.memory.*`（进程内模式）；环境变量 `RETAIL_GATEWAY_RATE_LIMIT_MODE` / `RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅（W-RL 引入；**两套互斥装配**，见 `ADR-RF-012` §12） |
 | 错误码前缀 | `RF_*` | `ADVANCE_*` / `CREDIT_*` 等 | 不冲突 ✅ |
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
 | 中台 jar | `com.company:company-platform-contracts:1.0.0-SNAPSHOT`（**✅ 已抽取**，独立仓 `../company-platform-contracts`，`mvn install` 到本地仓；34 单测全绿；RF 依赖 ≥ 此版本） | floorplan 不强制迁移（继续用 `com.company.floorplan.*` 现网类，基线全绿未动） | ✅ W1 完成 |
@@ -78,6 +81,19 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**用户指示**「把当前分支合并到 master」+「两套限流实现都合并，用一个配置作为开关，来采用哪种限流方式」
+>   —— 实施 **W-RL 网关限流双模式合入**（合并 `wt/ratelimit`）。
+>   改动面：`gateway/.../ratelimit/`（新增 `InMemoryRateLimitFilter` / `InMemoryRateLimitProperties` / `InMemoryRateLimitConfig` /
+>   `RateLimitPolicyResolver` / `RateLimitRegistry` / `TokenBucket` 等；`RateLimitFilter` 去 `@Component` 改由条件装配的 `RateLimitConfig` 建 bean）、
+>   `gateway/src/main/resources/application.yml`（新增 `retail.gateway.rate-limit.mode`，**共享禁区，已获授权**）、
+>   `gateway/pom.xml`（描述补双模式）、`scripts/smoke_ratelimit.py` / `scripts/smoke_ratelimit_edge.py` /
+>   `scripts/smoke_ratelimit_application.yml`（**`scripts/*` 共享禁区，已获授权**）、
+>   `AGENTS.md`（B-13 补「限流双实现互斥」+ §4 端口行补边缘 Nginx，**共享禁区，已获授权**）、
+>   `PROGRESS.md`（本文件，**共享禁区，已获授权**）、`docs/adr/ADR-RF-012`（**修订**：增第 12/13 条）、
+>   `R00 §3.8 §6`、`R02 §3.3 §9 §12`、`R07`、`R10`（K 组 A43–A49）、`README`、`docs/00-文档索引.md`、`interview/` 三份求职材料。
+>   **边界**：**不新增 Flyway 迁移**（V1–V20 字节未动）、**不改 `scripts/check_docs.py`**（C2/C13 期望值未变——
+>   本轮修订既有 `ADR-RF-012` 而非新建 ADR，ADR 仍是 15 份）、**未改父 pom**（网关 Redis 依赖本轮前已在）。
+>   **代价与风险**：两套实现都要维护；切模式会**静默降级**成单实例口径（`memory`），**切模式必须显式登记**。
 > - 2026-11-23：**用户授权**（「把解决的办法写到 agents.md 里」）实施 **Windows 行尾纪律固化**——修掉 `core.autocrlf=true` 把 `.sh` 检出成 CRLF、导致 WSL 侧 bash 解析失败的问题。
 >   改动面：`AGENTS.md`（**新增 §4.1 + 反模式 A-21 + §5 行尾门禁 + §11 检查单 + §12 自检**，**共享禁区，已获授权**）、
 >   `.gitattributes`（扩到 `*.py text eol=lf`，并锁定 `.gitattributes` 自身）、
@@ -286,6 +302,7 @@
 | 2026-11-23 | **持久层全量 MyBatis 化（W-MB，用户指示「jdbc 都换成 MyBatis」）** | **PASS**：12 个部署单元的持久层由 `JdbcTemplate` + `RowMapper` **全量迁到 MyBatis 3.0.3 注解 SQL**（无 XML、无 JPA）。红线：**SQL 语义、仓储方法签名、事务边界、对外接口一律不变**（`AGENTS.md` B-12）。改动面——①父 `pom.xml` 加 `mybatis-spring-boot-starter` 依赖管理，`infrastructure`/`external-api` 显式声明依赖；②新增共享映射件 `common/.../common/persistence/RowValues.java`（`asLong`/`asLongOrNull`/`asInt`/`asString`/`asBoolean`/`asInstant`/`asLocalDate`/`asBigDecimal`/`asTimestamp`/`asBytes`，NULL 口径对齐 `ResultSet.getXxx`：`getLong`→0、`getString`→null）；③各服务新增 `*.mapper` 包 + `@MapperScan` **显式列单一包**（精确装配，不做全包扫描，也不依赖 starter 自动扫描），共享 `infrastructure` 的 mapper 由 `RfOutboxConfig` 上的 `@MapperScan` 单独注册；④11 个服务 `application.yml` 加 `mybatis.configuration.local-cache-scope: STATEMENT`，**对齐原 JdbcTemplate「每次读都落库」的读语义**，避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存旧行；⑤唯一键幂等统一走 `ON CONFLICT` 原子语义（`ON CONFLICT DO NOTHING`，**不采用「捕获唯一键异常再重读」**——PG 事务内一旦触发唯一键错误，整笔事务即被置为 aborted），已对**真实 PG 实测**三处：`collection_cases` 部分唯一索引推断（`ON CONFLICT (loan_id) WHERE status <> 'CLOSED'` 首次 INSERT 0 1 / 再插 INSERT 0 0）、`bureau_report_triggers`（1 → 0）、`batch_runs` upsert（两次均 INSERT 0 1）；⑥MyBatis `@Options` 属性为 `keyColumn`（**单数**，无 `keyColumnNames`），自增主键统一「单 Map 参数 + `keyProperty` 回填」，等价原 `RETURNING` 空集语义。**验证**：`mvn -B clean package` → 17 模块 **BUILD SUCCESS（surefire 类级汇总 365 测试 0 失败 0 错误）**；`bash run-microservices.sh smoke` → **26/26 EXIT 0** + 前端页面 **46/46**；`scripts/e2e_w8.py` → **98/98 EXIT 0**；`external-simulator/demo_e2e.py` → **34/34**；`frontend/browser_e2e.py`（Playwright + 系统 Edge，逐按钮点击）→ **30/30**；`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C15 权威口径 365）。**未改 Flyway 迁移字节（V1–V17 全部 success、60 表）**、未引 MQ/Seata/Redis/对象存储、未改 `scripts/` 与 `run-microservices.sh`；文档口径同步回灌 `README` / `R00` / `R06` / `R10` / `AGENTS` 与 `interview/` 三份求职材料 |
 | 2026-11-23 | **W-CACHE / W-RL 产品档位配置化 + 两级缓存 + 网关限流**（用户裁决「配置化完整落地 + Caffeine L1 / Redis L2」+「网关限流补 Redis 令牌桶」） | **PASS**：`mvn -B clean package` → **BUILD SUCCESS（surefire 类级汇总 398 测试 0 失败 0 错误，55 个测试类）**；`bash run-microservices.sh smoke` → **33/33 EXIT 0**（原 26，+7：限流触发 429 / 首个请求放行 / 响应体含 `RF_GATEWAY_001` / 读档位 / 二次读走缓存 / 档位种子 / 快照三列已加）+ 前端页面 **46/46**；`scripts/e2e_w8.py` → **104/104 EXIT 0**（原 98，+6：建档位 → 按档位生成计划 → 快照落库 → 改版到版本 2 → 缓存已失效 → **历史计划快照与期次利息均不变**）；`external-simulator/demo_e2e.py` → **34/34**；`frontend/browser_e2e.py` → **30/30**；DB 实查 `flyway_schema_history` → **18 条全部 success**，四 schema **61 张表**，产品档位种子 2 条、`core.repayment_plans` 快照三列已加；`check_docs.py` → **PASS 15/15 EXIT 0**（C14 号段上限 = 18、C15 权威口径 = 398）。**关键断言实测**：改档位到版本 2（rateBp 100）后**历史计划快照仍为 `1|0`**、**历史期次利息仍为 0（不重算存量）**；限流探针路径首个请求放行、超限返回 429 且响应体含 `RF_GATEWAY_001`。**既有迁移字节未动、未引入 MQ/Seata/对象存储**；Redis 仅两类用途（只读配置 L2 + 网关限流态） |
 | 2026-11-23 | **生产就绪清单并入 R11 §2.1**（用户指示「将两轮生产就绪清单合并到 docs/R11 的投产准备阶段，并运行文档自检」） | **PASS**：两轮审计（主题分级 P0 10 项 / P1 9 项 / P2 9 项 + 模块视角 16 个 Maven 模块 + 端到端横切 8 项 + 「与现实差最远的六件事」+ 一处不要误改）合并进 `docs/R11-演进路线图与开工门禁.md` **§2.1「生产就绪清单（投产门禁展开）」**，同步 §0 文档控制（v2.1）、§1 引用口径、§2 阶段总览「投产准备」行判据、§9 自检表；**审计基线按当前 HEAD `3c46876` 复核**（Flyway 18 条迁移已执行 / 16 个 Maven 模块 / 四 schema 61 表），复核中**订正审计旧结论 2 处**：①网关**征信路径已有**专属限流规则（10 rps / 突发 20），真实缺口是**登录路径无专属规则**（落 `/api/**` 兜底 500 rps / 突发 1000）②出站 HTTP 计 **3 处裸客户端完全无超时 + 6 处只有连接超时、无读超时**（非「7 处全裸」）；另新发现 `external-api/application.yml` 的迁移条数注释与磁盘实际不符，已改写为「条数以迁移目录为准」。`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C13 文件数 31 项不变、C14 号段上限 = 18、C15 权威口径 = 398）——**隔离副本实测同结果**（剔除并行会话未提交的 `PROGRESS §9` 后复跑仍为 15/15）。**当前工作树整体 C4 FAIL 1 项，唯一原因是并行会话未提交的 `PROGRESS §9` 引用了超出 001–012 登记表的 ADR 编号**，按 `AGENTS.md §7` 不覆盖他人 WIP，待其补齐该 ADR 或改写引用即恢复。**本轮只改 1 份文档 + 1 处配置注释，未改业务代码、未改迁移字节、未碰 `scripts/` 禁区** |
+| 2026-11-24 | **W-RL 网关限流双模式合入 master**（用户指令「把当前分支合并到 master」+「两套限流实现都合并，用一个配置作为开关，来采用哪种限流方式」） | **PASS**：①`mvn -B -o package` → **BUILD SUCCESS**（surefire 类级汇总 **504 测试 / 74 个测试类 / 0 失败 0 错误 0 跳过**；较合入前 484 增 20 = 进程内过滤器 8 + 令牌桶 6 + 策略解析 3 + **模式开关互斥 3**）②**限流专项活体验收**：`scripts/smoke_ratelimit.py --mode redis` → **29/29 EXIT 0**；`--mode memory` → **33/33 EXIT 0**（两套实现各起真实网关进程打真实 HTTP；`mode=memory` 下「换 Authorization 头不换桶」、429 带 `X-RateLimit-*` 与 `details.policy`；`mode=redis` 下按调用方指纹分桶、429 响应体 `details.path`）③走网关冒烟 **33/33 EXIT 0** + 前端页面 **46/46 EXIT 0** + `scripts/e2e_w8.py` **104/104 EXIT 0**（**零回归**）④`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 权威口径 = 504）⑤**合并协调**：`git merge --no-ff wt/ratelimit`，**16 个冲突**（8 文档 + 5 代码 + 3 求职材料）全部按「**master 为底、只挑增量**」手工解；分支 12 个独有文件并入并**去类名冲突**（`InMemory*` 前缀，参数前缀 `retail.gateway.rate-limit.memory.*`）；**互斥装配**用互补 `@ConditionalOnProperty`（`redis` 缺省 `matchIfMissing=true` ／ `memory`）→ **同一时刻只注册一个限流过滤器**，`RateLimitModeSwitchTest` 在**装配期**钉死（叠加即双重限流）。**未新增 Flyway 迁移**（V1–V20 字节未动）、**未改 `scripts/check_docs.py`**（修订既有 `ADR-RF-012` 而非新建 ADR，ADR 仍 15 份） |
 | 2026-11-23 | **W-MERGE 并行路线合并收口验收**（`cf78529`，用户裁决「要，按 §9 裁决合并（MQ 不合）」） | **PASS**：①`mvn -B -o package` → **BUILD SUCCESS**（父 pom + 17 个 Maven 模块；surefire 类级汇总 **434 测试 / 61 个测试类 / 0 失败 0 错误 0 跳过**；本轮新增测试类：`statemachine` 引擎 1、`LoanStateMachineEngineTest`、`ReleaseStateMachineEngineTest`、`RegistryReceiptIdempotencyTest` 4 例、`RateLimitFilterTest` 6 例、`ClientIpResolverTest` 7 例）②注册端口段走网关冒烟 **33/33 EXIT 0** + 前端页面 **46/46 EXIT 0**（8090–8099 / 18081 / 18091，**WSL 侧**执行，见 §7 第 9 条）③`scripts/e2e_w8.py` → **104/104 EXIT 0**（走网关 18081，`run=e2e8-1795447783`）④`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C2 = 13 份 ADR、C13 = 32 项、C14 = 19 条迁移、C15 权威口径 = 434）⑤DB 实查 → `flyway_schema_history` **19 条全部 success**（installed_rank 1..19 连号）、四 schema **61 张表**（core 44 / integration 9 / pii 6 / audit 2）、`uk_receipt_order_authority_ref` 存在。**合并内容**：①`wt/lock` **只取回调幂等**（V19 表达式唯一索引 + `ON CONFLICT DO NOTHING` + 写入前查；**不合** Redisson / `common/lock`——锁不作正确性来源，`ADR-RF-013`）②`wt/statemachine` **合入**新增共享模块 `statemachine`（Spring StateMachine 4.0.0 进程内引擎；**领域状态图仍是唯一事实源**、`domain` 层零 Spring 不变）③`wt/ratelimit` **只取增量**（`nginx/` 可选部署形态 + `ClientIpResolver` 可信代理 IP 口径 + `trusted-proxy-cidrs` 默认空 = 不采信转发头；**master 的 Redis 令牌桶实现整体保留**）④`wt/mq` **不合**（违 `AGENTS.md` B-10，其 `V20__mq_envelope_channel.sql` 整条弃用）。**过程记录（三次起栈失败均为环境污染 / 并发编排，非代码缺陷）**：①共享验证库被 `wt/mq` 路线迁移污染 → Flyway 报 `Detected resolved migration not applied to database: 19`，**重建库**后 19 条干净重跑（**未用 `outOfOrder=true` 绕过**）②两个会话**同时起栈抢同一注册端口段**（8090 / 18081），双方共用 `.microservice-pids` 目录互删 pid 文件 → 孤儿 JVM 占端口③`run-microservices.sh` 的 `port_in_use()` 用 Windows 版 `netstat -ano`，在 WSL 下恒为空 → 占用拦截在 WSL 永不生效（**脚本属共享禁区，本轮未改**，仅记录，见 §7 第 13 条）；**串行化后一次跑通**。**未改已执行迁移字节**；G-DB-7 审计写入授权调整顺延 V20（`R06 §6` / `PROGRESS §2` 已登记） |
 
 | 2026-11-23 | **Windows 行尾纪律固化 + WSL 活体复现**（用户指示「把解决的办法写到 agents.md 里」） | **PASS**：①**WSL 活体复现**（Ubuntu / bash 5.3.9）——CRLF 脚本 `bash x.sh` → `line 2: set: pipefail\r: invalid option name`；CRLF 脚本直接执行 → `env: $'bash\r': No such file or directory`；CRLF `.py` 直接执行 → `env: $'python3\r': No such file or directory`，改用 `python3` 走解释器 → 正常；LF 同款脚本 → 全部正常。**关键实测：`bash -n` 对 CRLF 脚本不报错** → 该问题**只能靠 `git ls-files --eol` 判定**，语法检查检不出。②**仓库状态实测**：`git ls-files --eol` 索引侧**全为 `i/lf`**（blob 本身是 LF，**仓库没被提交坏**，坏的是工作区副本）；工作区侧 `.sh` 因 `.gitattributes` 已是 `w/lf`，`.py` 此前为 `w/crlf` → 本轮随属性扩围转回 LF。③**修复落盘**：`.gitattributes` 增 `*.py text eol=lf`；本仓 `core.autocrlf` 由 `true` 改为 `input`；`AGENTS.md` 新增 §4.1（现象 / 根因 / 三层修复 / 判定命令 / 纪律）+ 反模式 A-21 + §5 提交前行尾门禁 + §11 检查单。④`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**。**未改任何业务代码、未改已执行迁移字节、未碰 `scripts/` 禁区文件**；`AGENTS.md` / `PROGRESS.md` 属共享禁区，本轮经用户明确授权修改，理由已记入 §2 变更记录 |
@@ -307,7 +324,7 @@
    （真实 broker 活体联调）承担，单测与关闭态冒烟**都不等于** MQ 链路已通。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
    （V1 起共 20 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 484，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 504，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。
@@ -371,7 +388,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 17 模块 12 部署单元、62 表 / 20 迁移、484 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 17 模块 12 部署单元、62 表 / 20 迁移、504 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 
@@ -415,7 +432,7 @@
 > **⚠️ 后续变更（2026-11-23 当日更晚）**：用户裁决「**改口径合并 wt/mq**」，本节 `wt/mq` 行「不合 MQ 本身」的裁决**已被推翻**——
 > MQ 通道按 **`ADR-RF-014`** 合入 master（默认关闭、只作削峰缓冲层），详见 §0 轮次、§2 变更记录与 §6 的 W-MQ 验证行。
 > **本节保留裁决原文作为合并依据**；实际执行结果与实测数据见 **§6 验证记录（W-MERGE 行）**——
-> 代码合并提交 `cf78529`、收口回灌提交 `be856e6`，验收判据 = `mvn -B -o package`（当前 484 测试 0 失败）·
+> 代码合并提交 `cf78529`、收口回灌提交 `be856e6`，验收判据 = `mvn -B -o package`（当前 504 测试 0 失败）·
 > 走网关冒烟 33/33 · 前端页面 46/46 · `scripts/e2e_w8.py` 104/104 · `scripts/check_docs.py` PASS 15/15 EXIT 0 ·
 > Flyway V1–V20 共 20 条全部 success、四 schema 62 表。
 >
@@ -429,7 +446,7 @@
 |---|---|---|---|---|
 | `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **4**（`1b97244` + `5dff59f` + `a788505` + 合入 master `7663bd4`） | ✅ 已收口并**合入 master**（2026-11-24 用户「提交吧」） |
 | `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **1**（`a3e9057`） | ✅ 已收口（**不合并**，违 B-10） |
-| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **4**（`ec9fcf3` + `0ec3fc1` + `b7a3852` + `8d1a6de`） | ✅ 已收口（**只取增量**） |
+| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **4**（`ec9fcf3` + `0ec3fc1` + `b7a3852` + `8d1a6de`） | ✅ 已收口 → **2026-11-24 已整支合入 master**（用户改口径：两套限流实现 + 一个开关，不再「只取增量」） |
 | `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **2**（`b815d3e` + `a5c7fbb`） | ✅ 已收口（**已合并**） |
 
 分支创建于 2026-11-23 21:29–21:41（基线 `1422b55`），master 随后提交 `3c46876`（W-CACHE/W-RL）。
@@ -497,7 +514,12 @@
 
 ### 9.4 合并后的 master 状态（2026-11-24 00:5x 复核）
 
+> **后续取代（2026-11-24）**：§9.2 对 `wt/ratelimit` 的「只取三项增量、保留 master 实现」裁决，已被**用户新裁决取代**——
+> 「两套限流实现都合并，用一个配置作为开关，来采用哪种限流方式」。`wt/ratelimit` 已于 2026-11-24
+> 以 `git merge --no-ff` 合入 master（限流实现**双轨** + `retail.gateway.rate-limit.mode` 开关 + 互斥装配）。
+> §9.2 其余裁决（`wt/lock` 只取回调幂等、`wt/mq` 不合、`wt/statemachine` 合入）**仍然有效**。
+
 - master HEAD `af9869d`（**W-LOCK Redisson 分布式锁合入 master**，合并提交；父提交 `7663bd4` = W-MQ 合入 + Windows 行尾纪律固化，再往前为 `cf78529` 合并 58 文件与 `be856e6` 收口回灌）；**领先 `origin/master` 14 个提交，未推送**（推送属对外可见动作，需用户明示）。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
-- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 484）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 504）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
 - 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**保留待清理**。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。

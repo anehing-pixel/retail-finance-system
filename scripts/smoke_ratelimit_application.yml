@@ -1,0 +1,86 @@
+# 网关限流冒烟专用配置（scripts/smoke_ratelimit.py 与 scripts/smoke_ratelimit_edge.py 使用）。
+#
+# 这不是生产配置：
+#   · 端口与上游由脚本在运行时动态填入（__GATEWAY_PORT__ / __STUB_URI__）；
+#   · 只保留一条路由（/api/** → 本地桩上游），用于验证限流发生在转发之前；
+#   · 限流额度调成极小值，便于在秒级内触发 429；
+#   · 网关限流有两套实现（redis 分布式令牌桶 / memory 进程内令牌桶），
+#     由 __RATE_LIMIT_MODE__ 二选一；两套配置都写在本文件里，
+#     脚本按模式填各自那一套的占位符，未被选中的一套不生效。
+#
+# 生产口径见 gateway/src/main/java/com/company/retail/gateway/ratelimit/RateLimitProperties.java
+# 与 docs/R02-总体架构设计.md §3.4。
+
+server:
+  port: __GATEWAY_PORT__
+
+spring:
+  application:
+    name: api-gateway-ratelimit-smoke
+  data:
+    redis:
+      # redis 模式的限流态所在 Redis（与网关生产配置同口径：REDIS_HOST / REDIS_PORT）
+      host: __REDIS_HOST__
+      port: __REDIS_PORT__
+      # 与生产同口径的短超时：Redis 抖动时快速 fail-open，而不是把请求挂住
+      connect-timeout: 2s
+      timeout: 2s
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        fail-fast: false
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: core
+          uri: __STUB_URI__
+          predicates:
+            - Path=/api/**
+
+retail:
+  gateway:
+    rate-limit:
+      # 限流实现选择：redis（分布式令牌桶，默认）/ memory（进程内令牌桶）
+      mode: __RATE_LIMIT_MODE__
+      # ---------- redis 实现（mode=redis 时生效）----------
+      enabled: __REDIS_ENABLED__
+      # Redis 不可用时放行（保护层不拖垮主链路；生产可切 false 变 fail-closed）
+      fail-open: __REDIS_FAIL_OPEN__
+      # 计数维度：auth_or_ip（Authorization 头哈希，退化到 IP）/ ip
+      key-by: __REDIS_KEY_BY__
+      key-prefix: "__REDIS_KEY_PREFIX__"
+      # 可信代理网段（逗号分隔 CIDR）：为空 = 不采信 X-Forwarded-For
+      trusted-proxy-cidrs: "__REDIS_TRUSTED__"
+      rules:
+        # 健康检查单独一段：探活流量不应占用业务配额（生产同样建议如此）
+        - path: /api/health
+          replenish-rate: __REDIS_HEALTH_REPLENISH__
+          burst-capacity: __REDIS_HEALTH_BURST__
+        - path: /api/strict/**
+          replenish-rate: __REDIS_STRICT_REPLENISH__
+          burst-capacity: __REDIS_STRICT_BURST__
+        - path: /api/**
+          replenish-rate: __REDIS_REPLENISH__
+          burst-capacity: __REDIS_BURST__
+      # ---------- memory 实现（mode=memory 时生效）----------
+      memory:
+        enabled: __MEMORY_ENABLED__
+        max-tracked-keys: __MEMORY_MAX_TRACKED_KEYS__
+        idle-eviction-seconds: __MEMORY_IDLE_SECONDS__
+        trusted-proxy-cidrs: "__MEMORY_TRUSTED__"
+        default-policy:
+          capacity: __MEMORY_DEFAULT_CAPACITY__
+          refill-per-second: __MEMORY_DEFAULT_REFILL__
+        rules:
+          - path-prefix: /api/health
+            capacity: __MEMORY_HEALTH_CAPACITY__
+            refill-per-second: __MEMORY_HEALTH_REFILL__
+          - path-prefix: /api/strict/
+            capacity: __MEMORY_STRICT_CAPACITY__
+            refill-per-second: __MEMORY_STRICT_REFILL__
+          - path-prefix: /api/
+            capacity: __MEMORY_CAPACITY__
+            refill-per-second: __MEMORY_REFILL__

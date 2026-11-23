@@ -2,7 +2,7 @@
 
 > 日本第三方信贩公司 · 面向消费者（C 端）的新车零售金融 · 与 `floorplan-system` 同公司、共享中台能力
 > **架构：Spring Cloud 微服务，直接对齐 floorplan 的微服务形态**（10 个业务服务 + 网关 + DMZ）。
-> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；17 模块代码 + Flyway V1–V20 + 构建 484 测试 0 失败 + 走网关冒烟 33/33 + 全链路 E2E 104/104。文档全文使用中文。**
+> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；17 模块代码 + Flyway V1–V20 + 构建 504 测试 0 失败 + 走网关冒烟 33/33 + 全链路 E2E 104/104。文档全文使用中文。**
 > 先读 [`AGENTS.md`](AGENTS.md)（怎么干活），进度以 [`PROGRESS.md`](PROGRESS.md)（唯一事实源）为准，
 > 设计理由见 [`docs/00-文档索引.md`](docs/00-文档索引.md)。
 
@@ -63,7 +63,7 @@
 | 服务装配 | 精确装配 | 每服务只扫自身包 + `@Import` 按类注入，不做全包扫描 |
 | 事务一致性 | 本地事务 + 行锁 + 唯一约束；Transactional Outbox（数据库轮询） | **不引入 MQ / Seata / 分布式事务** |
 | 缓存 | **两级缓存**：Caffeine L1（进程内，默认 10s）+ Redis L2（默认 60s） | 只缓存**只读业务配置**（产品档位等）；Redis 不可用自动降级直读；**绝不缓存余额 / 核销流水 / 个人信息 / 征信与审查结果**（`ADR-RF-012`） |
-| 网关限流 | Redis 令牌桶（Lua 原子扣减） | 键取 `Authorization` 头 SHA-256 哈希（不存凭据）；超限返回 429 + `Retry-After` + 统一 `ApiResponse`；Redis 不可用 **fail-open**；规则可配（`ADR-RF-012`） |
+| 网关限流 | **双模式 + 一个开关**：`redis` = Redis 令牌桶（Lua 原子扣减，**缺省**）／`memory` = 进程内令牌桶 | 开关 `retail.gateway.rate-limit.mode`（`redis` \| `memory`），两套**互斥装配**（同一时刻只注册一个限流过滤器，不会双重限流）；`redis` 模式键取 `Authorization` 头 SHA-256 哈希（不存凭据）、超限 429 + `Retry-After` + 统一 `ApiResponse`、Redis 不可用 **fail-open**；`memory` 模式零外部依赖但为**单实例口径**（`ADR-RF-012` §12、`R02 §3.3`） |
 | 分布式锁 | Redisson 3.27.2（按业务键加锁，锁在**事务提交后**释放） | 只收敛并发窗口，**正确性仍由 DB 唯一索引 + `ON CONFLICT` 保证**；Redis 不可达即 fail-closed 拒写（`RF_LOCK_002`/503），不降级放行；锁键不落明文业务标识（`ADR-RF-015`） |
 | 同步调用 | Feign，仅用于门禁（fail-closed） | 必须透传 JWT；fallback 一律拒绝而非放行 |
 | 认证 | JWT 同密钥本地验签、零信任（网关不验签） | 员工侧与客户侧**两套密钥**，见 ADR-RF-004 |
@@ -101,7 +101,7 @@ flowchart TB
     BANK[银行 / 代收机构]
     GOV[车辆登记机关]
   end
-  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（Redis 令牌桶）"]
+  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（redis / memory 双模式）"]
   DMZ["external-api :18091<br/>DMZ：验签 · 签名 · nonce · partner scope"]
   CORE["retail-core :8090<br/>核心账务（不拆）<br/>债权·还款计划·代付·入金核销·结清"]
   SVC["auth :8091 · customer(PII) :8092 · application :8093<br/>underwriting :8094 · bureau :8095 · contract :8096<br/>title-release :8097 · servicing :8098 · recon :8099"]
@@ -126,7 +126,7 @@ flowchart TB
 
 | 服务 | 端口 | 职责 |
 |---|---|---|
-| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流已实现**（Redis 令牌桶：键取 `Authorization` 头哈希、规则按路径 Ant 最具体优先、Redis 不可用 fail-open，配置见 `retail.gateway.rate-limit.*`） |
+| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流已实现**（双模式一个开关：`retail.gateway.rate-limit.mode` = `redis`（缺省，Redis 令牌桶：键取 `Authorization` 头哈希、规则按路径 Ant 最具体优先、Redis 不可用 fail-open）／`memory`（进程内令牌桶，零依赖、单实例口径）；两套互斥装配，配置见 `retail.gateway.rate-limit.*` 与 `retail.gateway.rate-limit.memory.*`） |
 | `external-api` | 18091 | DMZ：DMS / 征信机构 / 支付回调的入站验签、出站签名、nonce、partner scope |
 | `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**唯一跑 Flyway** |
 | `auth-service` | 8091 | 员工侧 + 客户侧双主体 JWT 签发/验签 |
@@ -181,7 +181,7 @@ flowchart TB
 ## 5. 诚实的边界（防止把文档读成已实现）
 
 1. **已交付文档、工程约定与全部计划内代码**：17 模块（四层共享 + 状态机引擎底座 + 10 业务服务 + 网关 + DMZ）、
-   Flyway V1–V20（62 张表实测）、构建 484 测试 0 失败、走网关冒烟 33/33、全链路 E2E 104/104（`PROGRESS §6`）。
+   Flyway V1–V20（62 张表实测）、构建 504 测试 0 失败、走网关冒烟 33/33、全链路 E2E 104/104（`PROGRESS §6`）。
    实现范围以 `PROGRESS.md`（唯一事实源）为准；外部自动对接未实现（见第 3 条）。
 2. **C-01~C-12 系统口径已定源（2026-11-22）**：`C-01` 用户签（双形态并行）；`C-02`~`C-12` 架构 AI 裁决（用户授权
    「先定合理方向，后续可按新需求改动」），裁决值与外部核实项见 `R01 §6 §7`。**法务效力判断不实现**——系统实现

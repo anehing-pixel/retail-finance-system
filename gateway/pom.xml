@@ -11,7 +11,7 @@
 
   <artifactId>retail-api-gateway</artifactId>
   <name>Retail Finance :: Api Gateway</name>
-  <description>内部网关 :18081——路径切流、X-Request-Id、客户/员工 BFF 入口；本阶段不验签（鉴权下沉各服务）</description>
+  <description>内部网关 :18081——路径切流、X-Request-Id、令牌桶限流（redis/memory 双模式，一个开关切换）、客户/员工 BFF 入口；本阶段不验签（鉴权下沉各服务）</description>
 
   <dependencies>
     <dependency>

@@ -78,6 +78,9 @@ retail:
     rate-limit:
       # 网关令牌桶限流（Redis + Lua 原子扣减）
       enabled: ${RETAIL_GATEWAY_RATE_LIMIT_ENABLED:true}
+      # 限流实现模式：redis（Redis 令牌桶，分布式准确，缺省）/ memory（进程内令牌桶，单实例口径）
+      # 两个实现互斥装配，同一时刻只注册一个限流过滤器，不会双重限流（R02 §3.3）
+      mode: ${RETAIL_GATEWAY_RATE_LIMIT_MODE:redis}
       # Redis 不可用时放行（保护层不拖垮主链路）；生产可切 false 变 fail-closed
       fail-open: ${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:true}
       # 限流键维度：auth_or_ip（Authorization 头哈希，退化到 IP）/ ip

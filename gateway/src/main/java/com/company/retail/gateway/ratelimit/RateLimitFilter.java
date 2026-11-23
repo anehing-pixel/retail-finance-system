@@ -10,7 +10,6 @@ import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpResponse;
-import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -20,6 +19,10 @@ import java.util.Map;
 
 /**
  * 网关限流过滤器（Redis 令牌桶）。
+ *
+ * <p><b>只在 {@code retail.gateway.rate-limit.mode=redis}（缺省）时装配</b>；
+ * 切到 {@code memory} 时改由进程内令牌桶实现接管（{@link InMemoryRateLimitFilter}），
+ * 两者<b>互斥</b>，不会出现双重限流。开关口径见 {@code R02 §3.3}。</p>
  *
  * <p><b>定位</b>：网关是统一入口，在路由切流之前做令牌桶限流，
  * 防止外部对同一入口高频刷请求（外部回调、爬取、误重试）。
@@ -31,7 +34,6 @@ import java.util.Map;
  *
  * <p>顺序排在 {@code RequestIdFilter}(-100) 之后，保证被限流的响应也带请求号。</p>
  */
-@Component
 public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);

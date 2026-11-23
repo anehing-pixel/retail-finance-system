@@ -18,6 +18,16 @@ public class RateLimitProperties {
     /** 限流总开关。 */
     private boolean enabled = true;
 
+    /**
+     * 限流实现模式（{@code redis} / {@code memory}）。
+     *
+     * <p>网关有两套限流实现：{@code redis} = Redis 令牌桶（Lua 原子扣减，分布式准确，<b>默认</b>）；
+     * {@code memory} = 进程内令牌桶（零外部依赖，<b>单实例口径</b>，多副本时实际放行量
+     * ≈ 单副本额度 × 副本数）。两者<b>互斥装配</b>，同一时刻只注册一个限流过滤器，
+     * 不会出现双重限流。口径见 {@code R02 §3.3}。</p>
+     */
+    private String mode = "redis";
+
     /** Redis 不可用时是否放行（true = fail-open，默认）。 */
     private boolean failOpen = true;
 
@@ -46,6 +56,14 @@ public class RateLimitProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode == null || mode.isBlank() ? "redis" : mode.trim();
     }
 
     public boolean isFailOpen() {

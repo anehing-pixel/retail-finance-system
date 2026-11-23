@@ -33,15 +33,21 @@
 
 ## 3. ⚠️ 必须同时配网关的可信代理网段
 
-网关默认**不采信** `X-Forwarded-For`（`retail.ratelimit.trusted-proxy-cidrs` 默认为空），
-防止「换一个头就能重置限流」。前置 Nginx 后必须显式登记：
+网关默认**不采信** `X-Forwarded-For`（可信代理网段默认为空），防止「换一个头就能重置限流」。
+前置 Nginx 后必须显式登记——**按网关当前限流模式选对应的那一个键**：
 
 ```bash
 # 同机部署
-export RETAIL_RATELIMIT_TRUSTED_PROXY_CIDRS=127.0.0.1/32
+export RETAIL_GATEWAY_RATE_LIMIT_TRUSTED_PROXY_CIDRS=127.0.0.1/32              # mode=redis（缺省）
+export RETAIL_GATEWAY_RATE_LIMIT_MEMORY_TRUSTED_PROXY_CIDRS=127.0.0.1/32        # mode=memory
 # 容器部署（示例网段，按实际调整）
-export RETAIL_RATELIMIT_TRUSTED_PROXY_CIDRS=172.16.0.0/12
+export RETAIL_GATEWAY_RATE_LIMIT_TRUSTED_PROXY_CIDRS=172.16.0.0/12
+export RETAIL_GATEWAY_RATE_LIMIT_MEMORY_TRUSTED_PROXY_CIDRS=172.16.0.0/12
 ```
+
+> 配置键：`retail.gateway.rate-limit.trusted-proxy-cidrs`（`mode=redis`）／
+> `retail.gateway.rate-limit.memory.trusted-proxy-cidrs`（`mode=memory`）；
+> 限流模式由 `retail.gateway.rate-limit.mode` 选择（口径见 `R02 §3.3`）。
 
 不登记的后果：网关看到的所有来源都是 Nginx 自己 → 所有客户端共享一个桶 →
 正常流量被误伤，而攻击流量共享额度，等于没限。
@@ -101,13 +107,14 @@ done | sort | uniq -c
 ```
 
 边缘层 429 的响应体是统一响应结构（`code=RF_GATEWAY_001`，`details.layer=edge`）；
-网关层 429 的响应体 `details.layer` 缺省、`details.policy` 为命中的路由段，
-并带 `Retry-After` 与 `X-RateLimit-*` 响应头。
+网关层 429 的响应体 `details.layer` 缺省（`mode=memory` 时 `details.policy` 为命中的路由段，
+`mode=redis` 时为 `details.path`），并带 `Retry-After`；`mode=memory` 另带 `X-RateLimit-*` 响应头。
 
 ## 6. 参数怎么定
 
 `nginx.conf` 里的 `rate=` / `burst=` / `limit_conn` 是**建议起始值**（⚙️ 可配置覆盖），
-不是业务裁决。网关侧默认值见 `RateLimitProperties`（`retail.ratelimit.*`）。
+不是业务裁决。网关侧默认值见 `RateLimitProperties`（`retail.gateway.rate-limit.*`，`mode=redis`）
+与 `InMemoryRateLimitProperties`（`retail.gateway.rate-limit.memory.*`，`mode=memory`）。
 上线前按真实流量重标：边缘层按「单机可承受并发」反推，网关层按「单段业务峰值」正推。
 
 ## 7. 已知边界
