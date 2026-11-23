@@ -61,7 +61,37 @@ docker run --rm -p 18076:18076 -p 18077:18077 \
   nginx:alpine
 ```
 
-## 5. 怎么验证限流真的生效
+## 5. 实测记录（2026-11-23，WSL + nginx 1.28.3）
+
+`scripts/smoke_ratelimit_edge.py` → **13/13 EXIT 0**：
+
+| # | 断言 | 结果 |
+|---|---|---|
+| 1 | `nginx -t` 校验**交付配置本身** | ✅ |
+| 2 | 真实 nginx 进程启动并可服务 | ✅ |
+| 3 | 突发额度内放行、超额被边缘层拒绝 | ✅ |
+| 4 | 边缘 429 响应体为统一结构、错误码 `RF_GATEWAY_001` | ✅ |
+| 5 | 边缘 429 标记来源层 `details.layer=edge` | ✅ |
+| 6 | `X-Request-Id` 透传到上游 | ✅ |
+| 7 | `X-Forwarded-For` / `X-Real-IP` 透传到上游 | ✅ |
+| 8–13 | **双层联动**：真实 nginx 前置真实网关 → 同客户端被**网关层**拒绝（`details.policy`）、拒绝体不含 `edge`、换客户端 IP 独立放行 | ✅ |
+
+复现（需 nginx；WSL 侧以 root 运行，避免 pid 文件权限问题）：
+
+```bash
+wsl -u root python3 scripts/smoke_ratelimit_edge.py
+```
+
+**实测踩坑（已修进配置）**：
+
+1. `location @ratelimit_json` **不能写在 `http` 层** → nginx 报 *"location directive is not allowed here*；
+   已移入两个 `server` 块（`error_page 429 = @ratelimit_json` 仍在 http 层统一声明）。
+2. `access_log` 用相对路径（`logs/…`）时，非默认 prefix 下目录不存在 → `nginx -t` 直接失败；
+   已改为 `/var/log/nginx/rf_access.log`（源码编译/自定义 prefix 改回 `<prefix>/logs/rf_access.log` 并确保目录存在）。
+3. `nginx -t` 会尝试写 pid 文件（默认 `/run/nginx.pid`）→ 普通用户会报 *Permission denied*；
+   校验用 root 执行，或在配置里显式指定 `pid`。
+
+## 6. 怎么验证限流真的生效（手工）
 
 ```bash
 # 连续打，超过 burst=100 即应出现 429
