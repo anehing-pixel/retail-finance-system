@@ -262,6 +262,11 @@ case "${1:-}" in
       "$PYTHON" frontend/smoke_frontend.py
       RC=$?
     fi
+    if [ $RC -eq 0 ]; then
+      echo "=== MQ 通道冒烟（默认关闭 = 零回归；开启态见 MqEnvelopeLiveTest）==="
+      SMOKE_GATEWAY=http://127.0.0.1:18081 DB_CONTAINER=$DB_CONTAINER "$PYTHON" scripts/smoke_mq.py
+      RC=$?
+    fi
     echo "=== 冒烟退出码: $RC ==="
     do_stop
     exit $RC

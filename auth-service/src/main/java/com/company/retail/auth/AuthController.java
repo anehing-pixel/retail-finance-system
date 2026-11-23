@@ -1,4 +1,4 @@
-package com.company.retail.auth.controller;
+package com.company.retail.auth;
 
 import com.company.platform.exception.BusinessException;
 import com.company.platform.response.ApiResponse;

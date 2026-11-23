@@ -2,19 +2,23 @@ package com.company.retail.contract.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.common.messaging.CipherEnvelope;
+import com.company.retail.common.messaging.EnvelopeCipher;
+import com.company.retail.common.messaging.EnvelopePublisher;
+import com.company.retail.common.messaging.EnvelopeTopics;
 import com.company.retail.contract.domain.Contract;
 import com.company.retail.contract.domain.ContractDomainException;
 import com.company.retail.contract.domain.ContractPolicy;
 import com.company.retail.contract.domain.ContractStatus;
 import com.company.retail.contract.domain.StatutoryDocument;
 import com.company.retail.contract.domain.TransactionScheme;
-import com.company.retail.contract.integration.HttpDeliveryChannelAdapter;
 import com.company.retail.contract.persistence.ContractRepository;
 import com.company.retail.contract.persistence.StatutoryDocumentRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +35,11 @@ import java.util.Map;
  *
  * <p>C-08：法定书面文件只做交付动作留痕与状态记录，不实现书面文件效力判断；
  * 冷静期 8 日占位参数可配，不实现冷静期效力判断。</p>
+ *
+ * <p><b>ADR-RF-014 削峰分支</b>：MQ 开启时，送达通道受理推送改为「封密文信封入队」，
+ * 由消费端 {@link com.company.retail.contract.messaging.ContractDeliveryEnvelopeConsumer}
+ * 解密后执行<b>同一个</b> {@link DeliveryHandler} 动作（同步与异步只此一份业务逻辑）；
+ * 通道未启用时行为与原来逐字一致（事务边界、状态推进、返回值均不变）。</p>
  */
 @Service
 public class ContractApplicationService {
@@ -43,22 +52,29 @@ public class ContractApplicationService {
     private final OutboxPublisher outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    /** 送达通道（W-SIM2 双模：null=未配置，纯 DB 留痕 C-08）。 */
-    private final HttpDeliveryChannelAdapter deliveryAdapter;
+    /** 送达动作处理器（同步路径与 MQ 消费端共用同一份业务动作，ADR-RF-014）。 */
+    private final DeliveryHandler deliveryHandler;
+    /** MQ 通道（ADR-RF-014：缺 bean 或未启用 → 走同步路径，行为与原来逐字一致）。 */
+    private final ObjectProvider<EnvelopePublisher> publisherProvider;
+    private final ObjectProvider<EnvelopeCipher> cipherProvider;
 
     public ContractApplicationService(ContractRepository contractRepository,
                                       StatutoryDocumentRepository documentRepository,
                                       ContractPolicy policy,
                                       OutboxPublisher outbox,
                                       ObjectMapper objectMapper,
-                                      org.springframework.beans.factory.ObjectProvider<HttpDeliveryChannelAdapter> deliveryAdapter) {
+                                      DeliveryHandler deliveryHandler,
+                                      ObjectProvider<EnvelopePublisher> publisherProvider,
+                                      ObjectProvider<EnvelopeCipher> cipherProvider) {
         this.contractRepository = contractRepository;
         this.documentRepository = documentRepository;
         this.policy = policy;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
         this.clock = Clock.system(Contract.JST);
-        this.deliveryAdapter = deliveryAdapter.getIfAvailable();
+        this.deliveryHandler = deliveryHandler;
+        this.publisherProvider = publisherProvider;
+        this.cipherProvider = cipherProvider;
     }
 
     /** POST /api/contracts：创建合同（DRAFT）。uk_contract_app 幂等兜底：一个申请一份合同。 */
@@ -92,16 +108,39 @@ public class ContractApplicationService {
         StatutoryDocument document = new StatutoryDocument(null, contractId, docType, templateVersion,
                 Instant.now(clock), deliveryMethod, attachmentId, null);
         long documentId = documentRepository.insertDelivery(document, traceId);
-        // 送达通道受理推送（W-SIM2：咨询性副本，失败只记日志不中断留痕主流程；权威留痕=本表）
-        if (deliveryAdapter != null) {
-            String receiptRef = deliveryAdapter.notifyDelivered(contractId, docType, deliveryMethod, traceId);
-            if (receiptRef != null) {
-                log.info("送达通道已受理 contractId={} docType={} receiptRef={}", contractId, docType, receiptRef);
-            } else {
-                log.warn("送达通道推送未受理（留痕主流程不受影响）contractId={} docType={}", contractId, docType);
-            }
+        // 送达动作：MQ 开启 → 封密文入队（通道调用移出事务线程，削峰）；未启用 → 就地同步送达
+        // （W-SIM2：咨询性副本，失败只记日志不中断留痕主流程；权威留痕=本表）
+        DeliveryHandler.DeliveryCommand command = DeliveryHandler.DeliveryCommand.of(
+                contractId, docType, deliveryMethod, templateVersion, attachmentId, traceId);
+        if (!enqueueDelivery(command)) {
+            deliveryHandler.deliver(command);
         }
         return documentId;
+    }
+
+    /**
+     * 削峰分支：把送达载荷封成密文信封投进 MQ（ADR-RF-014）。
+     *
+     * <p>broker 上只允许出现信封（密文 + 非个人信息业务键）；载荷明文只存在于密文内部。</p>
+     *
+     * @return true = 已入队（调用方跳过同步送达）；false = MQ 未启用（调用方走同步路径）
+     */
+    private boolean enqueueDelivery(DeliveryHandler.DeliveryCommand command) {
+        EnvelopePublisher publisher = publisherProvider == null ? null : publisherProvider.getIfAvailable();
+        if (publisher == null || !publisher.enabled()) {
+            return false;
+        }
+        EnvelopeCipher cipher = cipherProvider == null ? null : cipherProvider.getIfAvailable();
+        if (cipher == null) {
+            throw new IllegalStateException("MQ 通道已启用但信封加解密器缺失，拒绝降级为同步送达");
+        }
+        CipherEnvelope envelope = cipher.seal(EnvelopeTopics.DELIVERY,
+                String.valueOf(command.contractId()),
+                DeliveryHandler.payloadJson(command), command.traceId());
+        publisher.publish(EnvelopeTopics.DELIVERY, envelope);
+        log.info("送达已封密文入队 contractId={} docType={} envelopeId={}",
+                command.contractId(), command.docType(), envelope.envelopeId());
+        return true;
     }
 
     /** DOCUMENTS_DELIVERED：交付留痕齐全后推进（模板按 C-08 配置选定）。 */

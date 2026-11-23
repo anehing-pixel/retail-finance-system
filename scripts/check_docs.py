@@ -111,6 +111,53 @@ def read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
+def adr_numbers() -> list[int]:
+    """磁盘上已落盘的 ADR 编号（升序）。"""
+    nums = []
+    for p in sorted(ADR.glob("ADR-RF-*.md")):
+        m = re.match(r"ADR-RF-(\d{3})-", p.name)
+        if m:
+            nums.append(int(m.group(1)))
+    return nums
+
+
+def known_missing_migration_numbers() -> set[int]:
+    """PROGRESS.md §2 号段占用表里登记为「已知缺号」的 Flyway 版本号。
+
+    缺号有两种合法成因，都必须在占用表里逐个登记，否则视为号段断裂
+    （两个并行流建同号迁移 = 启动失败的老教训）：
+      ① **预留**（如 G-DB-7 授权调整的 V19）——号段已规划、尚未落盘；
+      ② **已被并行流占用**（如 master 并行流的 V18）——脚本与执行都在另一条工作流，
+         本分支磁盘上就是缺号，合并时随该流带入。
+    """
+    reserved: set[int] = set()
+    prog = read(ROOT / "PROGRESS.md")
+    for line in prog.splitlines():
+        if "预留" not in line and "并行流占用" not in line:
+            continue
+        for lo, hi in re.findall(r"V(\d+)(?:–V(\d+))?", line):
+            start = int(lo)
+            end = int(hi) if hi else start
+            for v in range(start, end + 1):
+                reserved.add(v)
+    return reserved
+
+
+def reserved_adr_numbers() -> set[int]:
+    """PROGRESS.md §2 号段占用表里登记为「预留」的 ADR 编号。
+
+    并行工作流持有编号时，本仓暂时缺号是正常的；但缺号必须在占用表里显式登记为预留，
+    否则视为编号断裂（两个并行流建同号 = 启动失败的老教训，ADR 号段同理）。
+    """
+    reserved: set[int] = set()
+    prog = read(ROOT / "PROGRESS.md")
+    for line in prog.splitlines():
+        if "预留" in line:
+            for n in re.findall(r"ADR-RF-(\d{3})", line):
+                reserved.add(int(n))
+    return reserved
+
+
 # ---------------------------------------------------------------------------
 # C1 / C2：编号连续唯一
 # ---------------------------------------------------------------------------
@@ -132,9 +179,9 @@ def check_numbering() -> None:
         m = re.match(r"ADR-RF-(\d{3})-", p.name)
         if m:
             anums.append(int(m.group(1)))
-    ok2 = len(a_files) == 13 and sorted(anums) == list(range(1, 14)) and len(set(anums)) == 13
+    ok2 = len(a_files) == 14 and sorted(anums) == list(range(1, 15)) and len(set(anums)) == 14
     record("C2", "ADR 编号连续唯一", ok2,
-           f"实际 {len(a_files)} 份，编号 {sorted(anums)}，期望 001–013")
+           f"实际 {len(a_files)} 份，编号 {sorted(anums)}，期望 001–014")
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +229,7 @@ def check_index_refs() -> None:
 # ---------------------------------------------------------------------------
 def check_refs_and_cxx() -> None:
     r_ok = set(range(0, 12))
-    a_ok = set(range(1, 14))
+    a_ok = set(range(1, 15))
     bad_r, bad_a = set(), set()
     for p in md_files():
         t = read(p)
@@ -341,16 +388,16 @@ def check_scripts() -> None:
 # C13：索引登记文件数与实际一致
 # ---------------------------------------------------------------------------
 def check_count() -> None:
-    root_items = ["README.md", "AGENTS.md", "PROGRESS.md", ".gitignore"]
+    root_items = ["README.md", "AGENTS.md", "PROGRESS.md", ".gitignore", ".gitattributes"]
     root_ok = all((ROOT / f).exists() for f in root_items)
     docs_n = len(list(DOCS.glob("*.md")))          # 00 索引 + R00–R11 = 13
     adr_n = len(list(ADR.glob("*.md")))            # 13
     scripts_n = len([p for p in SCRIPTS.glob("*.py") if p.name in
                      ("check_docs.py", "normalize_terms.py")])
     total = (len(root_items) if root_ok else 0) + docs_n + adr_n + scripts_n
-    ok = root_ok and docs_n == 13 and adr_n == 13 and scripts_n == 2 and total == 32
+    ok = root_ok and docs_n == 13 and adr_n == 14 and scripts_n == 2 and total == 34
     record("C13", "索引登记文件数与实际一致", ok,
-           f"根 4 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 32")
+           f"根 5 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 34")
 
 
 # ---------------------------------------------------------------------------
@@ -369,29 +416,35 @@ def check_migration_range() -> None:
     scripts = sorted(p for p in mig_dir.glob("V*.sql") if p.is_file())
     actual_n = len(scripts)
     vers = sorted(int(re.match(r"V(\d+)__", p.name).group(1)) for p in scripts)
-    contiguous = vers == list(range(1, actual_n + 1))
+    actual_max = max(vers) if vers else 0
+    # 缺号只接受「PROGRESS.md §2 登记为已知缺号」的号段（预留号段，或已被并行流占用的号段）
+    gaps = [v for v in range(1, actual_max + 1) if v not in vers]
+    unregistered = [v for v in gaps if v not in known_missing_migration_numbers()]
+    contiguous = not unregistered
 
     # 只校验「声称当前终态已落地迁移数」的表述；
     # 历史阶段记录（如 W2 阶段只落了 V1–V9）、他项目号段、规划号段均不在此列。
     current_ctx = ("已落地", "当前状态", "终态", "实测 1", "共 60 张表", "Flyway V1\u2013V")
     exclude_ctx = ("floorplan", "起步", "预留", "不撞号", "独立库", "S1-W2", "S2 落", "W2", "W9-A 落",
-                   "原记录")   # 历史轮次的实测记录不改写（标注「原记录」即豁免）
+                   "原记录", "字节未动", "W-MB")   # 历史轮次的实测记录不改写（标注「原记录」即豁免）
 
     stale = []
     pattern = re.compile(r"V1[\u2013-]V(\d+)")
     for p in md_files():
         for i, line in enumerate(read(p).splitlines(), 1):
-            if not any(k in line for k in current_ctx):
+            if not (any(k in line for k in current_ctx) or re.search(r"共 \d+ 张表", line)):
                 continue
             if any(k in line for k in exclude_ctx):
                 continue
             for m in pattern.finditer(line):
-                if int(m.group(1)) != actual_n:
+                if int(m.group(1)) != actual_max:
                     stale.append("%s:%d \u2192 V1\u2013V%s" % (p.name, i, m.group(1)))
 
     ok = actual_n > 0 and contiguous and not stale
-    detail = ("磁盘迁移脚本 %d 条（V1\u2013V%d，号段连续=%s）；文档号段越界行 %s"
-              % (actual_n, actual_n, contiguous, stale if stale else "无"))
+    registered_gaps = sorted(set(gaps) & known_missing_migration_numbers())
+    detail = ("磁盘迁移脚本 %d 条（最高版本 V%d；缺号 %s；已登记预留=%s）；文档号段越界行 %s"
+              % (actual_n, actual_max, gaps if gaps else "无", registered_gaps if registered_gaps else "无",
+                 stale if stale else "无"))
     record("C14", "Flyway 号段口径与实际迁移一致", ok, detail)
 
 
@@ -403,13 +456,22 @@ def check_test_count() -> None:
 
     权威口径 = surefire 类级汇总（见 PROGRESS.md 顶部校正注：类级/模块级 surefire 汇总）。
     历史教训：曾长期以 surefire 系统计虚高值（706/748）对外表述，与实测 353 脱节。
+
+    排除两类语境：①含「虚高 / 校正 / 原记录」的历史订正说明；
+    ②历史实测记录行（表格首列为日期，如 PROGRESS §6 验证记录）——那里记的是当时的实测值，
+    属于历史事实快照，不是当前口径声明，不参与唯一性校验。
     """
     allow_ctx = ("虚高", "校正", "原记录", "口径已校正")
+    # 历史实测记录行（表格首列为日期，如 PROGRESS §6 验证记录）：记录的是**当时**的实测值，
+    # 随轮次推进必然与当前口径不同——它不是「口径声明」，不参与唯一性校验。
+    hist_row = re.compile(r"^\|\s*(?:\d{4}-\d{2}-\d{2}|—|-)\s*\|")
     pattern = re.compile(r"(?:构建|单测|测试)\s*(\d{2,4})\s*(?:个)?(?:测试|单测)")
     hits = {}
     for p in md_files():
         for i, line in enumerate(read(p).splitlines(), 1):
             if any(k in line for k in allow_ctx):
+                continue
+            if hist_row.match(line):
                 continue
             for m in pattern.finditer(line):
                 hits.setdefault(m.group(1), []).append("%s:%d" % (p.name, i))

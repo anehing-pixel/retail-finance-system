@@ -3,6 +3,7 @@ package com.company.retail.infrastructure.config;
 import com.company.platform.event.EventConsumer;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.infrastructure.mapper.OutboxMapper;
+import com.company.retail.infrastructure.outbox.EventConsumptionService;
 import com.company.retail.infrastructure.outbox.MyBatisOutboxPublisher;
 import com.company.retail.infrastructure.outbox.RfEventDispatcher;
 import org.mybatis.spring.annotation.MapperScan;
@@ -30,9 +31,18 @@ public class RfOutboxConfig {
         return new MyBatisOutboxPublisher(outboxMapper);
     }
 
+    /** 消费记账与执行（直投与 MQ 中继共用，ADR-RF-014）。 */
+    @Bean
+    public EventConsumptionService eventConsumptionService(OutboxMapper outboxMapper) {
+        return new EventConsumptionService(outboxMapper);
+    }
+
     @Bean
     public RfEventDispatcher eventDispatcher(OutboxMapper outboxMapper,
-                                             ObjectProvider<EventConsumer> consumerProvider) {
-        return new RfEventDispatcher(outboxMapper, consumerProvider);
+                                             ObjectProvider<EventConsumer> consumerProvider,
+                                             EventConsumptionService eventConsumptionService,
+                                             ObjectProvider<MqProperties> mqPropertiesProvider) {
+        return new RfEventDispatcher(outboxMapper, consumerProvider, eventConsumptionService,
+                mqPropertiesProvider);
     }
 }

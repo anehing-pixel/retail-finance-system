@@ -51,3 +51,21 @@ retail:
       url: ${RETAIL_CLIENTS_CUSTOMER_URL:}
     underwriting:
       url: ${RETAIL_CLIENTS_UNDERWRITING_URL:}
+  mq:
+    # MQ 削峰通道（ADR-RF-014）：默认关闭 → 走同步路径，行为与现网逐字一致；
+    # 打开后「控制器把含个人信息的载荷封成密文信封投进 MQ」，消费端解密后执行同一 handler。
+    enabled: ${RETAIL_MQ_ENABLED:false}
+    # 信封数据密钥：为空时回落 retail.pii.data-key（不新增密钥面，R06 §5）
+    data-key: ${RETAIL_MQ_DATA_KEY:}
+    key-version: ${RETAIL_MQ_KEY_VERSION:v1}
+    name-server: ${RETAIL_MQ_NAME_SERVER:127.0.0.1:9876}
+    producer-group: rf-bureau
+    consumer-group: rf-bureau
+    # 削峰旋钮：消费侧限速（并发消费线程 / 单次拉取条数）
+    consume-thread-max: ${RETAIL_MQ_CONSUME_THREADS:20}
+    pull-batch-size: ${RETAIL_MQ_PULL_BATCH:16}
+    # 通用中继：本服务是否由 RF_EVENT_RELAY 接管事件消费（打开后直投让位）
+    relay-consumer-enabled: ${RETAIL_MQ_RELAY_ENABLED:false}
+    # 仍走直投的消费者白名单（秒级刚性事件，如同意撤回，不进 MQ 延迟通道）
+    direct-consumers: ${RETAIL_MQ_DIRECT_CONSUMERS:}
+

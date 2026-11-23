@@ -30,8 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ScheduleDueRollupSchedulerTest {
 
-    private static final LocalDate BIZ_DATE = LocalDate.parse("2026-11-23");
-
     // ---------- 开关 ----------
 
     @Test
@@ -67,6 +65,8 @@ class ScheduleDueRollupSchedulerTest {
     void scheduleEnabled_cronTriggersExecution_marksDone() throws Exception {
         RecordingJobService jobService = new RecordingJobService();
         ScriptedGuard guard = new ScriptedGuard(true);
+        // 调度器取「当日」业务日（LocalDate.now()）：按执行前后区间断言，不把固定日期钉死
+        LocalDate dayBeforeRun = LocalDate.now();
         try (AnnotationConfigApplicationContext ctx = cronContext(jobService, guard)) {
             long deadline = System.currentTimeMillis() + 5000;
             while (jobService.invocations.isEmpty() && System.currentTimeMillis() < deadline) {
@@ -74,7 +74,10 @@ class ScheduleDueRollupSchedulerTest {
             }
             // 短间隔 cron（每秒）真实触发过至少一轮
             assertTrue(!jobService.invocations.isEmpty(), "cron 未在 5s 内触发");
-            assertEquals(BIZ_DATE, jobService.invocations.get(0).bizDate());
+            LocalDate dayAfterRun = LocalDate.now();
+            LocalDate bizDate = jobService.invocations.get(0).bizDate();
+            assertFalse(bizDate.isBefore(dayBeforeRun), "业务日不应早于执行开始日");
+            assertFalse(bizDate.isAfter(dayAfterRun), "业务日不应晚于执行结束日");
             assertEquals("DONE", guard.finishedStatuses.get(0));
         }
     }
