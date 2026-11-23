@@ -17,6 +17,7 @@ import com.company.retail.bureau.application.ManualReportAppService;
 import com.company.retail.bureau.application.SettlementConsentAnchorPort;
 import com.company.retail.bureau.acl.BureauAdapter;
 import com.company.retail.bureau.acl.CicStubAdapter;
+import com.company.retail.bureau.acl.HttpCicAdapter;
 import com.company.retail.bureau.acl.JiccStubAdapter;
 import com.company.retail.bureau.domain.CreditBureau;
 import com.company.retail.bureau.domain.CreditBureauReportingPolicy;
@@ -91,10 +92,17 @@ public class BureauServiceConfig {
         return new JdbcBusinessCalendar(jdbcTemplate);
     }
 
-    /** 挡板适配器注册表（真实接入按机构各替换一个实现，接口不变）。 */
+    /**
+     * 适配器注册表（双模装配，W-SIM）：CIC 按 {@code retail.bureau.cic-url} 切换——
+     * 不配走挡板 CicStubAdapter，配了走 HTTP 适配器（外部机构模拟器 / 未来真实专线，
+     * 同一提议协议 v1 报文）；JICC 维持挡板。真实接入按机构各替换一个实现，接口不变。
+     */
     @Bean
-    public Map<CreditBureau, BureauAdapter> bureauAdapters() {
-        List<BureauAdapter> list = List.of(new CicStubAdapter(), new JiccStubAdapter());
+    public Map<CreditBureau, BureauAdapter> bureauAdapters(
+            @Value("${retail.bureau.cic-url:}") String cicUrl) {
+        BureauAdapter cic = (cicUrl == null || cicUrl.isBlank())
+                ? new CicStubAdapter() : new HttpCicAdapter(cicUrl);
+        List<BureauAdapter> list = List.of(cic, new JiccStubAdapter());
         return list.stream().collect(Collectors.toUnmodifiableMap(BureauAdapter::bureau, Function.identity()));
     }
 

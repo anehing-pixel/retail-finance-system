@@ -4,7 +4,9 @@
 #
 # 起 12 个进程 + 数据库，网关 18081 作为统一入口按路径切流；
 # 外部 DMZ 18091 独立进程（/external/** 不走网关，R02 §3.1 范式 2）；
-# 前端控制台 18082（serve.py，静态 + 同源代理，W-FE）。
+# 前端控制台 18082（serve.py，静态 + 同源代理，W-FE）；
+# 外部机构模拟器 18100（node 就绪时自动拉起，RETAIL_BUREAU_CIC_URL 指向它；
+#   无 node 时 CIC 回落挡板，external-simulator/simulator.js，W-SIM）。
 #
 # 三个本地环境障碍及处理（对齐 floorplan run-microservices.sh）：
 #   1) WorkBuddy 注入 SERVER__PORT，Spring 宽松绑定会覆盖 yml 端口 → env -u 清掉；
@@ -13,7 +15,7 @@
 #
 # 端口分配（R00 §6）：retail-core=8090 auth=8091 customer=8092 application=8093
 #   underwriting=8094 bureau=8095 contract=8096 title-release=8097
-#   servicing=8098 recon=8099 网关=18081 DMZ=18091 前端=18082 DB=5435
+#   servicing=8098 recon=8099 网关=18081 DMZ=18091 前端=18082 模拟器=18100 DB=5435
 #
 # 用法：
 #   ./run-microservices.sh start   # 启动全部并前台保活；Ctrl+C 停止
@@ -21,6 +23,7 @@
 #   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 + 前端页面冒烟 → 自动清理，一条命令完成
 #   ./run-microservices.sh db      # 只确保数据库容器运行（幂等）
 #   # 浏览器点击级 E2E（可选，需 playwright + 系统 Edge）：python frontend/browser_e2e.py
+#   # 模拟对接 E2E（需模拟器在跑）：python external-simulator/demo_e2e.py
 # ============================================================================
 set -u
 cd "$(dirname "$0")"
@@ -76,6 +79,30 @@ start_one() {
   echo "[启动] $name pid=$(cat "$PIDDIR/$name.pid")"
 }
 
+# 外部机构模拟器（W-SIM）：node 可用才拉起，并把 CIC 出站切到模拟器；
+# 无 node 时跳过且不导出 RETAIL_BUREAU_CIC_URL → CIC 用挡板，链路不中断
+maybe_start_simulator() {
+  if port_in_use 18100; then
+    echo "[跳过] 18100 已有外部模拟器在跑"
+    export RETAIL_BUREAU_CIC_URL="${RETAIL_BUREAU_CIC_URL:-http://127.0.0.1:18100}"
+    return 0
+  fi
+  if ! command -v node >/dev/null 2>&1; then
+    echo "[跳过] 无 node，CIC 走挡板（未导出 RETAIL_BUREAU_CIC_URL）"
+    return 0
+  fi
+  node "$ROOT/external-simulator/simulator.js" > "$LOGDIR/external-simulator.log" 2>&1 &
+  echo $! > "$PIDDIR/external-simulator.pid"
+  echo "[启动] external-simulator pid=$(cat "$PIDDIR/external-simulator.pid")"
+  for i in $(seq 1 15); do
+    if curl -s -m 2 "http://127.0.0.1:18100/external-sim/health" >/dev/null 2>&1; then
+      echo "[就绪] external-simulator (port 18100, ${i}s)"; break
+    fi
+    sleep 1
+  done
+  export RETAIL_BUREAU_CIC_URL="${RETAIL_BUREAU_CIC_URL:-http://127.0.0.1:18100}"
+}
+
 wait_one() {
   local name="$1" marker="$2" port="$3"
   local i
@@ -98,13 +125,16 @@ port_in_use() {
 do_start() {
   ensure_db || return 1
   local busy=""
-  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091; do
+  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091 18100; do
     port_in_use "$p" && busy="$busy $p"
   done
   if [ -n "$busy" ]; then
     echo "[错误] 端口已被占用:$busy —— 请先执行 stop，或关闭占用进程后重试"
     return 1
   fi
+
+  echo "=== 启动外部机构模拟器（node 可用时；CIC 出站切至模拟器）==="
+  maybe_start_simulator
 
   echo "=== 启动 10 业务服务 + DMZ（retail-core 最先，唯一跑 Flyway）==="
   start_one retail-core "$(JAR retail-core retail-core)" || { do_stop; exit 1; }

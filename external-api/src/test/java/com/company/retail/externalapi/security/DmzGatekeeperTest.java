@@ -80,7 +80,7 @@ class DmzGatekeeperTest {
     final FakeNonceStore nonceStore = new FakeNonceStore(clock);
     final FakeCallLogStore callLogs = new FakeCallLogStore();
     final StubDirectory directory = new StubDirectory();
-    final PartnerRegistry registry = new PartnerRegistry(SECRET);
+    final PartnerRegistry registry = new PartnerRegistry(SECRET, SECRET);
 
     DmzGatekeeper newKeeper(boolean ipAllowlistEnabled) {
         DmzProperties props = new DmzProperties();

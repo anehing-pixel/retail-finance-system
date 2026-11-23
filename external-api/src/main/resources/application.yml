@@ -25,6 +25,14 @@ spring:
         fail-fast: false
 
 retail:
+  auth:
+    # 员工侧 JWT 密钥（W-SIM）：DMZ 转发内部 API 时签系统服务 token（svc-external-dmz），
+    # 与其他服务同一真相源；生产必须环境变量注入
+    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+  clients:
+    title-release:
+      # DMZ 入站转发直连（双模范式，R09 §7.2）：登记回执 → title-release 回执登记
+      url: ${RETAIL_CLIENTS_TITLE_RELEASE_URL:http://127.0.0.1:8097}
   dmz:
     # W9-B 三关开关：生产默认开（ip-allowlist-enabled 置 true + trust-forwarded-for 视 LB 拓扑）
     registry-mode: ${RETAIL_DMZ_REGISTRY_MODE:CONFIG}   # CONFIG=配置档案（W2 口径）/ DB=integration.partners 表
@@ -42,3 +50,9 @@ retail:
         scopes:
           - echo
         ip-allowlist: ${RETAIL_PARTNER_DMS_IP_ALLOWLIST:}
+      # 登记机关模拟器（W-SIM，R07 I-10/P-13 入站）：回执回调走 /external/registry/receipts
+      REG-SIM-01:
+        secret: ${RETAIL_PARTNER_REG_SECRET:dev-registry-sim-secret-0123456789}
+        scopes:
+          - registry_receipts
+        ip-allowlist: ${RETAIL_PARTNER_REG_IP_ALLOWLIST:}

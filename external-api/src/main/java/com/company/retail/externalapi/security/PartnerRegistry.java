@@ -28,8 +28,11 @@ public class PartnerRegistry {
 
     public PartnerRegistry(
             @Value("${retail.integration.partners.DMS-DEV-01.secret:dev-dms-partner-secret-0123456789}")
-            String dmsSecret) {
-        this.secrets = Map.of("DMS-DEV-01", dmsSecret);
+            String dmsSecret,
+            @Value("${retail.integration.partners.REG-SIM-01.secret:dev-registry-sim-secret-0123456789}")
+            String registrySimSecret) {
+        // W-SIM：新增登记机关模拟器 partner；新增 partner 必须同时补档案（application.yml）与密钥
+        this.secrets = Map.of("DMS-DEV-01", dmsSecret, "REG-SIM-01", registrySimSecret);
     }
 
     public boolean exists(String partnerCode) {

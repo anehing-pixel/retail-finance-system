@@ -28,6 +28,9 @@ retail:
     # 报送日批开关（默认 false=不跑）与 cron（默认每日 08:00 JST；C-05 T+1 口径）
     report-schedule-enabled: ${RETAIL_BUREAU_REPORT_SCHEDULE_ENABLED:false}
     report-cron: ${RETAIL_BUREAU_REPORT_CRON:0 0 8 * * *}
+    # CIC 对端双模（W-SIM）：空=挡板 CicStubAdapter；配 URL 走 HttpCicAdapter
+    # （提议协议 v1 §4.7/§4.8/§4.9 报文，对端可为外部机构模拟器 external-simulator）
+    cic-url: ${RETAIL_BUREAU_CIC_URL:}
   auth:
     # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
     secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}

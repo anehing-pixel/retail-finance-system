@@ -14,7 +14,9 @@ public class W4GateFacadeConfig {
     @Bean
     public ConsentGateFacade consentGateFacade(
             FeignContracts.ConsentGateClient consentGateClient,
-            @Value("${retail.clients.customer.url:}") String customerBaseUrl) {
-        return new ConsentGateFacade(consentGateClient, customerBaseUrl);
+            @Value("${retail.clients.customer.url:}") String customerBaseUrl,
+            @Value("${retail.auth.secret:}") String staffJwtSecret) {
+        // W-SIM：注入员工侧密钥，机器场景（事件消费/日批）自动签系统服务 token
+        return new ConsentGateFacade(consentGateClient, customerBaseUrl, staffJwtSecret);
     }
 }

@@ -1,5 +1,7 @@
 package com.company.retail.common.contract;
 
+import com.company.retail.common.security.JwtTokenVerifier;
+import com.company.platform.security.SubjectType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,11 +39,22 @@ public class ConsentGateFacade {
 
     private final FeignContracts.ConsentGateClient client;
     private final String customerBaseUrl;
+    /** 系统服务 token 签发器（W-SIM 修复：机器场景，null=旧行为无请求上下文即 fail-closed）。 */
+    private final JwtTokenVerifier serviceVerifier;
+    private volatile String cachedServiceToken;
+    private volatile long serviceTokenExpireAtMs;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ConsentGateFacade(FeignContracts.ConsentGateClient client, String customerBaseUrl) {
+        this(client, customerBaseUrl, null);
+    }
+
+    public ConsentGateFacade(FeignContracts.ConsentGateClient client, String customerBaseUrl,
+                             String staffJwtSecret) {
         this.client = client;
         this.customerBaseUrl = customerBaseUrl;
+        this.serviceVerifier = (staffJwtSecret == null || staffJwtSecret.isBlank()) ? null
+                : new JwtTokenVerifier(staffJwtSecret, SubjectType.EMPLOYEE);
     }
 
     /** 同意有效且未撤回才返回 true；任何异常/UNKNOWN 一律 false（fail-closed）。 */
@@ -95,13 +108,32 @@ public class ConsentGateFacade {
         }
     }
 
-    /** 门禁零信任：透传当前请求的 Authorization（无请求上下文时不透传，由下游拒绝）。 */
-    private static String currentAuthorization() {
+    /**
+     * 门禁零信任：透传当前请求的 Authorization；<b>机器场景</b>（事件消费/日批，无请求上下文）
+     * 签系统服务 token（主体 svc-bureau，EMPLOYEE 密钥，不伪装任何用户）——
+     * W-SIM 发现：事件驱动报送在调度线程永远拿不到用户 token，不签服务 token 则
+     * consent gate 401 → fail-closed → 报送永远发不出去（模拟对接 E2E 实证）。
+     */
+    private String currentAuthorization() {
         if (org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()
                 instanceof org.springframework.web.context.request.ServletRequestAttributes attrs) {
             String authorization = attrs.getRequest().getHeader("Authorization");
             return authorization == null ? "" : authorization;
         }
+        if (serviceVerifier != null) {
+            return "Bearer " + serviceToken();
+        }
         return "";
+    }
+
+    /** 服务 token 缓存 55 分钟（签发 1h，提前过期防边界漂移）。 */
+    private synchronized String serviceToken() {
+        long now = System.currentTimeMillis();
+        if (cachedServiceToken == null || now > serviceTokenExpireAtMs) {
+            cachedServiceToken = serviceVerifier.sign("svc-bureau",
+                    java.util.Map.of("roles", java.util.List.of("SYSTEM"), "perms", java.util.List.of()), 1);
+            serviceTokenExpireAtMs = now + 55 * 60 * 1000L;
+        }
+        return cachedServiceToken;
     }
 }
