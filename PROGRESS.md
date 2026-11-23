@@ -272,14 +272,29 @@
 9. **Windows 侧绑不上 RF 注册端口段 ≠ 有别的进程在占**：2026-11-23 实测——`netstat -ano`（含 `-a` 全状态）对 8090–8099/18081/18082/18091 **无任何记录**，但 `bind()` 一律返回 WSAEADDRINUSE；同机 8080–8089、18078–18080、18083–18090 实测可绑。根因：`.wslconfig` 的 `networkingMode=mirrored` 下 **HNS 为 WSL 端点保留的端口分配**（`netsh int ipv4 show excludedportrange` 查不到，须管理员权限查 HNS；而 WSL 侧可正常 bind 同端口）。
    **规避**：注册端口段验收放到 **WSL 侧**执行（mirrored 共享同一网络命名空间，所绑即真实注册端口，Windows 侧可经 127.0.0.1 访问）。
    **根治**：`wsl --shutdown` 清 HNS 端口分配——但会连带停掉跑在 WSL 内的 Docker（须 `docker start retail-finance-db` 复原），属环境操作，本轮**未做**。
-10. **并行流「网关限流」双实现重叠（2026-11-23 实测发现，必须在合并前二选一）**：本仓同时存在两套网关限流实现——
-    本流 **W-RL** 的**本地令牌桶**（worktree `wt/ratelimit`，配置前缀 `retail.ratelimit.*`，桶在进程内存 → 单实例口径，
-    不依赖 Redis）与并行「缓存」流的 **Redis + Lua 分布式桶**（主工作区未提交 WIP：父 `pom.xml` 加了
-    `spring-boot-starter-data-redis` + `gateway/src/main/resources/lua/token_bucket.lua`，配置前缀 `retail.gateway.rate-limit.*`，
-    键维度为 Authorization 头哈希 / IP，**默认 fail-open**，且本地无 Redis 实例）。两者**类名同名**
-    （`RateLimitFilter`、`RateLimitProperties`）→ 合并必然冲突；若两份同时生效 = **双层限流**（阈值被隐式相乘）+
-    两套配置前缀并存。**处置**：合并时**必须二选一**，不要让两份并存；无论选哪份，本流的**边缘 Nginx 层**、
-    `scripts/smoke_ratelimit.py`、文档口径均可直接复用（断言需按最终选型调整键维度）。详见 §0「下一轮」。
+10. **并行流「网关限流」双实现重叠 → 已按 master 裁决定案**（2026-11-23，master `1a7a31d` §9；master `3c46876` 已提交
+    **Redis + Lua 分布式令牌桶**：`TokenBucketLimiter` / `RateLimitFilter` / `RateLimitKeyResolver` / `RateLimitProperties` /
+    `RateLimitRuleMatcher` / `RateLimitConfig` + `lua/token_bucket.lua`，键取 **Authorization 头 SHA-256 哈希**（退化到 IP），
+    **默认 fail-open**，依赖 Redis）。本流的**本地令牌桶**（`retail.ratelimit.*`，桶在进程内存 → 单实例口径）与 master
+    **6 个类同名同路径** → 直接合并会互相覆盖，且两份同时生效 = **双层限流**（阈值被隐式相乘）。
+    **用户裁决（master §9）**：①**保留 master 实现**（哈希键在 NAT/代理下不会把不同调用方挤进同一个桶），
+    本流的 Java 实现**不并入**，作为对照实现留档在本分支；②**吸收**本流的**过滤器级测试**（master 缺过滤器级测试，
+    需按 master 实现改写后并入）；③`nginx/` 为**可选部署形态**、**不默认启用**，可作独立目录并入；
+    ④合并顺序 `wt/lock` → `wt/statemachine` → `wt/ratelimit`（仅取测试与 `nginx/`）→ `wt/mq`。
+    **本流交付与该裁决的对应关系**：`nginx/` 已按「可选部署形态、不默认启用」标注（`nginx/README.md §1`）；
+    本流的 `R02 §3.3` / `README` / `R00` 限流口径在合并时**以 master 文档为准**（master 已写 Redis 桶口径），
+    本流只需**追加**「边缘 Nginx 层」一段与边缘端口登记（18076 / 18077），**不要**把本地桶口径合进去。
+    **过滤器级测试并入规格**（master 实现下应断言的行为；差异以括号标注本流口径）：
+
+    | # | 断言 | master 实现下的注意点 |
+    |---|---|---|
+    | T1 | 未命中任何规则 → **直接放行**（不限流） | 本流是「回落到默认桶」；master 无默认规则即不限流 |
+    | T2 | 命中规则且超配额 → **429** + 响应体 `code=RF_GATEWAY_001` + `traceId` | master 响应体是手拼 map（`details{path}`），非 `ApiResponse` |
+    | T3 | 429 带 `Retry-After` | master **固定 "1"**（本流按补充速率算秒数）；master **不返回** `X-RateLimit-*`（本流有） |
+    | T4 | 不同 `Authorization` 头 → 不同桶；同头重复请求 → 仍被限 | 本流键是「客户端 IP」；master 键是 Authorization 哈希（NAT/代理下更稳） |
+    | T5 | Redis 不可用 → **fail-open 放行**（可切 fail-closed → 503） | 本流无此分支（桶在进程内存，不依赖外部） |
+    | T6 | 开关 `retail.gateway.rate-limit.enabled=false` → 全放行 | 配置前缀不同（本流 `retail.ratelimit.*`） |
+    | T7 | 限流在**路由转发之前**判定：被限流请求不打到下游 | 两者一致 |
 11. **E2E S11「outbox 发出 TITLE_RETENTION_REGISTERED」断言对时序敏感**：`LOAN_SETTLED` 消费会先按挡板补一条 `vin=UNKNOWN-<loanId>` 的保留登记行（`ensureRetentionForSettledLoan`；旧 `LoanSettledConsumer` 同款语义，**改动前既有**）；若该兜底行先于操作员显式登记落库，显式登记命中「已存在 → 幂等返回」分支（**不重复发布登记事件**，`R04 §6` 语义）→ 该断言失败，但业务状态仍为 REGISTERED、S11 其余断言全绿。实测：outbox 有积压导致消费者抢跑时出现（PASS 96 / FAIL 2），清空积压后复跑 98/98。**这是既有语义、不是回归**。**处置（2026-11-23 用户裁决「补发事件并订正VIN」）**：正式登记命中挡板占位行 → **订正 VIN + 补发一次**登记事件（乐观锁 + 占位 VIN 条件 → 并发/重放只订正一次、只补发一次）；登记订正**只支持同态订正**（C-04 裁决口径 REGISTERED），跨态一律 `RF_VALID_002` 拒绝、**不改状态**（INV-3 唯一入口不可旁路）。口径已同步 `R04 §6` / `R09 §5.1`，验收断言补 `R10` A31–A32；`scripts/e2e_w8.py` 属共享禁区，未改。
 
 ---
