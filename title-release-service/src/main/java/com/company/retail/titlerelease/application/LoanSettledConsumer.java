@@ -3,14 +3,11 @@ package com.company.retail.titlerelease.application;
 import com.company.platform.event.DomainEvent;
 import com.company.platform.event.EventConsumer;
 import com.company.retail.common.contract.OutboxPublisher;
-import com.company.retail.titlerelease.persistence.JdbcTitleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.Set;
 
 /**
@@ -28,12 +25,9 @@ public class LoanSettledConsumer implements EventConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(LoanSettledConsumer.class);
 
-    private final JdbcTitleRepository titleRepository;
     private final TitleReleaseApplicationService applicationService;
 
-    public LoanSettledConsumer(JdbcTitleRepository titleRepository,
-                               TitleReleaseApplicationService applicationService) {
-        this.titleRepository = titleRepository;
+    public LoanSettledConsumer(TitleReleaseApplicationService applicationService) {
         this.applicationService = applicationService;
     }
 
@@ -56,12 +50,9 @@ public class LoanSettledConsumer implements EventConsumer {
             throw new IllegalStateException("LOAN_SETTLED payload 缺 loanId（R09 §5.1 聚合键）");
         }
 
-        // 挡板兜底：交车报告（S9/G9）登记缺失时补一条 REGISTERED 保留记录（见最终报告 W6 挡板清单）
-        if (titleRepository.findByLoanId(loanId).isEmpty()) {
-            titleRepository.insert(loanId, "UNKNOWN-" + loanId, "REGISTERED", "REGISTERED",
-                    Timestamp.from(Instant.now()), null);
-            log.warn("LOAN_SETTLED 消费：债权 {} 缺保留登记记录，已按挡板补 REGISTERED（W6 兜底）", loanId);
-        }
+        // 挡板兜底：交车报告（S9/G9）登记缺失时补一条 REGISTERED 保留记录（见最终报告 W6 挡板清单）。
+        // 并发语义下沉到用例层：兜底建单与操作员主动登记撞 uk_title_loan 时幂等跳过，不抛异常。
+        applicationService.ensureRetentionForSettledLoan(loanId);
 
         // 幂等：已存在订单（重复投递 / 重放）直接返回
         var existing = applicationService.createReleaseOrderFromEvent(loanId, event.eventId());

@@ -11,7 +11,7 @@
 
   <artifactId>retail-infrastructure</artifactId>
   <name>Retail Finance :: Infrastructure</name>
-  <description>基础设施层：outbox 发布/消费机制、营业日历、Flyway 迁移脚本 V1–V9（唯一目录）</description>
+  <description>基础设施层：outbox 发布/消费机制、营业日历、Flyway 迁移脚本 V1–V17（唯一目录）</description>
 
   <dependencies>
     <dependency>

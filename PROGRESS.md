@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V15（60 表）· 构建 353 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V17（60 表）· 构建 359 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -12,6 +12,7 @@
 |---|---|
 | 轮次 | **W-SIM2 终态（2026-11-23）**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`），其后追加 W-FE 前端控制台、W-SIM/W-SIM2 外部模拟器双向闭环（六向对端 + 四服务双模接线）；master HEAD `8ded5ea`，仓库单分支（master）单 worktree，验证进程已全停 |
 | 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001`）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
+| 数据库隔离口径 | **本地 11 个连库单元（10 业务服务 + DMZ；网关不连库）统一以 `postgres` 超级用户连库** → DB role 隔离**本地不生效**，是**生产侧物理兜底**；兑现前提 = **按角色分配连接账号**（`R06 §3.1`） |
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
 | 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/`（check_docs / normalize_terms / gen_w2_services / smoke_w2）；`run-microservices.sh`；`.github/workflows/docs-check.yml`；**`frontend/`（W-FE）**；**`external-simulator/`（W-SIM：外部机构模拟器 simulator.js(18100, 零依赖 Node) + 模拟对接 E2E demo_e2e.py）** |
 | 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ（父 pom 为聚合器，不计入 16）；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
@@ -58,7 +59,7 @@
 | 外部 DMZ | 18091 | 18090 | 不冲突 ✅ |
 | 数据库宿主端口 | 5435 | 5434 | 不冲突 ✅ |
 | 数据库实例 | `retail_finance`（独立） | `floorplan`（独立） | 物理隔离 ✅ |
-| Flyway | V1 起（独立库） | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
+| Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧，2026-11-23） | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 错误码前缀 | `RF_*` | `ADVANCE_*` / `CREDIT_*` 等 | 不冲突 ✅ |
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
@@ -66,6 +67,18 @@
 | Feign 契约 | `com.company.retail.common.contract`（**✅ W2 已冻结**：`FeignContracts` 代付前 3 门禁契约（contract/consent/underwriting，fail-closed）+ `OutboxPublisher` 17 事件常量 + `EventPayloadGuard` 白名单；`w2-frozen` 后并行包只读） | `com.company.floorplan.common.contract` | 各自常量表 ✅ |
 
 > 变更记录：
+> - 2026-11-23：**用户授权**实施 V16 迁移（撤销 `retail_app_rw` 对 `pii.customer_pii` 的 SELECT）：
+>   原因——V1 的 `ALTER DEFAULT PRIVILEGES IN SCHEMA pii GRANT SELECT ON TABLES TO retail_app_rw`
+>   把 `pii.customer_pii` 也授了业务角色，与 `R06 §3` 角色表口径「不含 `pii.customer_pii`」及 `R08` PII-5 不一致。
+>   处理——新增 `V16__pii_customer_pii_revoke.sql`（只调授权，不改表结构与数据，V1–V15 字节未动），
+>   同步 `R06 §3 §6` 与 README / R02 / `00-文档索引` 的号段口径 V1–V15 → V1–V16；
+>   **本文件属共享禁区，本次改动已获用户明示授权**。
+> - 2026-11-23：**用户授权**实施 V17 迁移（撤销 `retail_app_rw` 对 `pii.consents` / `pii.consent_withdrawals` /
+>   `pii.identity_verifications` / `pii.identity_documents` 的 SELECT）：
+>   原因——V16 只撤了 `pii.customer_pii`，其余 pii 敏感表仍沿用 V1 建表时的默认授权，与 `R06 §3` 角色表口径不一致。
+>   读路径核实——4 张表仅 customer-service 直连（PII 归属方，生产走 `retail_pii_rw`，且该服务不写 core 表）；
+>   报发送量锚定走 `core.v_recon_inv5_consent` 视图（owner = postgres，以视图属主校验底层表权限），业务角色不受影响。
+>   处理——新增 `V17__pii_schema_revoke_app_role.sql`（只调授权，不改表结构与数据），同步 `R06 §3 §6` 与各文档号段口径。
 > - 2026-11-23：业务端口段由 8090–8098 扩为 **8090–8099**（新增 `recon-service :8099`），
 >   同步 `R00 §6`、`README §2`、`R02 §3`、`AGENTS §4`。
 > - 2026-11-23：**用户授权**清理收口残留的陈旧表述（§0「下一轮」、§3 旧编号阶段行、§7 假完成警示），
@@ -81,6 +94,19 @@
 - 2026-11-23：**用户授权**全仓文档与 W9 终态对齐：清除 README / `00` / R00 / R02 / R10 / R11 /
 >   AGENTS（§4 `run-microservices.sh` 标注）中「零代码/零迁移/零进程、jar 未抽取、服务未联调」等
 >   文档初始化时代的陈旧表述，改按实测终态回填；实现事实（`PROGRESS §6` 验证记录）未改。
+> - 2026-11-23：**用户口径**——本地各服务统一以 `postgres` 超级用户连库，DB role 隔离**本地不生效**，
+>   它是**生产侧物理兜底**；真正兑现要等**按角色分配连接账号**。
+>   落地：`R06 §3.1`（新增「连接账号口径：隔离何时真正兑现」）· `R08 PII-5` 与 `R10 A23` 加生效前提标注 ·
+>   `ADR-RF-004 §结论 3` 与 `ADR-RF-009 §结论 2` 加限定 · `PROGRESS §7` 加第 7 条警示 · `§6` V16 行加注脚。
+>   **未改任何业务代码、配置与已执行迁移**；验证结论不变（授权位配置正确，但**不等于**越权拦截已验证）。
+> - 2026-11-23：**用户授权**（「连上一轮 WIP 一起收口提交」）——把上一轮已执行但未纳入版本管理的 **V16 / V17 迁移脚本**与全仓号段口径校正（V1–V15 → V1–V17）一并提交，
+>   并提交本轮「DB 隔离口径 + 投产门禁 G-DB-1~G-DB-7」文档改动。
+>   提交前按 `AGENTS §5` 复验：构建 BUILD SUCCESS（surefire 类级汇总 0 失败 0 错误，测试数口径以顶部横幅为准）· 冒烟 26/26 + 前端 46/46 · E2E 98/98 · DB 17/17 迁移 + 60 表 · `check_docs.py` 15/15 PASS。
+>   复验中暴露**编排脚本两处缺陷**（PID 记账错位导致孤儿占端口、90s 就绪上限偏紧），已记入 §7 第 8 条；**未改该脚本**（属 `AGENTS §7` 共享禁区），修复建议同条列出。
+> - 2026-11-23：**用户决策**——只补**上线门禁**，本地维持超级用户连库（不在本地按角色分配账号）。
+>   落地：`R06 §3.2` 新增「投产门禁 G-DB-1~G-DB-7」（fail-closed）· `R11 §2` 新增「投产准备」阶段行 ·
+>   `R08 PII-5` 与 `R10 A23` 挂门禁引用 · `PROGRESS §3` 后续阶段门禁 · `§4` 新增「投产门禁」待办段。
+>   **未改任何业务代码、配置与已执行迁移**；门禁为**投产前**执行项，本地不触发、不阻塞当前验证结论。
 
 ---
 
@@ -94,7 +120,7 @@
 | **S3** | W6 账务闭环与解除 ‖ W7 贷后对拍合规（写入集互斥沿用并行纪律） | S2 全合 | ✅ **完成（2026-11-23 凌晨）**：V13/V14 落地（14 迁移 60 表实测）；合并后 538 测试 0 失败 + 走网关冒烟 26/26 |
 | **S4** | W8 收口：全链路 E2E 走网关 + 文档回灌 + 放行 | S3 全合 | ✅ **完成（2026-11-23）**：`scripts/e2e_w8.py` **98 断言 PASS / 0 FAIL / EXIT 0**（可重复跑），一镜到底覆盖 注册→核验→同意→申请→征信→审查→合同→冷静期→债权→三门禁代付→核销→结清→解押闭环→DPD/对拍→客户自助 |
 | **S5** | W9 收尾三包：报送执行闭环 / DMZ 三关 / 本地附件存储+日批 | S4 全合 | ✅ **完成（2026-11-23）**：三包合入，终态构建 0 失败 + 冒烟 26/26 + E2E 98/98 无回归；tag `w9-accepted` |
-| **后续** | 外部对接与合规验收：DMS 直连演进、征信/银行/身份核验/登记代办/通知通道、个人信息保护控制、访问审计、职责分离、全量回归 | `R07 §7` 调研清单回填 + 外部签约 | ⬜ 未启动（非阻塞，回填前走人工路径） |
+| **后续** | 外部对接与合规验收：DMS 直连演进、征信/银行/身份核验/登记代办/通知通道、个人信息保护控制、访问审计、职责分离、全量回归；**投产准备**（按角色分配连接账号、DB 隔离在运行期生效） | `R07 §7` 调研清单回填 + 外部签约；**投产门禁 G-DB-1~G-DB-7 全满足**（`R06 §3.2`，fail-closed） | ⬜ 未启动（非阻塞，回填前走人工路径） |
 
 ---
 
@@ -116,6 +142,12 @@
 - [x] `R07 §7` 外部方调研清单 —— **DMS 项 ✅ 已回填**（2026-11-22：数据集成商模式 + 四类接口 + 技术规范，`ADR-RF-011`）；集成商选型与其余通道（征信 / 银行 / 身份核验 / 登记代办 / 通知）仍待回填，**但我方提议协议 v1 已定稿（2026-11-23，`R07 §4.1–§4.16`）**，调研时随清单发出作为谈判基线
 
 **S1–S4**：见 `R11 §3` 工作包 W1–W8，本表不重复罗列（避免第二份会过期的清单）。
+
+**投产门禁（外部对接阶段收口前执行，`R06 §3.2`）**
+- [ ] **G-DB-1~G-DB-7 全部满足**：四角色独立登录账号（口令密钥托管，弃用 V1 的 `*_dev`）· 运行连接按角色分配 · 迁移账号与运行账号分离 · 默认权限绑定迁移账号 · 越权拦截实测（`R10 A23` 转正）· 业务流量禁用超管账号 · **审计写入账号归属落地（G-DB-7 已知缺口：当前单连接池 + `retail_app_rw` 无 audit INSERT 权限，切受限账号会写失败）**
+- [ ] G-DB-7 的授权调整走**新迁移**（V18–V19 号段已预留）：授 `retail_app_rw` 对 audit 两表的 `INSERT`/`SELECT`（仍禁 UPDATE/DELETE），不改已执行迁移字节（方案见 `R06 §3.2` 架构侧裁决）
+- [ ] 在**具备受限账号的类生产环境**执行一次完整实测并留证；**本地全绿不构成门禁通过证据**（本地统一超级用户，`R06 §3.1`）
+- [ ] 门禁 **fail-closed**：任一项不满足，生产部署不予放行（`AGENTS §5`）
 
 ---
 
@@ -167,6 +199,9 @@
 | 2026-11-23 | 仓库收尾（用户指示：仅保留 master） | **PASS**：master HEAD `8ded5ea`（E2E 截图产物刷新提交）；全仓仅 `refs/heads/master` 一个分支、主目录一个 worktree（`wt/w3~w9` 已随历次合并删除，`git worktree prune` 无残留）；验证进程全停（前端 18082 / 模拟器 18100），端口释放；仓库无远程（无推送步骤） |
 | 2026-11-23 | 文档终态更新（本节） | **PASS**：§0 轮次/验证行对齐 W-SIM2 终态；§6 补收尾记录；新增 §8 工期与运维投入评估；`check_docs.py` 复跑 PASS |
 | 2026-11-23 | **口径漂移复验与修正**（用户授权「修正文档口径不一致」） | **PASS**：本轮全量实测 `mvn -B -o package` → **BUILD SUCCESS / 353 测试 0 失败**（49 个测试类，surefire 类级汇总实测）；`check_docs.py` **PASS 15/15 EXIT 0**；DB 实查 `flyway_schema_history` → **15 条迁移全部 success**，四 schema **60 表**（core 43 / integration 9 / pii 6 / audit 2）；`run-microservices.sh smoke` **EXIT 0**（前端页面 46/46）；`scripts/e2e_w8.py` **98/98**；`external-simulator/demo_e2e.py` **34/34**。修正 4 类漂移：①**测试数 706→353**（README ×2 / R02 / R10 / 00-文档索引 ×2 共 7 处）；②**迁移号段 V1–V14→V1–V15**（README / PROGRESS ×2 / R02 / R06 ×2 / 00-文档索引 ×2 / R11 历史行 / `external-api/application.yml` 注释）；③**`AGENTS.md` §2 分层图与代码实况不符**——共享 `domain`(3 文件)/`application`(1 文件) 近乎空壳，真实分层是**服务内** `*.domain`/`*.application` 包，已补「实际落点」表与 53 文件零 Spring 实测说明；④**`AGENTS.md` 模块数分解式多算父 pom**。新增守护：`check_docs.py` **C14**（号段上限必须 == 磁盘迁移数）+ **C15**（测试数口径唯一 == 353），两项均经**注入反向验证**（改回 V1–V14 / 706 → 分别 FAIL EXIT 1，恢复后 PASS）。**未改任何业务代码**；AGENTS.md 与 scripts/check_docs.py 属共享禁区，本轮经用户授权修改，理由已记入 §2 变更记录 |
+| 2026-11-23 | **V16 迁移实施与验证**（用户授权：撤销 `retail_app_rw` 对 `pii.customer_pii` 的 SELECT） | **PASS**：`mvn -B -o package` → 17 模块 BUILD SUCCESS（构建 353 单测 0 失败，原记录口径；V17 轮修复后为 359）；`bash run-microservices.sh smoke` → **26/26 EXIT 0**（含「Flyway 迁移全部执行 16 / 16 条」「四 schema 60 张」）+ 前端页面 46/46；DB 实查 `flyway_schema_history` → **16 条全部 success，V16 = pii customer pii revoke**；权限位实查：`retail_app_rw`→`pii.customer_pii` SELECT = **false**、`retail_app_rw`→`pii.customers` SELECT = true、`retail_pii_rw`→`pii.customer_pii` SELECT = true、`retail_dmz_rw`→`pii.customer_pii` SELECT = false；`pg_default_acl` 实查 pii schema 默认授权只剩 `retail_pii_rw`（今后新建 pii 表默认不授予业务角色）；`check_docs.py` PASS 15/15。**未改任何业务代码，已执行迁移字节未动**；残余：`retail_app_rw` 对 `pii.consents` / `identity_*` 的 SELECT 沿用 V1 既有授权，本次未收（要一并收紧走下一号迁移）；**授权位级实测 ≠ 越权拦截实测**（本地统一超级用户连库，生效边界见 §7 第 7 条与 `R06 §3.1`） |
+| 2026-11-23 | **V17 迁移实施与验证**（用户授权：撤销 `retail_app_rw` 对 `pii.consents` / `pii.consent_withdrawals` / `pii.identity_verifications` / `pii.identity_documents` 的 SELECT） | **PASS**：`mvn -B -o package` → 17 模块 BUILD SUCCESS（构建 359 单测 0 失败，含新增 6 个幂等单测）；`bash run-microservices.sh smoke` → **26/26 EXIT 0**（含「Flyway 迁移全部执行 17 / 17 条」）+ 前端页面 46/46（复跑轮）；`scripts/e2e_w8.py` → **98/98 EXIT 0**（含 S12 recon INV-5 同意锚定对拍）；DB 实查 Flyway V1–V17 = **17 条全部 success**（V17 = pii schema revoke app role），`retail_app_rw` 在 pii schema 实测只剩 `pii.customers : SELECT`；**越权拦截实测（`R06 §3.1` G-DB-5）本地已实测**：用角色口令直连容器执行——`retail_app_rw`→`pii.customer_pii`/`consents`/`consent_withdrawals`/`identity_verifications`/`identity_documents` 全部 permission denied，`pii.customers`（45 行）/ `core.v_recon_inv5_consent` 视图 / `core.loans` 可读；`retail_pii_rw` 可读 `pii.consents`/`customer_pii`/`identity_verifications`；`retail_dmz_rw` 对 pii schema 无权、`integration.nonces` 可读（13/13 符合设计；服务自身连接池仍为超管，边界见 `R06 §3.1`）。**未改任何业务代码，已执行迁移字节未动**。另记：首轮前端冒烟 1 项失败（F11 保留登记撞 `uk_title_loan`）系 title-release 既有「先查后插」竞态（W-SIM2 幂等修复只覆盖「查时已存在」），与本次授权变更无关，复跑轮与 E2E 全绿；修复方案待决 |
+| 2026-11-23 | **DB 隔离口径 + 投产门禁收口验收**（本轮：口径固化 + 投产门禁 G-DB-1~G-DB-7；未改业务代码） | **PASS**：整树 `mvn -B -o package` → **BUILD SUCCESS**（surefire 类级汇总 359 测试 0 失败 0 错误）· `scripts/e2e_w8.py` → **98/98 EXIT 0**（含 S14 outbox 12 类齐全、INV-5 同意锚定对拍）· DB 实查 `flyway_schema_history` → **17 条全部 success**、四 schema **60 张**、`retail_app_rw` 在 pii schema 实测仅剩 `pii.customers : SELECT` · `python scripts/check_docs.py` → **PASS 15/15 EXIT 0**。**过程记录**：① `run-microservices.sh smoke` 首轮 25/26（`title-release` 一次性 socket 层抖动：Tomcat acceptor `Error setting socket options` + 网关 `Connection reset by peer`），复跑轮 **26/26 + 前端 46/46 EXIT 0**；② 满负载下（本机 31.8GB 内存仅余 4.9GB、421 进程、floorplan 栈并行）出现网关就绪需 105s > 脚本 90s 上限、路由检查超时等抖动，**非代码缺陷**——编排缺陷已记入 §7 第 8 条（`run-microservices.sh` 属共享禁区，本轮**未改**） |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 
@@ -177,13 +212,25 @@
 1. `R02` 的服务边界定义**已由 W2 落地并经网关冒烟验证**；但「路由可达」≠「业务能力完整」，
    能力完备性以 `scripts/smoke_w2.py`（26 断言）与 `scripts/e2e_w8.py`（98 断言）为准，新增能力必须补断言。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
-   （V1–V15，共 60 张表，实测 success）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 353，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
+   （V1–V17，共 60 张表，实测 success）。改表一律走新迁移，不许改已执行迁移的字节。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 359，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。
 6. **12 个服务都起了但彼此零调用 ≠ 微服务已落地**：必须用 Feign 门禁 + outbox + 走网关冒烟证明链路（A-16）——
    此判据已由 W2–W9 的冒烟与 E2E 满足，后续新增服务/链路仍按同判据验收。
+7. **本地全绿 ≠ DB role 隔离已生效**：本地 11 个连库单元（网关不连库）统一以 `postgres` 超级用户连库，超级用户绕过全部 ACL，
+   `retail_app_rw` / `retail_pii_rw` / `retail_dmz_rw` / `retail_audit_ins` 的授权位**在本地不被服务连接池行使**。
+   `R10 A23`（越权直查被拒）**本地可执行**——用角色口令直连容器即可实测（V17 轮已实测通过），
+   但**服务自身连接池**仍是超管，故**端到端的越权拦截**仍须**按角色分配连接账号**后才兑现
+   （含迁移账号与运行账号分离）。引用 V16/V17 的权限位结论时，只能表述为**授权位配置正确**，
+   不能表述为**越权拦截已验证**（`R06 §3.1`）；投产门禁见 `R06 §3.2`（G-DB-1~G-DB-7，fail-closed）。
+8. **编排脚本（`run-microservices.sh`）的 PID 记账与就绪上限有缺陷**（2026-11-23 收口提交时实测暴露）：
+   `start_one` 记录的 `$!` 与**实际 JVM 进程号不一致** → `do_stop` 的 `kill` 打空 → **孤儿 JVM 继续占端口**，
+>   下一轮 `start` 直接报 `Port 8090 already in use`（本轮连踩 2 次）；`wait_one` 的 **90s 上限在满负载下不够**（网关实测需 **105s** 才就绪）。
+>   **规避方式**：① 跑验证前先按端口清理残留（`ss -tlnp` / `fuser` 取 PID 后 `kill -9`）；② 就绪判据用**真实 HTTP 探活**（网关 `/api/health` 返回 200），
+>   **不要用日志关键字**（被孤儿进程写过的日志会出现稀疏空洞，`grep` 会命中上一轮残留字节而误判）；③ 起栈前先删日志。
+>   **修复建议（本轮未改，脚本属共享禁区）**：① `start_one` 记录真实 JVM PID，或 `do_stop` 改为按端口清理；② `wait_one` 上限提到 180s。
 
 ---
 
@@ -191,7 +238,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 16 模块 12 部署单元、60 表 / 15 迁移、353 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 16 模块 12 部署单元、60 表 / 17 迁移、359 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 

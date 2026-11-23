@@ -11,7 +11,6 @@ import com.company.retail.titlerelease.domain.TitleRetention;
 import com.company.retail.titlerelease.domain.TitleRetentionStatus;
 import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
 import com.company.retail.titlerelease.persistence.JdbcReleaseOrderRepository;
-import com.company.retail.titlerelease.persistence.JdbcTitleRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,14 +39,14 @@ public class TitleReleaseApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(TitleReleaseApplicationService.class);
 
-    private final JdbcTitleRepository titleRepository;
+    private final TitleRepositoryPort titleRepository;
     private final JdbcReleaseOrderRepository orderRepository;
     private final JdbcAttachmentRepository attachmentRepository;
     private final LocalStorageAttachmentStorage attachmentStorage;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
 
-    public TitleReleaseApplicationService(JdbcTitleRepository titleRepository,
+    public TitleReleaseApplicationService(TitleRepositoryPort titleRepository,
                                           JdbcReleaseOrderRepository orderRepository,
                                           JdbcAttachmentRepository attachmentRepository,
                                           LocalStorageAttachmentStorage attachmentStorage,
@@ -87,21 +86,31 @@ public class TitleReleaseApplicationService {
         if (loanId <= 0) {
             throw new BusinessException(RFErrorCode.RF_VALID_001, "loanId 必须为正整数业务主键");
         }
-        java.util.Optional<JdbcTitleRepository.TitleRow> existing = titleRepository.findByLoanId(loanId);
+        java.util.Optional<TitleRepositoryPort.TitleRow> existing = titleRepository.findByLoanId(loanId);
         if (existing.isPresent()) {
             // 幂等返回（W-SIM2）：LOAN_SETTLED 事件驱动的兜底建单（vin=UNKNOWN）与操作员主动登记
             // 存在竞态（uk_title_loan），重复登记返回既有记录而非 409——与 createReleaseOrderFromEvent
             // 的消费幂等同款语义；真实 vin 以事件建单后的登记变更流程订正
-            JdbcTitleRepository.TitleRow row = existing.get();
-            log.info("保留登记已存在，幂等返回 loanId={} titleId={} vin={}", loanId, row.titleId(), row.vin());
-            return new TitleRetentionView(row.titleId(), loanId, row.vin(), row.status(),
-                    row.registrationMode(), row.registeredAt() == null ? null : row.registeredAt().toInstant());
+            log.info("保留登记已存在，幂等返回 loanId={} titleId={} vin={}",
+                    loanId, existing.get().titleId(), existing.get().vin());
+            return toRetentionView(existing.get());
         }
         TitleRetention retention = TitleRetention.register(loanId, vin, contractualOnly);
         long titleId = titleRepository.insert(loanId, vin, retention.status().name(),
                 retention.registrationMode(),
                 retention.registeredAt() == null ? null : Timestamp.from(retention.registeredAt()),
                 traceId);
+        if (titleId == 0) {
+            // 并发兜底（uk_title_loan）：LOAN_SETTLED 兜底建单抢在本次 INSERT 之前提交 →
+            // 幂等返回既有记录，不重复发布登记事件（真实 vin 以登记变更流程订正）。
+            // 该分支曾以 500 暴露：唯一键异常直接冒泡（前端冒烟 F11 偶发失败）。
+            TitleRepositoryPort.TitleRow row = titleRepository.findByLoanId(loanId)
+                    .orElseThrow(() -> new BusinessException(RFErrorCode.RF_SYS_001,
+                            Map.of("reason", "TITLE_RETENTION_CONFLICT")));
+            log.info("保留登记并发冲突（uk_title_loan），幂等返回既有记录 loanId={} titleId={} vin={}",
+                    loanId, row.titleId(), row.vin());
+            return toRetentionView(row);
+        }
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("titleId", titleId);
@@ -116,8 +125,33 @@ public class TitleReleaseApplicationService {
                 retention.registrationMode(), retention.registeredAt());
     }
 
+    /**
+     * LOAN_SETTLED 兜底：缺保留登记记录时按挡板补 REGISTERED（W6 挡板清单）。
+     *
+     * <p>并发语义：操作员主动登记与本兜底建单撞 uk_title_loan 时，insert 返回 0（对方已建）
+     * → 幂等跳过，不抛异常（正常竞争，不是坏事件，不进 DEAD）。</p>
+     */
+    public void ensureRetentionForSettledLoan(long loanId) {
+        if (titleRepository.findByLoanId(loanId).isPresent()) {
+            return;
+        }
+        long titleId = titleRepository.insert(loanId, "UNKNOWN-" + loanId, "REGISTERED", "REGISTERED",
+                Timestamp.from(Instant.now()), null);
+        if (titleId == 0) {
+            log.info("保留登记兜底建单并发冲突（uk_title_loan），对方已建，跳过 loanId={}", loanId);
+            return;
+        }
+        log.warn("LOAN_SETTLED 消费：债权 {} 缺保留登记记录，已按挡板补 REGISTERED（W6 兜底）", loanId);
+    }
+
+    /** 保留登记行 → 视图（读模型收敛一处）。 */
+    private TitleRetentionView toRetentionView(TitleRepositoryPort.TitleRow row) {
+        return new TitleRetentionView(row.titleId(), row.loanId(), row.vin(), row.status(),
+                row.registrationMode(), row.registeredAt() == null ? null : row.registeredAt().toInstant());
+    }
+
     public TitleRetentionView getRetention(long loanId) {
-        JdbcTitleRepository.TitleRow row = titleRepository.findByLoanId(loanId)
+        TitleRepositoryPort.TitleRow row = titleRepository.findByLoanId(loanId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "该债权无保留登记记录", Map.of("loanId", String.valueOf(loanId))));
         return new TitleRetentionView(row.titleId(), row.loanId(), row.vin(), row.status(),
@@ -133,7 +167,7 @@ public class TitleReleaseApplicationService {
     @Transactional
     public ReleaseOrderView createReleaseOrder(long loanId, String loanSettledEvidenceRef,
                                                String traceId) {
-        JdbcTitleRepository.TitleRow retention = titleRepository.findByLoanId(loanId)
+        TitleRepositoryPort.TitleRow retention = titleRepository.findByLoanId(loanId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_TITLE_001,
                         "该债权无保留登记记录，无法创建解除订单",
                         Map.of("loanId", String.valueOf(loanId))));
@@ -150,7 +184,7 @@ public class TitleReleaseApplicationService {
     /** 事件驱动建单（第 1–2 步；消费幂等：uk_release_loan + 已存在即返回）。 */
     @Transactional
     public ReleaseOrderView createReleaseOrderFromEvent(long loanId, long settledEventId) {
-        JdbcTitleRepository.TitleRow retention = titleRepository.findByLoanId(loanId)
+        TitleRepositoryPort.TitleRow retention = titleRepository.findByLoanId(loanId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_TITLE_001,
                         "LOAN_SETTLED 消费：该债权无保留登记记录",
                         Map.of("loanId", String.valueOf(loanId))));
@@ -328,7 +362,7 @@ public class TitleReleaseApplicationService {
         order.confirmRegistration(authority);
 
         // 第 7 步：改写保留状态（INV-3 唯一入口）
-        JdbcTitleRepository.TitleRow titleRow = titleRepository.findById(order.titleId())
+        TitleRepositoryPort.TitleRow titleRow = titleRepository.findById(order.titleId())
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "保留记录不存在", Map.of("titleId", String.valueOf(order.titleId()))));
         TitleRetention retention = TitleRetention.restore(titleRow.titleId(), titleRow.loanId(),
@@ -347,7 +381,7 @@ public class TitleReleaseApplicationService {
         order.close();
         retention.close();
         updateOrderStatus(order);
-        JdbcTitleRepository.TitleRow latestTitle = titleRepository.findById(order.titleId())
+        TitleRepositoryPort.TitleRow latestTitle = titleRepository.findById(order.titleId())
                 .orElseThrow();
         titleRepository.updateStatus(latestTitle.titleId(), retention.status().name(), null,
                 latestTitle.version());

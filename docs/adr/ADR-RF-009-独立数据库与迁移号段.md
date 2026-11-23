@@ -20,6 +20,8 @@
    与 floorplan 的 `floorplan:5434` **物理隔离**，不共享实例、不共享 schema、不跨库 join。
 2. **4 schema 分区**：`core`（业务与账务）/ `pii`（个人敏感）/ `integration`（DMZ 集成）/ `audit`（审计）。
    各 schema 独立 DB role（`R06 §3`），`audit` 仅授 INSERT。
+   **生效前提**：角色授权是**生产侧物理兜底**；本地统一以 `postgres` 超级用户连库故本地不生效，
+   兑现需按角色分配连接账号（`R06 §3.1`）。
 3. **Flyway 从 `V1` 起，独立号段**（因独立实例，与 floorplan V1–V26 不会撞号）：
    V1–V9 = S1 地基、V10–V19 = S2、V20–V29 = S3、V30+ 按波次登记、**V32–V39 有意留空**。
    脚本唯一目录 `infrastructure/src/main/resources/db/migration/`；只有 `retail-core` 跑 Flyway。
