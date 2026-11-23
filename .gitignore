@@ -69,3 +69,6 @@ desktop.ini
 # ---- WorkBuddy 项目数据（非临时缓存，保留） ----
 # .workbuddy/ 目录本身不忽略
 
+# ---- 面试材料（个人求职用途，保留在本地但绝不入库） ----
+interview/
+
