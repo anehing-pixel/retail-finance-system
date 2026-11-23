@@ -3,6 +3,8 @@ package com.company.retail.externalapi.controller;
 import com.company.platform.exception.BusinessException;
 import com.company.platform.response.ApiResponse;
 import com.company.retail.common.config.TraceIdFilter;
+import com.company.retail.common.lock.DistributedLockManager;
+import com.company.retail.common.lock.LockKeys;
 import com.company.retail.common.security.JwtTokenVerifier;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.company.retail.externalapi.security.DmzGatekeeper;
@@ -45,6 +47,8 @@ public class RegistryReceiptInboundController {
 
     private final DmzGatekeeper gatekeeper;
     private final JwtTokenVerifier staffVerifier;
+    private final DistributedLockManager locks;
+    private final java.time.Duration lockWait;
     private final String titleReleaseUrl;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(FORWARD_TIMEOUT).build();
@@ -53,10 +57,14 @@ public class RegistryReceiptInboundController {
     public RegistryReceiptInboundController(
             DmzGatekeeper gatekeeper,
             @Value("${retail.auth.secret}") String staffJwtSecret,
-            @Value("${retail.clients.title-release.url}") String titleReleaseUrl) {
+            @Value("${retail.clients.title-release.url}") String titleReleaseUrl,
+            DistributedLockManager locks,
+            @Value("${retail.lock.wait-time-ms:3000}") long lockWaitMs) {
         this.gatekeeper = gatekeeper;
         this.staffVerifier = new JwtTokenVerifier(staffJwtSecret,
                 com.company.platform.security.SubjectType.EMPLOYEE);
+        this.locks = locks;
+        this.lockWait = java.time.Duration.ofMillis(lockWaitMs);
         this.titleReleaseUrl = titleReleaseUrl == null ? ""
                 : (titleReleaseUrl.endsWith("/")
                 ? titleReleaseUrl.substring(0, titleReleaseUrl.length() - 1) : titleReleaseUrl);
@@ -88,6 +96,36 @@ public class RegistryReceiptInboundController {
             throw new BusinessException(RFErrorCode.RF_PTNR_003,
                     Map.of("reason", "INVALID_PAYLOAD"));
         }
+        // 回调幂等（ADR-RF-012）：外部方「换 nonce 重推」同一业务回执时，DMZ 的 nonce 关
+        // （只挡同一 nonce 重放）挡不住 —— 按业务键（订单 + 回执号）加分布式锁串行化转发。
+        // 锁在临界区结束即释放（DMZ 无本地事务）；下游 title-release 另有回执登记锁 + 唯一索引兜底。
+        return locks.callWithLock(LockKeys.dmzCallback(releaseOrderId, receiptRef), lockWait,
+                () -> forward(request, req, releaseOrderId, receiptRef, rawRef));
+    }
+
+    /** JSON 序列化（受检异常收敛为 RF_SYS_001）。 */
+    private String toJson(Object value) {
+        try {
+            return mapper.writeValueAsString(value);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException(RFErrorCode.RF_SYS_001,
+                    Map.of("reason", "FORWARD_PAYLOAD_SERIALIZE"));
+        }
+    }
+
+    /** JSON 解析（受检异常收敛为 RF_SYS_001）。 */
+    private JsonNode parseJson(String raw) {
+        try {
+            return mapper.readTree(raw);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException(RFErrorCode.RF_SYS_001,
+                    Map.of("reason", "FORWARD_RESPONSE_PARSE"));
+        }
+    }
+
+    /** 锁内转发：签系统服务 token → 转发 title-release → 组装响应。 */
+    private Object forward(HttpServletRequest request, JsonNode req, long releaseOrderId,
+                           String receiptRef, String rawRef) {
         if (titleReleaseUrl.isBlank()) {
             throw new BusinessException(RFErrorCode.RF_SYS_001,
                     Map.of("reason", "TITLE_RELEASE_URL_NOT_CONFIGURED"));
@@ -107,7 +145,7 @@ public class RegistryReceiptInboundController {
                 .timeout(FORWARD_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + serviceToken)
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(forward)))
+                .POST(HttpRequest.BodyPublishers.ofString(toJson(forward)))
                 .build();
         HttpResponse<String> resp;
         try {
@@ -119,7 +157,7 @@ public class RegistryReceiptInboundController {
             throw new BusinessException(RFErrorCode.RF_SYS_001,
                     Map.of("reason", "TITLE_RELEASE_UNREACHABLE"));
         }
-        JsonNode upstream = mapper.readTree(resp.body());
+        JsonNode upstream = parseJson(resp.body());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("received", true);
         data.put("partnerCode", request.getHeader("X-Partner-Code"));

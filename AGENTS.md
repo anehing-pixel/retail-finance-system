@@ -69,6 +69,10 @@ gateway / external-api / 10 个业务服务
   对齐原 JdbcTemplate「每次读都落库」的读语义，避免同一事务内重复 SELECT 命中本地缓存旧行。
 - **唯一键幂等走 `ON CONFLICT` 原子语义**，不采用「捕获唯一键异常再重读」——
   PostgreSQL 事务内一旦触发唯一键错误，整笔事务即被置为 aborted，无法继续读库。
+- **分布式锁（`ADR-RF-012`）只收敛并发窗口，不是正确性来源**：锁不可用一律 **fail-closed 拒绝写**
+  （`RF_LOCK_002` 503），不降级放行；锁在**事务提交后**释放（`TransactionSynchronization#afterCompletion`），
+  临界区**锁内重查**；锁键 `retail:lock:{用途}:{摘要}` 不落明文业务标识；
+  锁分域不共用（DMZ 入站与回执登记是两把锁，否则持锁调下游自死锁）。
 
 ### 实际落点（按包名前缀找代码）
 
@@ -110,11 +114,12 @@ gateway / external-api / 10 个业务服务
 |---|---|---|
 | JDK / Maven | 17 / 3.9.x | 与 floorplan 一致 |
 | PostgreSQL | 16，容器 `retail-finance-db`，宿主端口 **5435** | 5432/5434 已被占用，**不得复用** |
+| Redis | 7，容器 `retail-finance-lock-redis`，宿主端口 **6381** | 分布式锁依赖（`ADR-RF-012`）；Redis 不可达 → 受保护写路径 fail-closed 拒写 |
 | Nacos | 本地不启；`discovery.fail-fast=false` | 网关用 `ROUTE_*` 覆盖为直连 |
 | `SERVER__PORT` 坑 | 本机注入会覆盖 `server.port` | 启动一律 `env -u SERVER__PORT` |
 | 后台进程 | 随 shell 会话被回收 | 启动 + 测试 + 清理必须放**同一条命令**内 |
 | 进程数 | 网关 1 + DMZ 1 + 业务服务 10 = **12 个 JVM** | 用 `run-microservices.sh start/stop/smoke` 编排（✅ W2 已交付） |
-| 端口 | 业务 8090–8099 / 网关 18081 / DMZ 18091 | 与 floorplan 8080–8088 / 18080 / 18090 不冲突 |
+| 端口 | 业务 8090–8099 / 网关 18081 / DMZ 18091 / Redis 6381 | 与 floorplan 8080–8088 / 18080 / 18090 不冲突 |
 | Flyway | 只有 `retail-core` 跑迁移 | 避免重复迁移 |
 | VSCode Java 语言服务器 | 会锁 `target/classes` 导致 `mvn clean` 失败 | 勿误杀，改用增量 `package` |
 

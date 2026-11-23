@@ -34,6 +34,15 @@ retail:
     # 员工侧 JWT 密钥（W-SIM）：DMZ 转发内部 API 时签系统服务 token（svc-external-dmz），
     # 与其他服务同一真相源；生产必须环境变量注入
     secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+  lock:
+    # 分布式锁（ADR-RF-012）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
+    redis:
+      address: ${RETAIL_LOCK_REDIS_ADDRESS:redis://127.0.0.1:6380}
+      connect-timeout-ms: ${RETAIL_LOCK_CONNECT_TIMEOUT_MS:3000}
+      timeout-ms: ${RETAIL_LOCK_TIMEOUT_MS:3000}
+      retry-attempts: ${RETAIL_LOCK_RETRY_ATTEMPTS:0}
+    # 抢锁等待上限：超时按并发冲突拒绝（RF_LOCK_001）
+    wait-time-ms: ${RETAIL_LOCK_WAIT_MS:3000}
   clients:
     title-release:
       # DMZ 入站转发直连（双模范式，R09 §7.2）：登记回执 → title-release 回执登记

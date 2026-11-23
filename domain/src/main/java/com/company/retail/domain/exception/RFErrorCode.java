@@ -67,6 +67,10 @@ public enum RFErrorCode implements ErrorCode {
     RF_DMS_002("车辆重复申请", 409),
     RF_DMS_003("交易形态字段缺失（双形态下每笔申请必填）", 400),
 
+    // ---- 分布式锁（ADR-RF-012） ----
+    RF_LOCK_001("并发冲突：同类请求处理中（锁等待超时）", 409),
+    RF_LOCK_002("分布式锁服务不可用（Redis 不可达，fail-closed 拒绝写）", 503),
+
     // ---- 兜底 ----
     RF_SYS_001("未预期异常", 500);
 

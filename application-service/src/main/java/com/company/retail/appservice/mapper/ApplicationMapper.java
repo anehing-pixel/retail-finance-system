@@ -18,6 +18,10 @@ import java.util.Map;
  * <p><b>生成键口径</b>：受理插入用 {@code useGeneratedKeys} 回填 {@code application_id}，
  * 写入后由仓储从入参 Map 的 {@code applicationId} 键读取；冲突/未插入时该键为 null
  * （等价原 RETURNING 返回空集），仓储按「未插入」处理。</p>
+     *
+     * <p><b>并发口径（ADR-RF-012）</b>：同幂等键并发写由 {@code uk_app_idempotency}
+     * 唯一索引兜底，插入走 {@code ON CONFLICT DO NOTHING}——不捕获唯一键异常，
+     * 避免 PostgreSQL「唯一键错误即整笔事务 aborted」。</p>
  */
 public interface ApplicationMapper {
 
@@ -41,7 +45,8 @@ public interface ApplicationMapper {
             + "consent_ref, trace_id) "
             + "VALUES (#{applicationNo}, #{customerId}, #{dealerPartnerId}, 'SUBMITTED', "
             + "#{transactionScheme}, #{submittedAt}, #{channel}, #{idempotencyKey}, "
-            + "#{requestFingerprint}, #{consentRef}, #{traceId})")
+            + "#{requestFingerprint}, #{consentRef}, #{traceId}) "
+            + "ON CONFLICT (idempotency_key) DO NOTHING")
     @Options(useGeneratedKeys = true, keyProperty = "applicationId", keyColumn = "application_id")
     int insertApplication(Map<String, Object> params);
 
@@ -67,6 +72,10 @@ public interface ApplicationMapper {
             + "transaction_scheme, submitted_at, channel, idempotency_key, consent_ref "
             + "FROM core.applications WHERE idempotency_key = #{idempotencyKey}")
     List<Map<String, Object>> findByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
+
+    /** 按幂等键读请求指纹（并发同键冲突时判定重放 / 冲突）。 */
+    @Select("SELECT request_fingerprint FROM core.applications WHERE idempotency_key = #{idempotencyKey}")
+    List<Map<String, Object>> findFingerprintByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
 
     /** 状态回写（目标状态由聚合方法产出；version 递增，updated_at 取库端 now()）。 */
     @Update("UPDATE core.applications SET status = #{status}, updated_at = now(), version = version + 1 "

@@ -36,6 +36,15 @@ retail:
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
     secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+  lock:
+    # 分布式锁（ADR-RF-012）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
+    redis:
+      address: ${RETAIL_LOCK_REDIS_ADDRESS:redis://127.0.0.1:6380}
+      connect-timeout-ms: ${RETAIL_LOCK_CONNECT_TIMEOUT_MS:3000}
+      timeout-ms: ${RETAIL_LOCK_TIMEOUT_MS:3000}
+      retry-attempts: ${RETAIL_LOCK_RETRY_ATTEMPTS:0}
+    # 抢锁等待上限：超时按并发冲突拒绝（RF_LOCK_001）
+    wait-time-ms: ${RETAIL_LOCK_WAIT_MS:3000}
   clients:
     # Feign 门禁双模 URI（R09 §7.2）：空串回退 lb://，本地无注册中心用环境变量直连
     contract:

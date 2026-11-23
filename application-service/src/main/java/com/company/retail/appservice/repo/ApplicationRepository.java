@@ -34,7 +34,12 @@ public class ApplicationRepository {
         return at == null ? Optional.empty() : Optional.of(at);
     }
 
-    /** 插入申请（SUBMITTED 起点）+ 车辆项，返回 applicationId。 */
+    /**
+     * 插入申请（SUBMITTED 起点）+ 车辆项，返回 applicationId。
+     *
+     * <p>同幂等键并发时命中 {@code uk_app_idempotency} → {@code ON CONFLICT DO NOTHING}
+     * 不插入、生成键不回填 → 返回 0，调用方按幂等语义处理（重放 / 冲突）；此时不落车辆项。</p>
+     */
     public long insert(Application agg, String applicationNo, Application.Item item,
                        String idempotencyKey, String requestFingerprint, String traceId) {
         Map<String, Object> params = new HashMap<>();
@@ -49,10 +54,11 @@ public class ApplicationRepository {
         params.put("consentRef", agg.getConsentId());
         params.put("traceId", traceId);
         mapper.insertApplication(params);
-        // 生成键回填：冲突/未插入时为 null（等价原 RETURNING 返回空集）→ 按「未插入」处理
+        // 生成键回填：ON CONFLICT 冲突 / 未插入时为 null（等价原 RETURNING 返回空集）
         Object generated = params.get("applicationId");
         if (generated == null) {
-            throw new IllegalStateException("申请插入未回填生成键 application_id");
+            // 唯一键冲突（uk_app_idempotency）：不落车辆项，由调用方按幂等语义处理
+            return 0L;
         }
         long applicationId = ((Number) generated).longValue();
         mapper.insertItem(applicationId, item.vin(), item.model(), item.cashPrice(),
@@ -71,6 +77,13 @@ public class ApplicationRepository {
     public Optional<Application> findByIdempotencyKey(String idempotencyKey) {
         List<Map<String, Object>> rows = mapper.findByIdempotencyKey(idempotencyKey);
         return rows.isEmpty() ? Optional.empty() : Optional.of(toAggregate(rows.get(0)));
+    }
+
+    /** 按幂等键读请求指纹（并发同键冲突时判定「重放」还是「冲突」，ADR-RF-012）。 */
+    public Optional<String> findFingerprintByIdempotencyKey(String idempotencyKey) {
+        List<Map<String, Object>> rows = mapper.findFingerprintByIdempotencyKey(idempotencyKey);
+        return rows.isEmpty() ? Optional.empty()
+                : Optional.ofNullable(RowValues.asString(rows.get(0), "request_fingerprint"));
     }
 
     /** 状态回写（目标状态由聚合方法产出）。 */

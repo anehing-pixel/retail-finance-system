@@ -3,6 +3,7 @@ package com.company.retail.titlerelease;
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.EventPayloadGuard;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.common.lock.InProcessLockManager;
 import com.company.retail.titlerelease.application.TitleReleaseApplicationService;
 import com.company.retail.titlerelease.application.TitleRepositoryPort;
 import com.company.retail.titlerelease.persistence.AttachmentRepository;
@@ -142,7 +143,9 @@ class TitleRetentionIdempotencyTest {
                 new AttachmentRepository(null),      // 本组用例不触达附件
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
-                new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()));
+                new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
+                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-012）
+                3000L);
     }
 
     // ---------- 用例 ----------

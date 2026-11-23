@@ -16,12 +16,15 @@
 # 端口分配（R00 §6）：retail-core=8090 auth=8091 customer=8092 application=8093
 #   underwriting=8094 bureau=8095 contract=8096 title-release=8097
 #   servicing=8098 recon=8099 网关=18081 DMZ=18091 前端=18082 模拟器=18100 DB=5435
+#   Redis=6381（分布式锁 ADR-RF-012：受保护写路径的硬依赖，Redis 不可达即 fail-closed 拒绝写；
+#     与并行会话的缓存 Redis retail-finance-redis:6382 分端口分容器名，不冲突）
 #
 # 用法：
 #   ./run-microservices.sh start   # 启动全部并前台保活；Ctrl+C 停止
 #   ./run-microservices.sh stop    # 另开窗口停止全部
 #   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 + 前端页面冒烟 → 自动清理，一条命令完成
 #   ./run-microservices.sh db      # 只确保数据库容器运行（幂等）
+#   ./run-microservices.sh redis   # 只确保 Redis 容器运行（幂等；分布式锁依赖）
 #   # 浏览器点击级 E2E（可选，需 playwright + 系统 Edge）：python frontend/browser_e2e.py
 #   # 模拟对接 E2E（需模拟器在跑）：python external-simulator/demo_e2e.py
 # ============================================================================
@@ -39,7 +42,10 @@ command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 
 DB_CONTAINER=retail-finance-db
+REDIS_CONTAINER=retail-finance-lock-redis   # 独立于并行会话的 retail-finance-redis（缓存用，6382）
 export RETAIL_CUSTOMER_DEV_LOGIN="${RETAIL_CUSTOMER_DEV_LOGIN:-true}"   # 冒烟要用客户开发桥；生产默认 false
+# 分布式锁（ADR-RF-012）：Redis 地址注入给 application/title-release/external-api 三个服务
+export RETAIL_LOCK_REDIS_ADDRESS="${RETAIL_LOCK_REDIS_ADDRESS:-redis://127.0.0.1:6381}"
 
 JAR() { echo "$ROOT/$1/target/$2-1.0.0-SNAPSHOT.jar"; }
 
@@ -68,6 +74,25 @@ ensure_db() {
     sleep 1
   done
   echo "[错误] 数据库 60s 未就绪"; return 1
+}
+
+# Redis（分布式锁依赖，ADR-RF-012）：容器幂等启动 + 探活
+ensure_redis() {
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$REDIS_CONTAINER"; then
+    echo "[Redis] $REDIS_CONTAINER 已运行"
+  elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$REDIS_CONTAINER"; then
+    docker start "$REDIS_CONTAINER" >/dev/null && echo "[Redis] $REDIS_CONTAINER 已启动"
+  else
+    echo "[Redis] 创建 $REDIS_CONTAINER（redis:7-alpine，宿主 6381）"
+    docker run -d --name "$REDIS_CONTAINER" -p 6381:6379 redis:7-alpine >/dev/null
+  fi
+  for i in $(seq 1 30); do
+    if docker exec "$REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep -q PONG; then
+      echo "[Redis] 就绪（retail-finance-lock-redis:6381）"; return 0
+    fi
+    sleep 1
+  done
+  echo "[错误] Redis 30s 未就绪"; return 1
 }
 
 start_one() {
@@ -133,8 +158,9 @@ port_in_use() {
 
 do_start() {
   ensure_db || return 1
+  ensure_redis || return 1
   local busy=""
-  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091 18100; do
+  for p in 8090 8091 8092 8093 8094 8095 8096 8097 8098 8099 18081 18091 18100 6381; do
     port_in_use "$p" && busy="$busy $p"
   done
   if [ -n "$busy" ]; then
@@ -246,7 +272,10 @@ case "${1:-}" in
   db)
     ensure_db
     ;;
+  redis)
+    ensure_redis
+    ;;
   *)
-    echo "用法: $0 {start|stop|smoke|db}"; exit 1
+    echo "用法: $0 {start|stop|smoke|db|redis}"; exit 1
     ;;
 esac

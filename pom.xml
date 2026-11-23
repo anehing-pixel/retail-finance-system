@@ -44,6 +44,8 @@
     <platform-contracts.version>1.0.0-SNAPSHOT</platform-contracts.version>
     <!-- 持久层：MyBatis（Spring Boot 3.2 兼容线 3.0.x） -->
     <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
+    <!-- 分布式锁：Redisson（ADR-RF-012；锁服务不可用即 fail-closed 拒绝写） -->
+    <redisson.version>3.27.2</redisson.version>
     <jjwt.version>0.12.5</jjwt.version>
   </properties>
 
@@ -90,6 +92,12 @@
         <groupId>org.mybatis.spring.boot</groupId>
         <artifactId>mybatis-spring-boot-starter</artifactId>
         <version>${mybatis-spring-boot.version}</version>
+      </dependency>
+      <!-- 分布式锁客户端（ADR-RF-012）：版本与 Spring Boot 3.2.5 的 Netty 线对齐 -->
+      <dependency>
+        <groupId>org.redisson</groupId>
+        <artifactId>redisson</artifactId>
+        <version>${redisson.version}</version>
       </dependency>
       <dependency>
         <groupId>io.jsonwebtoken</groupId>

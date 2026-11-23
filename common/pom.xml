@@ -11,7 +11,7 @@
 
   <artifactId>retail-common</artifactId>
   <name>Retail Finance :: Common</name>
-  <description>跨服务共用基础设施：Feign 门禁契约（冻结）、双主体 JWT 验签、JWT 透传、事件 payload 白名单、Web 装配</description>
+  <description>跨服务共用基础设施：Feign 门禁契约（冻结）、双主体 JWT 验签、JWT 透传、事件 payload 白名单、分布式锁、Web 装配</description>
 
   <dependencies>
     <!-- 语义层：RF_* 错误码 / 权限点常量 -->
@@ -53,6 +53,20 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-crypto</artifactId>
+    </dependency>
+    <!-- 分布式锁机制件 common/lock：Redisson 适配器 + 锁键命名（ADR-RF-012）。
+         optional = 不传递给下游服务，由使用方显式声明依赖（精确装配：
+         不需要分布式锁的服务不必背上 Redisson） -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- 事务同步回调（锁在事务提交后释放，而非临界区返回即释放） -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

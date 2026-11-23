@@ -34,6 +34,16 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+    <!-- 分布式锁（ADR-RF-012）：Redisson 客户端 + 事务同步回调（锁在提交后释放）。
+         common 里是 optional，需使用方显式声明（精确装配纪律） -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+    </dependency>
     <!-- 服务注册发现；本地无 Nacos 时 fail-fast=false，路由用 ROUTE_* 直连覆盖 -->
     <dependency>
       <groupId>com.alibaba.cloud</groupId>

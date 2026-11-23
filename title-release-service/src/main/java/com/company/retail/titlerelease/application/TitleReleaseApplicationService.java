@@ -2,6 +2,8 @@ package com.company.retail.titlerelease.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.common.lock.DistributedLockManager;
+import com.company.retail.common.lock.LockKeys;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.company.retail.titlerelease.domain.EvidenceChainPolicy;
 import com.company.retail.titlerelease.domain.ReceiptAuthority;
@@ -14,6 +16,7 @@ import com.company.retail.titlerelease.persistence.ReleaseOrderRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +25,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -45,19 +49,25 @@ public class TitleReleaseApplicationService {
     private final LocalStorageAttachmentStorage attachmentStorage;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
+    private final DistributedLockManager locks;
+    private final java.time.Duration lockWait;
 
     public TitleReleaseApplicationService(TitleRepositoryPort titleRepository,
                                           ReleaseOrderRepository orderRepository,
                                           AttachmentRepository attachmentRepository,
                                           LocalStorageAttachmentStorage attachmentStorage,
                                           OutboxPublisher outbox,
-                                          ObjectMapperHolder mapperHolder) {
+                                          ObjectMapperHolder mapperHolder,
+                                          DistributedLockManager locks,
+                                          @Value("${retail.lock.wait-time-ms:3000}") long lockWaitMs) {
         this.titleRepository = titleRepository;
         this.orderRepository = orderRepository;
         this.attachmentRepository = attachmentRepository;
         this.attachmentStorage = attachmentStorage;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
+        this.locks = locks;
+        this.lockWait = java.time.Duration.ofMillis(lockWaitMs);
     }
 
     /** ObjectMapper 桥（收口一处，同 retail-core 范式）。 */
@@ -387,7 +397,6 @@ public class TitleReleaseApplicationService {
     public ReceiptResult registerReceipt(long releaseOrderId, String authorityText, String receiptRef,
                                          String verifiedBy, String rawRef, String traceId) {
         ReceiptAuthority authority = parseAuthority(authorityText);
-        ReleaseOrder order = loadOrder(releaseOrderId);
 
         if (authority == ReceiptAuthority.PARTNER_SELF_REPORT) {
             // X-10：经销商/消费者自证「已解押」一律拒绝采信（C-11；不落库、不改状态）
@@ -396,9 +405,48 @@ public class TitleReleaseApplicationService {
                     Map.of("authority", authority.name()));
         }
 
-        // 回执先落库（append-only 留痕）
-        orderRepository.insertReceipt(releaseOrderId, authority.name(), receiptRef, verifiedBy,
-                rawRef, traceId);
+        // 回调幂等（ADR-RF-012）：同一回执（订单 + 权威 + 回执号）的重复 / 并发投递串行化，
+        // 锁在事务提交后释放；锁内重查既有回执 → 幂等返回首次结果。
+        return locks.callWithLock(LockKeys.registryReceipt(releaseOrderId, receiptRef), lockWait,
+                () -> registerReceiptUnderLock(releaseOrderId, authority, receiptRef,
+                        verifiedBy, rawRef, traceId));
+    }
+
+    /**
+     * 锁内回执登记：幂等重放检查 → 回执落库 → 状态推进 → 闭环事件。
+     *
+     * <p>幂等三道闸：① 锁内重查既有回执；② uk_receipt_order_authority_ref 唯一索引
+     * （ON CONFLICT DO NOTHING）；③ 状态机本身拒绝非法二次推进。锁只是并发窗口的收敛手段，
+     * 唯一索引才是最终权威。</p>
+     */
+    private ReceiptResult registerReceiptUnderLock(long releaseOrderId, ReceiptAuthority authority,
+                                                    String receiptRef, String verifiedBy, String rawRef,
+                                                    String traceId) {
+        ReleaseOrder order = loadOrder(releaseOrderId);
+
+        // 幂等重放：同一 (订单, 权威, 回执号) 已登记 → 返回既有结果，
+        // 不重复落库、不重复推进状态、不重复发事件。
+        Optional<ReleaseOrderRepository.ReceiptRow> existing =
+                orderRepository.findReceiptByRef(releaseOrderId, authority.name(), receiptRef);
+        if (existing.isPresent()) {
+            log.info("登记回执已存在，幂等返回 releaseOrderId={} receiptRef={} status={}",
+                    releaseOrderId, receiptRef, order.status());
+            return new ReceiptResult(releaseOrderId, order.status().name(), authority.name(),
+                    ReleaseOrderStatus.CLOSED == order.status(),
+                    "回执已登记（幂等重放：不重复落库、不重复推进状态、不重复发事件）");
+        }
+
+        // 回执先落库（append-only 留痕）；uk_receipt_order_authority_ref 唯一索引兜底并发
+        long receiptId = orderRepository.insertReceipt(releaseOrderId, authority.name(), receiptRef,
+                verifiedBy, rawRef, traceId);
+        if (receiptId == 0) {
+            // 并发 / 重放命中唯一索引 → 幂等返回既有结果
+            log.info("登记回执并发冲突（uk_receipt_order_authority_ref），幂等返回 releaseOrderId={} receiptRef={}",
+                    releaseOrderId, receiptRef);
+            return new ReceiptResult(releaseOrderId, order.status().name(), authority.name(),
+                    ReleaseOrderStatus.CLOSED == order.status(),
+                    "回执已登记（并发幂等：不重复落库、不重复推进状态、不重复发事件）");
+        }
 
         if (authority == ReceiptAuthority.INTERNAL_WITNESS) {
             // 我方见证代录：仅中间态 MANUAL_RECORDED，绝不等于解押完成（C-11 / X-9）
