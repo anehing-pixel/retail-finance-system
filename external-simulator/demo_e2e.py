@@ -58,6 +58,18 @@ def data_of(resp):
     return (resp or {}).get("data") or {}
 
 
+def call_raw(method, url):
+    """非 JSON 响应（CSV/文件）原始读取：返回 (status, text)。"""
+    req = urllib.request.Request(url, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status, r.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return 0, str(e)
+
+
 def wait_until(fn, desc, timeout_s, interval=1.0):
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -272,6 +284,56 @@ code, resp = call("GET", SIM + "/external-sim/events")
 cb = [e for e in data_of(resp).get("items", []) if e.get("dir") == "OUT-CALLBACK"]
 check("28 回调被 DMZ 接受(200)", bool(cb) and cb[-1].get("status") == 200,
       json.dumps(cb[-1])[:100] if cb else "无回调记录")
+
+# ---------- 7. W-SIM2 全通道扩展断言 ----------
+# 29 eKYC（P-12）：核验 start 时真 HTTP 提交，只出脱敏号（红线 B-7）
+kyc = wait_until(lambda: call("GET", SIM + "/external-sim/stats")[1]
+                 .get("data", {}).get("kycSubmissions", 0) >= 1, "eKYC 提交", 15)
+code, resp = call("GET", SIM + "/external-sim/events")
+kyc_ev = [e for e in data_of(resp).get("items", []) if e.get("dir") == "IN-KYC"]
+check("29 eKYC 出站走模拟器(脱敏号)", bool(kyc) and bool(kyc_ev)
+      and kyc_ev[-1].get("maskedNumber") == "****9999",
+      json.dumps(kyc_ev[-1])[:100] if kyc_ev else "无 eKYC 事件")
+
+# 30 DMS 集成商（I-02）：审查决定事件消费 → 真 HTTP 推送
+dms = wait_until(lambda: call("GET", SIM + "/external-sim/stats")[1]
+                 .get("data", {}).get("dmsNotifications", 0) >= 1, "DMS 通知", 20)
+code, resp = call("GET", SIM + "/external-sim/events")
+dms_ev = [e for e in data_of(resp).get("items", []) if e.get("dir") == "IN-DMS-RESULT"]
+check("30 DMS 审查结果通知(I-02)", bool(dms) and bool(dms_ev)
+      and dms_ev[-1].get("decision") == "APPROVED",
+      json.dumps(dms_ev[-1])[:100] if dms_ev else "无 DMS 事件")
+
+# 31 银行代付（P-09）：三门禁代付走真 HTTP 网关
+bank = wait_until(lambda: call("GET", SIM + "/external-sim/stats")[1]
+                  .get("data", {}).get("bankDisbursements", 0) >= 1, "银行代付", 10)
+code, resp = call("GET", SIM + "/external-sim/events")
+bank_ev = [e for e in data_of(resp).get("items", []) if e.get("dir") == "IN-BANK-DISBURSEMENT"]
+check("31 银行代付出站(P-09)", bool(bank) and bool(bank_ev)
+      and bank_ev[-1].get("amount") == 1550000
+      and str(bank_ev[-1].get("instructionRef", "")).startswith("INS-"),
+      json.dumps(bank_ev[-1])[:100] if bank_ev else "无代付事件")
+
+# 32 书面送达（P-14）：两份法定文件交付留痕同时推送送达通道
+dlv = wait_until(lambda: call("GET", SIM + "/external-sim/stats")[1]
+                 .get("data", {}).get("deliveries", 0) >= 2, "送达推送", 10)
+check("32 送达通道推送×2(P-14)", bool(dlv))
+
+# 33 入金明细文件（P-11）：模拟器网银导出 CSV → 逐行导入（loanId 缺省走 UNMATCHED 人工匹配）
+code, resp_text = call_raw("GET", SIM + "/bank/v1/entry-files?txn=FILE-" + TAG + "&amount=123456")
+rows = [line.split(",") for line in resp_text.strip().splitlines()[1:]] if code == 200 else []
+check("33a 入金文件下发(CSV)", code == 200 and len(rows) == 2
+      and rows[0][2] == "123456" and rows[0][4] == "BOOKED",
+      resp_text[:100] if isinstance(resp_text, str) else str(resp_text))
+first = rows[0] if rows else None
+if first:
+    code, resp = call("POST", GW + "/api/payments",
+                      {"loanId": 0, "accountRef": first[1], "transactionId": first[0],
+                       "amount": int(first[2]), "channel": "DIRECT_DEBIT",
+                       "paymentRef": "PM-FILE-" + TAG}, token=token, idem="FILE-" + TAG)
+    check("33b 文件逐行导入→UNMATCHED", code == 200
+          and data_of(resp).get("status") == "UNMATCHED",
+          json.dumps(resp)[:100])
 
 print("\n===== demo_e2e: %d checks, %d PASS, %d FAIL =====" % (PASS + FAIL, PASS, FAIL))
 sys.exit(1 if FAIL else 0)

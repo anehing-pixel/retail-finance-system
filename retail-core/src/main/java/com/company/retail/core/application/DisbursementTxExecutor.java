@@ -3,6 +3,7 @@ package com.company.retail.core.application;
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.core.domain.Loan;
+import com.company.retail.core.integration.BankPayAdapter;
 import com.company.retail.core.persistence.JdbcDisbursementRepository;
 import com.company.retail.core.persistence.JdbcLoanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
@@ -30,15 +31,19 @@ public class DisbursementTxExecutor {
     private final JdbcDisbursementRepository disbursementRepository;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
+    /** 银行代付网关（W-SIM2 双模：挡板/HTTP，配置 retail.core.bank-pay-url）。 */
+    private final BankPayAdapter bankPayAdapter;
 
     public DisbursementTxExecutor(JdbcLoanRepository loanRepository,
                                   JdbcDisbursementRepository disbursementRepository,
                                   OutboxPublisher outbox,
-                                  ObjectMapperHolder mapperHolder) {
+                                  ObjectMapperHolder mapperHolder,
+                                  BankPayAdapter bankPayAdapter) {
         this.loanRepository = loanRepository;
         this.disbursementRepository = disbursementRepository;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
+        this.bankPayAdapter = bankPayAdapter;
     }
 
     @Transactional
@@ -60,6 +65,13 @@ public class DisbursementTxExecutor {
         String instructionRef = request.payeeAccountRef() == null || request.payeeAccountRef().isBlank()
                 ? "INS-" + loan.loanId()
                 : "INS-" + loan.loanId() + "-" + request.payeeAccountRef();
+        // 银行网关外呼（W-SIM2：挡板=同步假成功；HTTP=真实对端）。失败→抛出回滚整个本地事务，
+        // 不产生半代付状态（债权仍 DISBURSING 前态，重试幂等键可重发）
+        BankPayAdapter.PayResult bank = bankPayAdapter.pay(instructionRef, loan.principal(), request.payeeAccountRef());
+        if (!bank.paid()) {
+            throw new BusinessException(RFErrorCode.RF_SYS_001, "银行代付未受理",
+                    Map.of("instructionRef", instructionRef, "reason", bank.rawMessage()));
+        }
         long disbursementId;
         try {
             disbursementId = disbursementRepository.insert(loan.loanId(), request.payeeAccountRef(),
@@ -86,8 +98,8 @@ public class DisbursementTxExecutor {
         outbox.publish(OutboxPublisher.DISBURSEMENT_PAID, String.valueOf(disbursementId),
                 mapperHolder.writeJson(payload));
 
-        log.info("代付完成 loanId={} contractId={} disbursementId={} amount={}",
-                loan.loanId(), loan.contractId(), disbursementId, loan.principal());
+        log.info("代付完成 loanId={} contractId={} disbursementId={} amount={} bankRef={}",
+                loan.loanId(), loan.contractId(), disbursementId, loan.principal(), bank.bankRef());
         return new DisbursementApplicationService.DisbursementView(disbursementId, loan.loanId(),
                 loan.contractId(), "PAID", loan.principal(), "JPY", instructionRef, paidAt,
                 loan.status().name());

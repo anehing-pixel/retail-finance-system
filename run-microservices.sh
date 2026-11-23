@@ -84,11 +84,11 @@ start_one() {
 maybe_start_simulator() {
   if port_in_use 18100; then
     echo "[跳过] 18100 已有外部模拟器在跑"
-    export RETAIL_BUREAU_CIC_URL="${RETAIL_BUREAU_CIC_URL:-http://127.0.0.1:18100}"
+    export_sim_urls
     return 0
   fi
   if ! command -v node >/dev/null 2>&1; then
-    echo "[跳过] 无 node，CIC 走挡板（未导出 RETAIL_BUREAU_CIC_URL）"
+    echo "[跳过] 无 node，外部通道全走挡板（未导出 SIM URL 组）"
     return 0
   fi
   node "$ROOT/external-simulator/simulator.js" > "$LOGDIR/external-simulator.log" 2>&1 &
@@ -100,7 +100,16 @@ maybe_start_simulator() {
     fi
     sleep 1
   done
+  export_sim_urls
+}
+
+# W-SIM2 全通道切换：六向外部调用全部指向模拟器（各服务配置空值时回落挡板）
+export_sim_urls() {
   export RETAIL_BUREAU_CIC_URL="${RETAIL_BUREAU_CIC_URL:-http://127.0.0.1:18100}"
+  export RETAIL_CORE_BANK_PAY_URL="${RETAIL_CORE_BANK_PAY_URL:-http://127.0.0.1:18100}"
+  export RETAIL_KYC_PROVIDER_URL="${RETAIL_KYC_PROVIDER_URL:-http://127.0.0.1:18100}"
+  export RETAIL_DMS_OUTBOUND_URL="${RETAIL_DMS_OUTBOUND_URL:-http://127.0.0.1:18100}"
+  export RETAIL_CONTRACT_DELIVERY_URL="${RETAIL_CONTRACT_DELIVERY_URL:-http://127.0.0.1:18100}"
 }
 
 wait_one() {

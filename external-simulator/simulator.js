@@ -1,8 +1,8 @@
 /* eslint-disable */
 /**
- * 外部机构模拟器（W-SIM）——按我方提议协议 v1 扮演外部对端，零 npm 依赖。
+ * 外部机构模拟器（W-SIM→W-SIM2 全通道）——按我方提议协议 v1 扮演外部对端，零 npm 依赖。
  *
- * 扮演两个机构（其余通道按同一模式扩展）：
+ * 扮演六个对端（R07 §4 通道全覆盖，P-10 扣款委托为远期波次除外）：
  *   ① CIC 征信机构（出站对端，R07 §4.7/§4.8/§4.9）：
  *      POST /cic/v1/inquiries   征信查询（校验信封 + consentId 非空 INV-5）
  *      POST /cic/v1/reports     T+1 报送受理
@@ -11,6 +11,15 @@
  *      POST /registry/v1/submissions  接收解除委托 → 2s 后"办结"，
  *        按我方 DMZ 签名规范（METHOD\nPATH\nts\nnonce\nkeyVersion\nsha256hex(body)
  *        的 HMAC-SHA256）回调 POST {DMZ}/external/registry/receipts
+ *   ③ 银行（出站对端，R07 §4.10 / P-09 代付）：
+ *      POST /bank/v1/disbursements    代付指令受理 → 同步返回 PAID + bankRef
+ *   ④ eKYC 供应商（出站对端，R07 §4.13 / P-12，形状冻结）：
+ *      POST /kyc/v1/verifications     核验受理（只收脱敏号/引用，不收 PII）
+ *   ⑤ DMS 集成商（出站对端，R07 §4.4 / I-02 审查结果通知）：
+ *      POST /dms/v1/underwriting-result  审查决定接收回执
+ *   ⑥ 通知/书面送达通道（出站对端，R07 §4.15 / P-14）：
+ *      POST /notify/v1/deliveries     送达受理 → 回执引用
+ *   附：GET /bank/v1/entry-files      入金明细文件下发（P-11，CSV，网银导出口径）
  *
  * 运行：node external-simulator/simulator.js   （端口 18100，env SIM_PORT / SIM_DMZ_URL）
  * 观测：GET /external-sim/stats  GET /external-sim/events
@@ -27,7 +36,10 @@ const PARTNER_SECRET = process.env.SIM_PARTNER_SECRET || "dev-registry-sim-secre
 const CALLBACK_PATH = "/external/registry/receipts";
 const CALLBACK_DELAY_MS = parseInt(process.env.SIM_CALLBACK_DELAY_MS || "2000", 10);
 
-const stats = { cicInquiries: 0, cicReports: 0, cicDisputes: 0, registrySubmissions: 0, callbacks: 0 };
+const stats = {
+  cicInquiries: 0, cicReports: 0, cicDisputes: 0, registrySubmissions: 0, callbacks: 0,
+  bankDisbursements: 0, kycSubmissions: 0, dmsNotifications: 0, deliveries: 0, entryFilesServed: 0,
+};
 const events = [];          // 收到的报文（观测面，含 BANDEAU 摘要不含 PII）
 const seenMessageIds = new Set();   // 协议幂等：同 messageId 重放返回首次结果
 
@@ -123,6 +135,24 @@ const server = http.createServer(async (req, res) => {
       return ok(res, { items: events.slice(-50) });
     }
 
+    // ---------- 银行入金明细文件下发（P-11，GET 在读 body 之前处理） ----------
+    // 网银导出口径：CSV，首行表头，金额一律整数日元；支持 ?amount=&txn=&paidOn= 定制行内容
+    if (req.method === "GET" && path === "/bank/v1/entry-files") {
+      stats.entryFilesServed += 1;
+      const amount = String(parseInt(url.searchParams.get("amount") || "13500", 10));
+      const txn = url.searchParams.get("txn") || ("SIMTXN-" + Date.now());
+      const paidOn = url.searchParams.get("paidOn") || new Date().toISOString().slice(0, 10);
+      const csv = [
+        "transactionId,accountRef,amount,paidOn,bankStatus",
+        txn + ",ACC-REF-" + txn.slice(-4) + "," + amount + "," + paidOn + ",BOOKED",
+        txn + "-B,ACC-REF-" + txn.slice(-4) + "-B," + (Number(amount) + 1000) + "," + paidOn + ",BOOKED",
+      ].join("\n") + "\n";
+      events.push({ dir: "OUT-ENTRY-FILE", txn: txn, rows: 2 });
+      log("[bank entry-file] txn=" + txn, "amount=" + amount);
+      res.writeHead(200, { "Content-Type": "text/csv; charset=utf-8" });
+      return res.end(csv);
+    }
+
     const body = await readBody(req);
     let parsed = null;
     try { parsed = JSON.parse(body); } catch (e) { /* 留给信封校验报错 */ }
@@ -164,6 +194,66 @@ const server = http.createServer(async (req, res) => {
       const disputeRef = "CIC-SIM-DSP-" + crypto.randomUUID();
       events.push({ dir: "IN-DISPUTE", disputeId: parsed.payload.disputeId, ref: disputeRef });
       return ok(res, { disputeRef: disputeRef, accepted: true, slaDays: 30 });
+    }
+
+    // ---------- 银行代付（出站对端，P-09） ----------
+    if (req.method === "POST" && path === "/bank/v1/disbursements") {
+      const err = validateEnvelope(parsed);
+      if (err) return fail(res, 400, "RF_PROTOCOL", err);
+      if (!parsed.payload.instructionRef || !(parsed.payload.amount > 0)) {
+        return fail(res, 422, "RF_PROTOCOL", "INSTRUCTION_REF_AND_AMOUNT_REQUIRED");
+      }
+      stats.bankDisbursements += 1;
+      const bankRef = "BANK-SIM-" + crypto.randomUUID();
+      events.push({ dir: "IN-BANK-DISBURSEMENT", instructionRef: parsed.payload.instructionRef,
+                    amount: parsed.payload.amount, ref: bankRef });
+      log("[bank disbursement] instructionRef=" + parsed.payload.instructionRef,
+          "amount=" + parsed.payload.amount, "ref=" + bankRef);
+      return ok(res, { bankRef: bankRef, status: "PAID", paidAt: new Date().toISOString() });
+    }
+
+    // ---------- eKYC 供应商（出站对端，P-12 形状冻结；只收脱敏号/引用，红线 B-7） ----------
+    if (req.method === "POST" && path === "/kyc/v1/verifications") {
+      const err = validateEnvelope(parsed);
+      if (err) return fail(res, 400, "RF_PROTOCOL", err);
+      if (parsed.payload.fullName || parsed.payload.rawNumber) {
+        // PII 红线：核验出站只允许脱敏号/引用，收到明文 PII 直接拒绝
+        return fail(res, 422, "RF_PROTOCOL", "RAW_PII_FORBIDDEN");
+      }
+      stats.kycSubmissions += 1;
+      const providerRef = "KYC-SIM-" + crypto.randomUUID();
+      events.push({ dir: "IN-KYC", verificationId: parsed.payload.verificationId,
+                    maskedNumber: parsed.payload.maskedNumber, ref: providerRef });
+      log("[kyc submission] verificationId=" + parsed.payload.verificationId, "ref=" + providerRef);
+      return ok(res, { providerRef: providerRef, status: "PENDING",
+                       note: "人工复核通道并行保留（C-07 口径）", acceptedAt: new Date().toISOString() });
+    }
+
+    // ---------- DMS 集成商（出站对端，I-02 审查结果通知） ----------
+    if (req.method === "POST" && path === "/dms/v1/underwriting-result") {
+      const err = validateEnvelope(parsed);
+      if (err) return fail(res, 400, "RF_PROTOCOL", err);
+      stats.dmsNotifications += 1;
+      const dmsRef = "DMS-SIM-" + crypto.randomUUID();
+      events.push({ dir: "IN-DMS-RESULT", caseId: parsed.payload.caseId,
+                    applicationId: parsed.payload.applicationId,
+                    decision: parsed.payload.decision, ref: dmsRef });
+      log("[dms underwriting-result] caseId=" + parsed.payload.caseId,
+          "decision=" + parsed.payload.decision, "ref=" + dmsRef);
+      return ok(res, { accepted: true, dmsRef: dmsRef, receivedAt: new Date().toISOString() });
+    }
+
+    // ---------- 通知/书面送达通道（出站对端，P-14） ----------
+    if (req.method === "POST" && path === "/notify/v1/deliveries") {
+      const err = validateEnvelope(parsed);
+      if (err) return fail(res, 400, "RF_PROTOCOL", err);
+      stats.deliveries += 1;
+      const receiptRef = "DLV-SIM-" + crypto.randomUUID();
+      events.push({ dir: "IN-DELIVERY", contractId: parsed.payload.contractId,
+                    docType: parsed.payload.docType, ref: receiptRef });
+      log("[delivery] contractId=" + parsed.payload.contractId,
+          "docType=" + parsed.payload.docType, "ref=" + receiptRef);
+      return ok(res, { receiptRef: receiptRef, channel: "SIM-POST", acceptedAt: new Date().toISOString() });
     }
 
     // ---------- 登记机关（入站发起方） ----------

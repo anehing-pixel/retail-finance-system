@@ -87,9 +87,15 @@ public class TitleReleaseApplicationService {
         if (loanId <= 0) {
             throw new BusinessException(RFErrorCode.RF_VALID_001, "loanId 必须为正整数业务主键");
         }
-        if (titleRepository.findByLoanId(loanId).isPresent()) {
-            throw new BusinessException(RFErrorCode.RF_CONFLICT_001,
-                    "该债权已存在保留登记记录（uk_title_loan）");
+        java.util.Optional<JdbcTitleRepository.TitleRow> existing = titleRepository.findByLoanId(loanId);
+        if (existing.isPresent()) {
+            // 幂等返回（W-SIM2）：LOAN_SETTLED 事件驱动的兜底建单（vin=UNKNOWN）与操作员主动登记
+            // 存在竞态（uk_title_loan），重复登记返回既有记录而非 409——与 createReleaseOrderFromEvent
+            // 的消费幂等同款语义；真实 vin 以事件建单后的登记变更流程订正
+            JdbcTitleRepository.TitleRow row = existing.get();
+            log.info("保留登记已存在，幂等返回 loanId={} titleId={} vin={}", loanId, row.titleId(), row.vin());
+            return new TitleRetentionView(row.titleId(), loanId, row.vin(), row.status(),
+                    row.registrationMode(), row.registeredAt() == null ? null : row.registeredAt().toInstant());
         }
         TitleRetention retention = TitleRetention.register(loanId, vin, contractualOnly);
         long titleId = titleRepository.insert(loanId, vin, retention.status().name(),

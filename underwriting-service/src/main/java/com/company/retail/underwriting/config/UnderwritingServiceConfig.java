@@ -3,6 +3,7 @@ package com.company.retail.underwriting.config;
 import com.company.retail.common.contract.ConsentGateFacade;
 import com.company.retail.underwriting.application.AffordabilityAssessmentRepository;
 import com.company.retail.underwriting.application.ConsentGateGuard;
+import com.company.retail.underwriting.application.DmsResultNotificationConsumer;
 import com.company.retail.underwriting.application.InquiryCompletedConsumer;
 import com.company.retail.underwriting.application.UnderwritingCaseAppService;
 import com.company.retail.underwriting.application.UnderwritingCaseRepository;
@@ -11,6 +12,7 @@ import com.company.retail.underwriting.domain.AffordabilityPolicy;
 import com.company.retail.underwriting.domain.StubAffordabilityPolicy;
 import com.company.retail.underwriting.infrastructure.JdbcAffordabilityAssessmentRepository;
 import com.company.retail.underwriting.infrastructure.JdbcUnderwritingCaseRepository;
+import com.company.retail.underwriting.integration.HttpDmsOutboundAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -65,5 +67,18 @@ public class UnderwritingServiceConfig {
     @Bean
     public InquiryCompletedConsumer inquiryCompletedConsumer(UnderwritingCaseRepository caseRepository) {
         return new InquiryCompletedConsumer(caseRepository);
+    }
+
+    /**
+     * DMS 结果通知消费方（I-02，W-SIM2）：双模——outbound-url 空=挡板 no-op 消费者，
+     * 非空=真 HTTP 推送，失败落 outbound_tasks 人工补发。
+     */
+    @Bean
+    public DmsResultNotificationConsumer dmsResultNotificationConsumer(
+            @Value("${retail.dms.outbound-url:}") String outboundUrl,
+            JdbcTemplate jdbcTemplate) {
+        HttpDmsOutboundAdapter adapter = (outboundUrl == null || outboundUrl.isBlank())
+                ? null : new HttpDmsOutboundAdapter(outboundUrl);
+        return new DmsResultNotificationConsumer(adapter, jdbcTemplate);
     }
 }

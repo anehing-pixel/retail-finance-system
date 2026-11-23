@@ -24,6 +24,9 @@ spring:
         fail-fast: false
 
 retail:
+  kyc:
+    # eKYC 供应商双模（W-SIM2，P-12 形状冻结）：空=纯人工 MANUAL（C-07），非空=HTTP 对端
+    provider-url: ${RETAIL_KYC_PROVIDER_URL:}
   auth:
     # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
     secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}

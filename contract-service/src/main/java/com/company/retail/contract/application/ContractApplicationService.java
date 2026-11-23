@@ -8,10 +8,13 @@ import com.company.retail.contract.domain.ContractPolicy;
 import com.company.retail.contract.domain.ContractStatus;
 import com.company.retail.contract.domain.StatutoryDocument;
 import com.company.retail.contract.domain.TransactionScheme;
+import com.company.retail.contract.integration.HttpDeliveryChannelAdapter;
 import com.company.retail.contract.persistence.JdbcContractRepository;
 import com.company.retail.contract.persistence.JdbcStatutoryDocumentRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,24 +35,30 @@ import java.util.Map;
 @Service
 public class ContractApplicationService {
 
+    private static final Logger log = LoggerFactory.getLogger(ContractApplicationService.class);
+
     private final JdbcContractRepository contractRepository;
     private final JdbcStatutoryDocumentRepository documentRepository;
     private final ContractPolicy policy;
     private final OutboxPublisher outbox;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    /** 送达通道（W-SIM2 双模：null=未配置，纯 DB 留痕 C-08）。 */
+    private final HttpDeliveryChannelAdapter deliveryAdapter;
 
     public ContractApplicationService(JdbcContractRepository contractRepository,
                                       JdbcStatutoryDocumentRepository documentRepository,
                                       ContractPolicy policy,
                                       OutboxPublisher outbox,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      org.springframework.beans.factory.ObjectProvider<HttpDeliveryChannelAdapter> deliveryAdapter) {
         this.contractRepository = contractRepository;
         this.documentRepository = documentRepository;
         this.policy = policy;
         this.outbox = outbox;
         this.objectMapper = objectMapper;
         this.clock = Clock.system(Contract.JST);
+        this.deliveryAdapter = deliveryAdapter.getIfAvailable();
     }
 
     /** POST /api/contracts：创建合同（DRAFT）。uk_contract_app 幂等兜底：一个申请一份合同。 */
@@ -82,7 +91,17 @@ public class ContractApplicationService {
         }
         StatutoryDocument document = new StatutoryDocument(null, contractId, docType, templateVersion,
                 Instant.now(clock), deliveryMethod, attachmentId, null);
-        return documentRepository.insertDelivery(document, traceId);
+        long documentId = documentRepository.insertDelivery(document, traceId);
+        // 送达通道受理推送（W-SIM2：咨询性副本，失败只记日志不中断留痕主流程；权威留痕=本表）
+        if (deliveryAdapter != null) {
+            String receiptRef = deliveryAdapter.notifyDelivered(contractId, docType, deliveryMethod, traceId);
+            if (receiptRef != null) {
+                log.info("送达通道已受理 contractId={} docType={} receiptRef={}", contractId, docType, receiptRef);
+            } else {
+                log.warn("送达通道推送未受理（留痕主流程不受影响）contractId={} docType={}", contractId, docType);
+            }
+        }
+        return documentId;
     }
 
     /** DOCUMENTS_DELIVERED：交付留痕齐全后推进（模板按 C-08 配置选定）。 */

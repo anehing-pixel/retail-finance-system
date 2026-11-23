@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V14（60 表）· 构建 706 测试 0 失败 · 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V14（60 表）· 构建 353 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -15,7 +15,7 @@
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
 | 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/`（check_docs / normalize_terms / gen_w2_services / smoke_w2）；`run-microservices.sh`；`.github/workflows/docs-check.yml`；**`frontend/`（W-FE）**；**`external-simulator/`（W-SIM：外部机构模拟器 simulator.js(18100, 零依赖 Node) + 模拟对接 E2E demo_e2e.py）** |
 | 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——父 pom + 四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
-| 验证 | `mvn -B clean package` → **BUILD SUCCESS（706 测试 0 失败）**；`run-microservices.sh smoke` → **26/26**；`scripts/e2e_w8.py` 全链路 → **98/98 EXIT 0**（可重复）；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰 |
+| 验证 | `mvn -B clean package` → **BUILD SUCCESS（单测 0 失败；总数以 surefire 汇总为准，见顶部校正注）**；`run-microservices.sh smoke` → **26/26**；`scripts/e2e_w8.py` 全链路 → **98/98 EXIT 0**（可重复）；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰 |
 | 业务阻塞 | ✅ 系统口径已全部定源（`C-01` 用户签；`C-02`~`C-12` AI 裁决，`R01 §6`）；外部核实项不阻塞 |
 | 外部依赖 | 中台 jar ✅；`R07 §7`：DMS ✅ 回填（`ADR-RF-011`）；集成商选型与其余通道未回填（**不阻塞 S2 并行窗口**） |
 | 下一轮 | **计划内 S0–S5 全部完成，W9 已放行（tag `w9-accepted`）**。后续进入外部对接阶段：集成商选型与征信/银行/身份核验/登记代办/通知通道调研回填（`R07 §7`）；**各通道字段级「我方提议协议 v1」已定稿（`R07 §4.1–§4.16`，用户授权）**，随调研发出作为谈判基线，回填前仍不实现自动对接（非阻塞） |
@@ -88,7 +88,7 @@
 | **S2** | 并行窗口 W3‖W4‖W5（客户与申请 / 审查与征信 / 合同与账务前半） | W2 冻结（`w2-frozen`） | ✅ **完成（2026-11-22）**：三包全合，`mvn clean package` 332 测试 0 失败，走网关冒烟 26/26，Flyway 12/12 迁移、51 张表实测 |
 | **S3** | W6 账务闭环与解除 ‖ W7 贷后对拍合规（写入集互斥沿用并行纪律） | S2 全合 | ✅ **完成（2026-11-23 凌晨）**：V13/V14 落地（14 迁移 60 表实测）；合并后 538 测试 0 失败 + 走网关冒烟 26/26 |
 | **S4** | W8 收口：全链路 E2E 走网关 + 文档回灌 + 放行 | S3 全合 | ✅ **完成（2026-11-23）**：`scripts/e2e_w8.py` **98 断言 PASS / 0 FAIL / EXIT 0**（可重复跑），一镜到底覆盖 注册→核验→同意→申请→征信→审查→合同→冷静期→债权→三门禁代付→核销→结清→解押闭环→DPD/对拍→客户自助 |
-| **S5** | W9 收尾三包：报送执行闭环 / DMZ 三关 / 本地附件存储+日批 | S4 全合 | ✅ **完成（2026-11-23）**：三包合入，终态 706 测试 0 失败 + 冒烟 26/26 + E2E 98/98 无回归；tag `w9-accepted` |
+| **S5** | W9 收尾三包：报送执行闭环 / DMZ 三关 / 本地附件存储+日批 | S4 全合 | ✅ **完成（2026-11-23）**：三包合入，终态构建 0 失败 + 冒烟 26/26 + E2E 98/98 无回归；tag `w9-accepted` |
 | **后续** | 外部对接与合规验收：DMS 直连演进、征信/银行/身份核验/登记代办/通知通道、个人信息保护控制、访问审计、职责分离、全量回归 | `R07 §7` 调研清单回填 + 外部签约 | ⬜ 未启动（非阻塞，回填前走人工路径） |
 
 ---
@@ -154,6 +154,7 @@
 | 2026-11-23 | W8 E2E 定稿 | **PASS**：`python scripts/e2e_w8.py` **98/98 全绿 × 多轮可重复**；期间修复 ①网关 `/api/jobs/**` 通配误劫持 retail-core `schedule-due-rollup`（改 servicing 只精确收 `dpd-snapshot`）②`/api/customer-self/**` 路由段补齐 ③建库固化 `max_connections=300`；复跑 W2 冒烟 26/26 无回归 |
 | 2026-11-23 | W9 三包合并终态验收 | **PASS**：A（bureau 报送执行闭环：DPD_CHANGED/LOAN_SETTLED 消费→SENT+CREDIT_BUREAU_REPORT_SENT+报文留痕，人工 MANUAL 通道，日批默认关）/ B（DMZ 三关：nonce 原子防重放 409/scope/IP 白名单可配/call_logs append-only）/ C（本地附件存储：SHA256+预签名+防穿越+受控下载；到期滚转/DPD 日批 batch_runs 抢占锁防重）→ 终态 `mvn clean package` **706 测试 0 失败**；重启栈后冒烟 **26/26** + E2E **98/98** 无回归 |
 | 2026-11-23 | W-SIM 模拟对接双向闭环 | **PASS**：①出站——`HttpCicAdapter`（双模 `RETAIL_BUREAU_CIC_URL`，提议协议 v1 信封）接 Node 模拟器，查询/报送真 HTTP 往返；②入站——模拟器按 DMZ 签名规范回调 `/external/registry/receipts`（过三关+call_logs）→ 系统服务 token 转发 title-release → EXTERNAL_REGISTRY 自动 CLOSED；`demo_e2e.py` **28 断言 PASS/0 FAIL**（含未签名/坏签名/nonce 三关负例）；配套修复真实缺陷：事件驱动报送在调度线程无请求上下文 → consent gate 401 fail-closed 报送永远发不出（e2e_w8 未覆盖该断言，单测 mock 了 gate）→ `ConsentGateFacade` 机器场景签系统服务 token（svc-bureau） |
+| 2026-11-23 | W-SIM2 外部模拟器全通道化 | **PASS**：模拟器扩至六向对端（+银行代付 P-09/eKYC P-12/DMS 结果 I-02/送达 P-14/入金文件 P-11）；Java 侧四服务双模接线（retail-core `BankPayAdapter` 替换内联 PAID、customer `KycProvider` 脱敏号出站、underwriting `DmsResultNotificationConsumer`+outbound_tasks 兑底、contract `DeliveryChannelAdapter` 留痕旁路）；`demo_e2e.py` **34 断言 PASS/0 FAIL**；`smoke_frontend.py` 46/46；`browser_e2e.py` 30/30；全量 `mvn clean package` **BUILD SUCCESS 单测 353/0**（本轮校正：此前记录 706/748 系统计虚高，权威口径=surefire 类级/模块级汇总）；配套修复：①customer 构造器歧义导致启动失败（删冗余构造器）②`registerRetention` 与 LOAN_SETTLED 兜底建单竞态 409 → 幂等返回既有记录 |
 | 2026-11-23 | W-FE 浏览器点击级验收 | **PASS**：`browser_e2e.py`（Playwright 驱动真实 Edge headless）逐按钮点击 S1–S12 全链路 + 假合同负例 + 客户自助脱敏/主体隔离负例 + Tab 切换/ID chips/计划表/请求日志面板/无 JS 错误/无失败请求，**30 断言 PASS/0 FAIL ×2 轮可重复**；发现并修复真实 bug：GET 请求携带 null body 违反浏览器 fetch 规范（仅真实浏览器触发，requests 复现不了）→ `app.js` call() 修复；截图留证 `frontend/screenshots/` |
 | 2026-11-23 | W-FE 前端页面级验收 | **PASS**：`frontend/`（index.html + app.js 运营台/客户自助两页 + serve.py 同源代理 /gw→18081、/svc→8098、/cust→8092）；配套补 title-release 只读端点 `GET /api/release-orders?loanId=`（页面定位事件建单，42 单测 0 失败）；`python frontend/smoke_frontend.py` **46 断言 PASS / 0 FAIL / EXIT 0 × 2 轮可重复**（静态页/登录/注册/核验/同意/申请+幂等/审查+G3 负例/合同/三门禁+G8 负例/核销对拍/结清/解押闭环+X-10 负例/DPD/recon/客户自助脱敏+主体隔离负例，全部经 18082 同源代理走真实链路） |
 | 2026-11-23 | PROGRESS 陈旧表述清理（用户授权） | **PASS**：§0「下一轮」改写为 W9 放行后的外部对接阶段；§3 删除旧编号 S2/S3/S4 残留行，合并为「后续」行；§7 六条假完成警示按现实回填；`check_docs.py` 复跑 PASS |
@@ -169,7 +170,7 @@
    能力完备性以 `scripts/smoke_w2.py`（26 断言）与 `scripts/e2e_w8.py`（98 断言）为准，新增能力必须补断言。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
    （V1–V14，共 60 张表，实测 success）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 706）+ 冒烟 + E2E 实测记录（§6）为准。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 353，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。

@@ -24,6 +24,9 @@ spring:
         fail-fast: false
 
 retail:
+  dms:
+    # DMS 集成商出站双模（W-SIM2，I-02）：空=挡板（结果只落 outbox 人工导出），非空=事件消费真 HTTP 推送
+    outbound-url: ${RETAIL_DMS_OUTBOUND_URL:}
   auth:
     # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
     secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
