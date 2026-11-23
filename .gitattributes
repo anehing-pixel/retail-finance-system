@@ -1,0 +1,10 @@
+# 行尾规则（W-MQ 轮实测踩坑固化；2026-11-23 扩到 .py）
+# Windows 侧 core.autocrlf=true 会把 .sh 检出成 CRLF，
+# 而本仓的启动/验收脚本在 WSL 侧以 bash 执行 → CRLF 会让 bash 解析失败
+# （WSL 活体实测原文：line 2: set: pipefail\r: invalid option name /
+#   env: $'bash\r': No such file or directory）。
+# 同理 .py 以 shebang 直接执行会报 env: $'python3\r'（走 python3 解释器则正常）。
+# 属性优先级高于 core.autocrlf：仓库 blob 一律 LF，检出即 LF。
+*.sh text eol=lf
+*.py text eol=lf
+.gitattributes text eol=lf

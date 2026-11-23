@@ -79,7 +79,7 @@ gateway / external-api / 10 个业务服务
 - **状态机引擎（可选底座，`statemachine` 共享模块）**：引擎**只做执行器，不做事实源**——
   领域状态图（`LoanStatus` / `ReleaseOrderStatus` / `TitleRetentionStatus` 等枚举 + 允许迁移）仍是唯一事实源；
   引擎不得侵入 `domain`（`domain` 继续零 Spring 注解、纯 JUnit 可跑），接线只放服务内 `*.application.statemachine` 包。
-  引擎**不引入外部中间件**（进程内，不违反 B-10「不引 MQ / Seata / 对象存储」）。
+  引擎**不引入外部中间件**（进程内，不违反 B-10「不引 Seata / 分布式事务 / 对象存储」）。
 
 ### 实际落点（按包名前缀找代码）
 
@@ -92,6 +92,7 @@ gateway / external-api / 10 个业务服务
 | Outbox / Flyway / 持久层基建 | 共享 `infrastructure` jar | `infrastructure/.../infrastructure/{outbox,config,persistence,mapper}` |
 | 状态机引擎（编排，不放业务语义） | 共享 `statemachine` jar（`com.company.retail.statemachine`）+ 各服务 `*.application.statemachine`（图配置与接线） | `statemachine/.../statemachine`、`retail-core/.../core/application/statemachine` |
 | 状态机引擎底座（可选） | 共享 `statemachine` jar + 服务内 `*.application.statemachine` 接线包 | `statemachine/.../statemachine/{DomainStateMachineConfigurer,StateMachineRunner}`、`retail-core/.../core/application/statemachine/` |
+| MQ 削峰通道（密文信封 / RocketMQ 适配） | 共享 `common` 端口 + 共享 `infrastructure` 适配 | `common/.../common/messaging`（端口 / 信封）、`infrastructure/.../infrastructure/messaging`（生产端 / 消费端 / 中继） |
 
 > 命名不统一是**已知现状**（各服务用 `application` / `app`、`repo` / `persistence` / `infrastructure` 混用），
 > 本轮不改动；新代码**跟随所在服务既有命名**，不要跨服务强行统一。
@@ -111,11 +112,12 @@ gateway / external-api / 10 个业务服务
 | B-7 | **审查拒绝 / 撤回 / 提前结清 / 正常结清是四个不同的债权终态**，不得合并 | `R04 §3` |
 | B-8 | 金额一律 `BIGINT` 整数日元；时间 `TIMESTAMPTZ` 全系统 JST；禁止 `double` 参与金额 | `R00 §5` |
 | B-9 | 审计 `actor` 取验签身份；禁止从客户端头或请求体取 | `R00 §5` |
-| B-10 | **不引入 MQ / Seata / 对象存储**；文件本地、事件走 outbox（Redis 的**窄用途**限定见 B-13） | `ADR-RF-008` |
+| B-10 | **不引入 Seata / 分布式事务 / 对象存储**；文件本地。**MQ 已引入**（`ADR-RF-014`，2026-11-23 用户授权改口径）：仅作 outbox 之上的**削峰缓冲层**，不参与任何本地事务，**outbox 仍是唯一真相源**（Redis 的**窄用途**限定见 B-13） | `ADR-RF-008`（第 3 条 MQ 部分已被取代）、`ADR-RF-014` |
 | B-11 | **核心账务不拆**：入金核销 + 余额 + 债权终态同一本地事务，留在 `retail-core` | `ADR-RF-001` |
 | B-12 | **持久层改造不改语义**：SQL 语义、仓储方法签名、事务边界、对外接口一律不变 | `R02 §3.1`、本文件 §2 |
 | B-13 | **Redis 用途白名单只有两类**：① **只读业务配置**的 L2 缓存（产品档位等）；② **网关限流状态**。**绝不缓存**债权余额 / 核销流水 / 个人信息 / 征信结果 / 审查结果。**改配置不得改历史计划**（计划侧落快照）；Redis 锁**不作正确性来源**；缓存不可用 → 降级直读数据源，限流不可用 → fail-open | `ADR-RF-012` §2 §3 |
 | B-14 | **状态机：领域为状态图唯一事实源**——引擎迁移边必须由领域状态图生成，**禁止在引擎侧另写一份状态图**；未提供变更入口的边必须显式登记为「未接线」，未登记即启动装配失败；**接入引擎不得改变对外语义**（错误码、消息、事务边界一律不变） | `R04 §5.3`、本文件 §2 §9 |
+| B-15 | **MQ 上只允许出现密文信封**：含个人信息的载荷必须先加密成信封再入队（信封 8 键白名单 + 明文 PII 键默认拒绝）；**明文载荷一律不入队**，broker 落盘行永久保留、事后撤回不可能 | `ADR-RF-014`、`R09 §5.5` |
 
 ---
 
@@ -132,9 +134,61 @@ gateway / external-api / 10 个业务服务
 | 进程数 | 网关 1 + DMZ 1 + 业务服务 10 = **12 个 JVM** | 用 `run-microservices.sh start/stop/smoke` 编排（✅ W2 已交付） |
 | 端口 | 业务 8090–8099 / 网关 18081 / DMZ 18091 | 与 floorplan 8080–8088 / 18080 / 18090 不冲突 |
 | Flyway | 只有 `retail-core` 跑迁移 | 避免重复迁移 |
+| RocketMQ | 本地单节点：namesrv **9876** / broker **10911**，运行台在 `data/mq-broker`（不入版本库） | **本轮口径「先不用 MQ 集群」**；Docker Hub 拉取超时，broker 由 Maven Central 的 `rocketmq-namesrv/broker:5.0.0` 直接起；启动须带 `ROCKETMQ_HOME` 与 JDK17 `--add-opens` |
 | VSCode Java 语言服务器 | 会锁 `target/classes` 导致 `mvn clean` 失败 | 勿误杀，改用增量 `package` |
+| 换行符 | 仓库 blob **一律 LF**；`.gitattributes` 强制 `.sh` / `.py` 为 `eol=lf`；本仓 `core.autocrlf` 不得为 `true` | 见 §4.1 |
+| 脚本执行位置 | `run-microservices.sh` / `scripts/dev-stack.sh` 在 **WSL 侧**执行（Windows 侧绑不上 8090–8099/18081/18091） | `PROGRESS §7` 第 9 条；行尾纪律见 §4.1 |
 
 > 本节在 S1 首次实测后必须回填真实值；在此之前任何「已验证」表述都是假的。
+
+### 4.1 Windows 行尾转换与 WSL 执行（2026-11-23 实测）
+
+**现象**：Windows 侧 `core.autocrlf=true` 时，`.sh` 检出到工作区会被转成 CRLF；
+本仓启动与验收脚本在 WSL 侧以 bash 执行，CRLF 会让 bash 解析失败。WSL 活体复现的报错原文：
+
+- `bash x.sh` → `line 2: set: pipefail\r: invalid option name`
+- 直接执行（走 shebang）→ `env: $'bash\r': No such file or directory`
+- Python 脚本直接执行 → `env: $'python3\r': No such file or directory`（改用 `python3 脚本.py` 走解释器则正常）
+
+**根因**：转换发生在**检出**环节，**仓库 blob 本身是 LF**（`git ls-files --eol` 中文本文件一律为 `i/lf`；截图等二进制显示 `-text` 属正常）。
+所以「仓库被提交坏了」是误判——坏的是工作区副本，索引与远端都是干净的。
+
+**判定**（不要靠 `bash -n`：实测 CRLF 脚本 `bash -n` **不报错**，检不出该问题）：
+
+```bash
+git ls-files --eol | grep -v 'i/lf' | grep -v '\-text'   # 期望：无输出（文本文件索引必须全为 i/lf）
+git ls-files --eol | grep 'w/crlf'       # 期望：无输出（工作区也必须为 w/lf）
+git check-attr text eol -- run-microservices.sh   # 期望：text: set / eol: lf
+```
+
+**修复**（三层，缺一层就复发）：
+
+1. `.gitattributes`（仓库内、随代码走，**最关键的一层**）：
+   ```
+   *.sh  text eol=lf
+   *.py  text eol=lf
+   ```
+   属性优先级高于 `core.autocrlf`，新克隆的机器不用再单独配置。**规则本体只写在 `.gitattributes`，
+   别处禁止再复制一份通配符**（两处漂移 = 又一次复发），且**必须随收口提交**，否则新克隆的机器会复发。
+2. 本仓 Git 配置：`git config core.autocrlf input`（入库存 LF、检出不再转换）。
+   本仓已实测从 `true` 改为 `input`（**仅 local**，不动全局配置）。
+   **不得**设为 `true`；也不依赖全局配置——全局为 `true` 时靠第 1、2 层兜住。
+3. 已被转换的工作区文件改回 LF：
+   ```bash
+   git add --renormalize .     # 按新属性重新规范化索引
+   git checkout-index -f -a    # 按属性重新检出工作区
+   ```
+   ⚠️ **工作区有未提交改动时禁用第 3 步**：两条命令都作用于整棵树（`--renormalize` 会把未暂存的改动一起暂存，
+   `checkout-index -f -a` 会覆盖工作区内容）。先提交或 stash 再执行；本仓并行轮次多，改前先 `git status` 看清楚。
+
+**纪律**：
+
+- 新增或改写 `.sh` / `.py` **一律 LF**。Windows 侧写文件时，`Set-Content` / `Out-File` / `>` 重定向
+  默认写 CRLF，**不要用**；用 `[System.IO.File]::WriteAllText($path, $content)`（内容原样写出，保持 LF）。
+- 提交前跑一次 `git ls-files --eol | grep 'w/crlf'`，非空即中止提交。
+- `.sh` 只在 WSL 侧执行；Windows 侧的 bash（Git Bash / cygwin）不作为验收环境。
+- `.md` / `.java` / `.yml` 用 CRLF 无害，**不必批量转换**；只对会被解释器直接执行的脚本类型设 `eol=lf`。
+- 本仓 `.sh` 的权威入口是 `run-microservices.sh` 与 `scripts/dev-stack.sh`，两者都必须保持 `i/lf w/lf`。
 
 ---
 
@@ -155,6 +209,11 @@ bash run-microservices.sh smoke      # 启动 12 个进程 → 走网关 18081 �
 - 新增/修改服务必须补对应冒烟断言，且**必须验证从网关可达、返回的是目标服务的业务响应而非兜底 404**。
 - Feign 门禁必须验证 JWT 透传生效（缺失时 fallback 拒付，而不是静默放行）。
 - 改服务必须补 `scripts/smoke_<agent>.py` 断言；`scripts/check_docs.py` 是文档轮的等价冒烟，同样不许跳过。
+- **MQ 通道的验收**（`ADR-RF-014`）：默认关闭时只验零回归；开启后必须跑**真实 broker 活体联调**
+  `mvn -B test -pl infrastructure -am -Dtest=MqEnvelopeLiveTest -Drf.mq.live=true`，
+  判据含「broker 上回读的原始消息体不含明文个人信息」——只跑单测不算 MQ 链路已通。
+- **行尾门禁**（§4.1）：提交前跑 `git ls-files --eol | grep 'w/crlf'`，非空即中止提交——
+  行尾转换发生在**检出**环节，编译、单测、冒烟**全都测不出来**（CRLF 脚本 `bash -n` 也不报错）。
 
 ---
 
@@ -163,7 +222,7 @@ bash run-microservices.sh smoke      # 启动 12 个进程 → 走网关 18081 �
 - 本项目**独立数据库实例**（`retail_finance`），Flyway 从 `V1` 起，与 floorplan 的 `V1–V26` 物理隔离、不会撞号。
 - 但**端口段、配置键前缀、JWT 密钥环境变量、中台 jar 版本、Feign 契约**是跨项目共享资源，
   改动前必须在 `PROGRESS.md §2` 登记。
-- 号段规划见 `R06 §6`：V1–V9 起步地基、V10–V19 段（**V18 已占用** = 产品档位目录 + 还款计划快照列；**V19 已占用** = 外部登记回执幂等唯一索引）、V20–V29 预留（**V20 = G-DB-7 审计写入授权调整**）、V30+ 按波次分配、V32–V39 有意留空。
+- 号段规划见 `R06 §6`：V1–V9 起步地基、V10–V19 段（**V18 已占用** = 产品档位目录 + 还款计划快照列；**V19 已占用** = 外部登记回执幂等唯一索引）、**V20 已占用** = MQ 密文信封通道（`ADR-RF-014`）、V21–V29 预留（**V21 = G-DB-7 审计写入授权调整**，因 V20 归 MQ 而顺延）、V30+ 按波次分配、V32–V39 有意留空。
 - **已执行的迁移字节不改**（Flyway 校验和失配会让服务起不来）；调整一律走新迁移。
 - 开新分支前先查 `PROGRESS.md §2` 的号段占用表；两个并行流建同号迁移 = 启动失败（floorplan 真实事故）。
 - 新增服务端口必须从 8090–8099 未占用位分配，并同步 `R00 §6` / `README §2` / 网关路由表。
@@ -202,7 +261,7 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 
 ---
 
-## 9. 反模式清单（沿用 floorplan 9 条 + 本项目 6 条）
+## 9. 反模式清单（沿用 floorplan 9 条 + 本项目 12 条）
 
 | # | 反模式 | 实际后果 / 正确做法 |
 |---|---|---|
@@ -223,6 +282,10 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 | **A-15** | **把 floorplan 的担保登记 / 放车放证 / 担保门禁直接搬过来** | C 端是已交付车的所有权保留，不是让与担保登记；整条链废弃见 `ADR-RF-006` |
 | **A-16** | **12 个服务都起了但彼此零调用，就报「微服务已落地」** | 必须用 Feign 门禁 + outbox 事件 + 走网关冒烟证明链路已通 |
 | **A-17** | **引擎侧另写一份状态图**（领域一份、引擎一份，两份漂移） | 迁移边必须由领域 `graph()` 生成；未接线边显式登记，否则启动装配 fail-fast（B-14） |
+| **A-18** | **把明文载荷（含个人信息）直接塞进 MQ** | broker 落盘行永久保留、明文不可撤回 = 合规事故；必须先封**密文信封**再入队，见 B-15、`ADR-RF-014` |
+| **A-19** | **用 MQ 取代 outbox 当唯一真相源** | 「先写库还是先发消息」的原子性没有保证，等于把金融账务一致性押在时序上；outbox 必须留在本地事务里，MQ 只做其后的削峰缓冲 |
+| **A-20** | **broker 不可用时静默降级为同步执行** | 调用方以为已入队、实际同步跑出重复投递与不可预期时序；宁可显式失败 |
+| **A-21** | **在 Windows 侧把 `.sh` / `.py` 写回成 CRLF**（`Set-Content` / `Out-File` / `>` 重定向默认写 CRLF） | 仓库 blob 是 LF，坏的是工作区副本；WSL 侧 bash 直接解析失败（`set: pipefail\r: invalid option name`）；写文件用 `[System.IO.File]::WriteAllText`，提交前核对 `git ls-files --eol`，见 §4.1 |
 
 ---
 
@@ -235,6 +298,7 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 | 中台共享边界与三处切断点 | `R03`、`ADR-RF-003` |
 | 双主体身份与个人信息隔离 | `ADR-RF-004`、`R08` |
 | 事件载荷禁个人信息 | `R09 §5`、`ADR-RF-007` |
+| MQ 削峰与密文信封 | `ADR-RF-014`、`R09 §5.5`、`R02 §3.2 §7.2 §9 §12` |
 | 端口 / 号段 / 前缀 | `R00 §6 §7`、本文件 §6 |
 | 状态机引擎（分层口径 / 迁移范围 / 版本选型） | `R04 §5.3`、共享 `statemachine` 模块、本文件 B-14 |
 | 参数默认值（可配置覆盖） | `R01 §7` |
@@ -253,12 +317,15 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 - [ ] 涉及状态机的，已确认状态图仍以领域为唯一事实源（`*.Status.graph()`）、未接线边已显式登记、`domain` 未引入 Spring 依赖
 - [ ] 涉及新服务的，已确认端口位、网关路由、精确装配清单与冒烟断言归属
 - [ ] 收口时跑 `python scripts/check_docs.py`，并在 `PROGRESS.md` 记录结果
+- [ ] 涉及 MQ 的：已确认载荷走**密文信封**（非明文）、同一 handler 两个入口（不写两份业务逻辑）、幂等键已登记、开启后跑过**真实 broker 活体联调**（`ADR-RF-014`）
+- [ ] 涉及 `.sh` / `.py` 脚本的（含新增、改写、批量替换）：已确认落盘为 LF（`git ls-files --eol` 中该文件为 `i/lf w/lf`），见 §4.1
 
 ---
 
 ## 12. 自检
 
 本手册覆盖：事实源优先级、分层与精确装配、口径红线、环境事实（12 进程）、验收判据、
-号段与共享资源、禁区、命名、反模式 17 条、口径索引、开工检查单。
+号段与共享资源、禁区、命名、反模式 21 条、口径索引、开工检查单，
+以及 §4.1 的 Windows 行尾纪律（仓库 blob 一律 LF，脚本只在 WSL 侧执行）。
 与 `README.md`（是什么）、`PROGRESS.md`（做到哪一步）、`docs/R00`（命名定源）无内容重复，仅互相引用。
 全文中文。
