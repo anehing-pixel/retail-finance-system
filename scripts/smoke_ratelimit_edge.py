@@ -7,18 +7,27 @@
 最后做**双层联动**：真实 nginx 前置真实网关，验证「边缘透传 XFF + 网关登记可信代理网段」
 这条前提成立——同客户端被网关层拒绝、换客户端独立放行，且拒绝来自网关层而非边缘层。
 
-前置：需要 nginx 运行时（本机无 nginx 时请在 Linux / WSL 侧执行；Windows 侧可用
+运行形态（两种，均为**真实 nginx**，不是模拟）：
+  · Docker 模式（默认优先）：用本地镜像 `nginx:latest` 起容器，`--network host` 与宿主同网络命名空间，
+    交付配置原样挂载进 `/etc/nginx/nginx.conf` → **不需要在机器上装 nginx**，镜像在本地即可离线跑；
+  · 宿主模式：直接用宿主 nginx 可执行文件（`NGINX_BIN` 可指定路径）。
+  `EDGE_NGINX_MODE=auto|docker|host` 控制选择，默认 `auto`（有本地 nginx 镜像就用 Docker，否则回落宿主）。
+
+前置：Docker 模式需要本地已有 nginx 镜像（`docker image inspect nginx:latest` 通过）；
+      宿主模式需要 nginx 运行时（本机无 nginx 时请在 Linux / WSL 侧执行；Windows 侧可用
       `wsl -u root python3 scripts/smoke_ratelimit_edge.py`）。
-双层联动还需要网关 jar（`mvn -B -o -pl gateway -am package`），缺失则跳过该段。
+      双层联动还需要网关 jar（`mvn -B -o -pl gateway -am package`），缺失则跳过该段。
 用法：
     python scripts/smoke_ratelimit_edge.py
-    NGINX_BIN=/usr/sbin/nginx python scripts/smoke_ratelimit_edge.py
-退出码：0 = 全部通过；1 = 有断言失败；2 = 环境不具备（无 nginx 等）。
+    EDGE_NGINX_MODE=host NGINX_BIN=/usr/sbin/nginx python scripts/smoke_ratelimit_edge.py
+    EDGE_NGINX_MODE=docker NGINX_IMAGE=nginx:latest python scripts/smoke_ratelimit_edge.py
+退出码：0 = 全部通过；1 = 有断言失败；2 = 环境不具备（无 nginx 镜像 / 无 nginx 可执行文件等）。
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -35,6 +44,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CONF = ROOT / "nginx" / "nginx.conf"
 JAR = ROOT / "gateway" / "target" / "retail-api-gateway-1.0.0-SNAPSHOT.jar"
 NGINX = os.environ.get("NGINX_BIN") or shutil.which("nginx") or "/usr/sbin/nginx"
+NGINX_IMAGE = os.environ.get("NGINX_IMAGE", "nginx:latest")
+MODE = (os.environ.get("EDGE_NGINX_MODE", "auto") or "auto").strip().lower()
 
 PASS = 0
 FAIL = []
@@ -102,7 +113,46 @@ def start_stub(port):
     return httpd
 
 
-def patch_conf(stub_port, edge_port, rate, burst):
+# ---------------------------------------------------------------------------
+# nginx 运行形态：Docker 容器 / 宿主进程
+# ---------------------------------------------------------------------------
+
+def docker_cli():
+    return shutil.which("docker")
+
+
+def docker_image_present(image):
+    cli = docker_cli()
+    if not cli:
+        return False
+    proc = subprocess.run([cli, "image", "inspect", image], capture_output=True, text=True)
+    return proc.returncode == 0
+
+
+def pick_mode():
+    """auto：优先 Docker（镜像本地即可离线跑，不改宿主环境），否则回落宿主 nginx。"""
+    if MODE in ("docker", "host"):
+        return MODE
+    if docker_image_present(NGINX_IMAGE):
+        return "docker"
+    if Path(NGINX).exists():
+        return "host"
+    return None
+
+
+def check_conf(mode):
+    """语法校验交付配置本身（验的是交付物，不是临时改写版）。"""
+    if mode == "docker":
+        proc = subprocess.run(
+            [docker_cli(), "run", "--rm", "-v", "{}:/etc/nginx/nginx.conf:ro".format(CONF),
+             NGINX_IMAGE, "nginx", "-t"],
+            capture_output=True, text=True)
+        return proc.returncode, (proc.stderr or "")[-400:]
+    proc = subprocess.run([NGINX, "-t", "-c", str(CONF)], capture_output=True, text=True)
+    return proc.returncode, (proc.stderr or "")[-400:]
+
+
+def patch_conf(stub_port, edge_port, rate, burst, daemon_off=True):
     """按需改写交付配置：上游指向桩、端口换空闲、额度调小（仅用于测试，不改交付物）。"""
     conf = CONF.read_text(encoding="utf-8")
     conf = conf.replace("server 127.0.0.1:18081;", "server 127.0.0.1:{};".format(stub_port))
@@ -113,28 +163,90 @@ def patch_conf(stub_port, edge_port, rate, burst):
     conf = conf.replace("rate=20r/s;", "rate={}r/s;".format(rate))
     conf = conf.replace("burst=100 nodelay;", "burst={} nodelay;".format(burst))
     conf = conf.replace("burst=50 nodelay;", "burst={} nodelay;".format(burst))
-    return "daemon off;\n" + conf
+    # 宿主模式需要前台常驻；Docker 模式由镜像入口自带 `-g "daemon off;"`，
+    # 配置里再写一次会触发 nginx "daemon directive is duplicate" 致命错误。
+    return ("daemon off;\n" + conf) if daemon_off else conf
 
 
-def start_nginx(conf_text, tmp, name):
-    path = tmp / name
-    path.write_text(conf_text, encoding="utf-8")
-    # 每个实例独立 pid 文件：否则第二个实例会因共用系统 pid 文件被判「已在运行」而退出
-    pid_file = tmp / (name + ".pid")
-    err_path = tmp / (name + ".stderr")
-    err_file = open(err_path, "wb")
-    proc = subprocess.Popen([NGINX, "-p", str(tmp), "-c", str(path), "-g", "pid {};".format(pid_file)],
-                            stdout=err_file, stderr=err_file)
-    proc.err_file = err_file
-    proc.err_path = err_path
-    return proc
+class HostNginx:
+    """宿主 nginx 进程形态。"""
+
+    label = "宿主 nginx"
+
+    def __init__(self, conf_text, tmp, name):
+        path = tmp / name
+        path.write_text(conf_text, encoding="utf-8")
+        # 每个实例独立 pid 文件：否则第二个实例会因共用系统 pid 文件被判「已在运行」而退出
+        pid_file = tmp / (name + ".pid")
+        self.err_path = tmp / (name + ".stderr")
+        err_file = open(self.err_path, "wb")
+        self.proc = subprocess.Popen([NGINX, "-p", str(tmp), "-c", str(path), "-g", "pid {};".format(pid_file)],
+                                     stdout=err_file, stderr=err_file)
+        err_file.close()
+
+    def alive(self):
+        return self.proc.poll() is None
+
+    def tail(self):
+        try:
+            return self.err_path.read_text(errors="replace")[-300:] if self.err_path.exists() else ""
+        except Exception:
+            return ""
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
 
 
-def wait_http(url, proc, tries=40, interval=0.25):
+class DockerNginx:
+    """Docker 容器形态：--network host 与宿主同网络命名空间，交付配置原样挂载。
+
+    不加 `daemon off;`（镜像入口已带 `-g "daemon off;"`）；端口直接落在宿主命名空间，
+    上游 127.0.0.1 指向宿主上的桩 / 网关进程，语义与同机部署一致。
+    """
+
+    label = "Docker nginx"
+
+    def __init__(self, conf_text, tmp, name):
+        path = tmp / name
+        path.write_text(conf_text, encoding="utf-8")
+        self.cname = "rf-edge-" + re.sub(r"\W+", "-", name)
+        cmd = [docker_cli(), "run", "-d", "--rm", "--network", "host",
+               "-v", "{}:/etc/nginx/nginx.conf:ro".format(path),
+               "--name", self.cname, NGINX_IMAGE]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        self.cid = (proc.stdout or "").strip()
+        if proc.returncode != 0:
+            raise RuntimeError("docker run 失败 rc={} stderr={}".format(proc.returncode, (proc.stderr or "")[-300:]))
+
+    def alive(self):
+        proc = subprocess.run([docker_cli(), "inspect", "-f", "{{.State.Running}}", self.cid],
+                              capture_output=True, text=True)
+        return proc.stdout.strip() == "true"
+
+    def tail(self):
+        proc = subprocess.run([docker_cli(), "logs", "--tail", "30", self.cid], capture_output=True, text=True)
+        return ((proc.stdout or "") + (proc.stderr or ""))[-300:]
+
+    def stop(self):
+        subprocess.run([docker_cli(), "rm", "-f", self.cid], capture_output=True)
+
+
+def start_nginx(mode, conf_text, tmp, name):
+    if mode == "docker":
+        return DockerNginx(conf_text, tmp, name)
+    return HostNginx(conf_text, tmp, name)
+
+
+def wait_http(url, runner, tries=40, interval=0.25):
     """等待 URL 返回 200；返回 (是否就绪, 最后一次状态码与响应体片段)。"""
     last = (0, "")
     for _ in range(tries):
-        if proc.poll() is not None:
+        if not runner.alive():
             return False, last
         code, body = req(url)
         last = (code, body[:200])
@@ -144,7 +256,7 @@ def wait_http(url, proc, tries=40, interval=0.25):
     return False, last
 
 
-def dual_layer(tmp):
+def dual_layer(mode, tmp):
     """双层联动：真实 nginx 前置真实网关。"""
     if not JAR.is_file():
         print("SKIP  双层联动（网关 jar 不存在，先跑 mvn -B -o -pl gateway -am package）")
@@ -192,19 +304,19 @@ retail:
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     nginx = None
     try:
-        gw_ready, gw_last = wait_http("http://127.0.0.1:{}/api/health".format(gw_port), gw, tries=120, interval=0.5)
+        gw_ready, gw_last = wait_http("http://127.0.0.1:{}/api/health".format(gw_port), _ProcRunner(gw), tries=120, interval=0.5)
         check("双层联动：网关实例启动就绪", gw_ready, "网关未就绪 last={}".format(gw_last))
         if not gw_ready:
             return
         edge_port = free_port()
-        nginx = start_nginx(patch_conf(gw_port, edge_port, 1000, 1000), tmp, "nginx-dual.conf")
+        nginx = start_nginx(mode, patch_conf(gw_port, edge_port, 1000, 1000, daemon_off=(mode == "host")),
+                             tmp, "nginx-dual.conf")
         base = "http://127.0.0.1:{}".format(edge_port)
         edge_ready, edge_last = wait_http(base + "/api/health", nginx)
         detail = "边缘层未就绪 last={}".format(edge_last)
-        try:
-            detail += " stderr=" + (nginx.err_path.read_text(errors="replace")[-300:] if nginx.err_path.exists() else "")
-        except Exception:
-            pass
+        tail = nginx.tail()
+        if tail:
+            detail += " nginx 输出=" + tail
         check("双层联动：边缘层启动并可服务", edge_ready, detail)
         if not edge_ready:
             return
@@ -222,12 +334,8 @@ retail:
         check("双层联动：换客户端 IP 后网关层独立放行（证明经边缘取到真实客户端）",
               code3 == 200, "HTTP {}".format(code3))
     finally:
-        if nginx is not None and nginx.poll() is None:
-            nginx.terminate()
-            try:
-                nginx.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                nginx.kill()
+        if nginx is not None:
+            nginx.stop()
         if gw.poll() is None:
             gw.terminate()
             try:
@@ -237,20 +345,50 @@ retail:
         gw_stub.shutdown()
 
 
+class _ProcRunner:
+    """把普通子进程包装成 runner 接口（网关进程用）。"""
+
+    def __init__(self, proc):
+        self.proc = proc
+
+    def alive(self):
+        return self.proc.poll() is None
+
+    def tail(self):
+        return ""
+
+    def stop(self):
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+
+
 def main():
-    if not Path(NGINX).exists():
-        print("环境不具备：找不到 nginx 可执行文件（{}）".format(NGINX))
-        print("请在有 nginx 的环境执行，或用 NGINX_BIN 指定路径。")
+    mode = pick_mode()
+    if mode is None:
+        print("环境不具备：既没有本地 nginx 镜像（{}），也没有宿主 nginx 可执行文件（{}）".format(
+            NGINX_IMAGE, NGINX))
+        print("请在有 nginx 的环境执行，或用 EDGE_NGINX_MODE=host + NGINX_BIN 指定路径。")
+        return 2
+    if mode == "docker" and not docker_image_present(NGINX_IMAGE):
+        print("环境不具备：本地没有 nginx 镜像（{}），先 docker pull 或指定 NGINX_IMAGE。".format(NGINX_IMAGE))
+        return 2
+    if mode == "host" and not Path(NGINX).exists():
+        print("环境不具备：找不到 nginx 可执行文件（{}），或用 NGINX_BIN 指定路径。".format(NGINX))
         return 2
     if not CONF.is_file():
         print("环境不具备：缺少 {}".format(CONF))
         return 2
 
+    runner_label = DockerNginx.label if mode == "docker" else HostNginx.label
+    print("运行形态：{}（{}）".format(runner_label, NGINX_IMAGE if mode == "docker" else NGINX))
+
     # ---------- 1) 交付配置本身的语法校验（验的是交付物，不是临时改写版）----------
-    proc = subprocess.run([NGINX, "-t", "-c", str(CONF)], capture_output=True, text=True)
-    check("nginx -t 校验交付配置 nginx/nginx.conf 通过",
-          proc.returncode == 0,
-          "rc={} stderr={}".format(proc.returncode, (proc.stderr or "")[-300:]))
+    rc, stderr = check_conf(mode)
+    check("nginx -t 校验交付配置 nginx/nginx.conf 通过", rc == 0, "rc={} stderr={}".format(rc, stderr))
 
     # ---------- 2) 起真实 nginx（上游指向桩，额度调小以秒级触发 429）----------
     stub_port = free_port()
@@ -258,11 +396,13 @@ def main():
     httpd = start_stub(stub_port)
     tmp = Path(tempfile.mkdtemp(prefix="rf-edge-"))
     (tmp / "logs").mkdir(exist_ok=True)
-    nginx = start_nginx(patch_conf(stub_port, edge_port, 1, 3), tmp, "nginx.conf")
+    nginx = start_nginx(mode, patch_conf(stub_port, edge_port, 1, 3, daemon_off=(mode == "host")),
+                         tmp, "nginx.conf")
     try:
         base = "http://127.0.0.1:{}".format(edge_port)
         ready, nginx_last = wait_http(base + "/api/health", nginx)
-        check("nginx 进程启动并可服务", ready, "nginx 未就绪 last={}".format(nginx_last))
+        check("nginx 进程启动并可服务", ready,
+              "nginx 未就绪 last={} 输出={}".format(nginx_last, nginx.tail()))
         if ready:
             codes = []
             first_body = ""
@@ -293,14 +433,9 @@ def main():
             check("反向代理头 X-Forwarded-For / X-Real-IP 已透传到上游",
                   bool(echoed.get("xForwardedFor")) and bool(echoed.get("xRealIp")),
                   "上游收到 XFF={} XRealIP={}".format(echoed.get("xForwardedFor"), echoed.get("xRealIp")))
-            dual_layer(tmp)
+            dual_layer(mode, tmp)
     finally:
-        if nginx.poll() is None:
-            nginx.terminate()
-            try:
-                nginx.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                nginx.kill()
+        nginx.stop()
         httpd.shutdown()
         shutil.rmtree(tmp, ignore_errors=True)
 

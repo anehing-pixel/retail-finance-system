@@ -48,22 +48,33 @@ export RETAIL_RATELIMIT_TRUSTED_PROXY_CIDRS=172.16.0.0/12
 
 ## 4. 校验与启动
 
+**首选：Docker 形态**（本机只要有 `nginx` 镜像即可**离线**跑——不改宿主环境、不必装 nginx）：
+
+```bash
+# 校验交付配置本身
+docker run --rm -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:latest nginx -t
+# 启动：--network host 使容器与宿主同网络命名空间，上游 127.0.0.1 即宿主上的网关 / DMZ
+docker run -d --rm --network host \
+  -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+  --name rf-edge nginx:latest
+# 停止
+docker rm -f rf-edge
+```
+
+**备选：宿主安装 nginx**（同一份配置，语义等价）：
+
 ```bash
 nginx -t -c "$PWD/nginx/nginx.conf"       # 配置语法校验
 nginx -c "$PWD/nginx/nginx.conf"          # 前台启动（另开终端停止）
 ```
 
-容器方式：
+> ⚠️ 若用 bridge 网络 + `-p` 映射端口（不用 `--network host`），容器里的 `127.0.0.1` 指容器自己，
+> 上游要改成 `host.docker.internal`（或容器网段），否则 nginx 会连不上网关；
+> 改完记得同步 §3 的可信代理网段登记。
 
-```bash
-docker run --rm -p 18076:18076 -p 18077:18077 \
-  -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
-  nginx:alpine
-```
+## 5. 实测记录（2026-11-24，WSL + Docker `nginx:latest`）
 
-## 5. 实测记录（2026-11-23，WSL + nginx 1.28.3）
-
-`scripts/smoke_ratelimit_edge.py` → **13/13 EXIT 0**：
+`scripts/smoke_ratelimit_edge.py` → **13/13 EXIT 0**（验收脚本自动选运行形态：有本地 nginx 镜像走 Docker，否则回落宿主 nginx）：
 
 | # | 断言 | 结果 |
 |---|---|---|
@@ -76,11 +87,15 @@ docker run --rm -p 18076:18076 -p 18077:18077 \
 | 7 | `X-Forwarded-For` / `X-Real-IP` 透传到上游 | ✅ |
 | 8–13 | **双层联动**：真实 nginx 前置真实网关 → 同客户端被**网关层**拒绝（`details.policy`）、拒绝体不含 `edge`、换客户端 IP 独立放行 | ✅ |
 
-复现（需 nginx；WSL 侧以 root 运行，避免 pid 文件权限问题）：
+复现（**宿主无需安装 nginx**，只要本地有 `nginx` 镜像；WSL 侧以 root 运行，避免 pid 文件权限问题）：
 
 ```bash
-wsl -u root python3 scripts/smoke_ratelimit_edge.py
+wsl -u root python3 scripts/smoke_ratelimit_edge.py                      # auto：有镜像走 Docker
+wsl -u root env EDGE_NGINX_MODE=docker python3 scripts/smoke_ratelimit_edge.py   # 强制 Docker
+wsl -u root env EDGE_NGINX_MODE=host NGINX_BIN=/usr/sbin/nginx python3 scripts/smoke_ratelimit_edge.py  # 强制宿主
 ```
+
+退出码：**0** = 全部通过；**1** = 有断言失败；**2** = 环境不具备（无 nginx 镜像 / 无 nginx 可执行文件）。
 
 **实测踩坑（已修进配置）**：
 
@@ -88,8 +103,8 @@ wsl -u root python3 scripts/smoke_ratelimit_edge.py
    已移入两个 `server` 块（`error_page 429 = @ratelimit_json` 仍在 http 层统一声明）。
 2. `access_log` 用相对路径（`logs/…`）时，非默认 prefix 下目录不存在 → `nginx -t` 直接失败；
    已改为 `/var/log/nginx/rf_access.log`（源码编译/自定义 prefix 改回 `<prefix>/logs/rf_access.log` 并确保目录存在）。
-3. `nginx -t` 会尝试写 pid 文件（默认 `/run/nginx.pid`）→ 普通用户会报 *Permission denied*；
-   校验用 root 执行，或在配置里显式指定 `pid`。
+3. 宿主模式下 `nginx -t` 会尝试写 pid 文件（默认 `/run/nginx.pid`）→ 普通用户会报 *Permission denied*；
+   校验用 root 执行，或在配置里显式指定 `pid`（Docker 模式在容器内以 root 跑，无此问题）。
 
 ## 6. 怎么验证限流真的生效（手工）
 
@@ -104,14 +119,16 @@ done | sort | uniq -c
 网关层 429 的响应体 `details.layer` 缺省、`details.policy` 为命中的路由段，
 并带 `Retry-After` 与 `X-RateLimit-*` 响应头。
 
-## 6. 参数怎么定
+## 7. 参数怎么定
 
 `nginx.conf` 里的 `rate=` / `burst=` / `limit_conn` 是**建议起始值**（⚙️ 可配置覆盖），
 不是业务裁决。网关侧默认值见 `RateLimitProperties`（`retail.ratelimit.*`）。
 上线前按真实流量重标：边缘层按「单机可承受并发」反推，网关层按「单段业务峰值」正推。
 
-## 7. 已知边界
+## 8. 已知边界
 
 - 限流是**保护层**，不是安全边界：真正的正确性防线在各服务内（幂等唯一索引、乐观锁、fail-closed 门禁）。
 - 网关令牌桶是**单实例**口径（桶在进程内存里）：网关多副本时实际放行量 ≈ 单副本额度 × 副本数。
 - 本仓库**没有 Redis**，也**不引入**（`AGENTS.md` B-10 口径）；因此本层不提供跨实例全局配额。
+- 本层**零宿主依赖**：交付物只是 nginx 配置，宿主装 nginx 或用 Docker 镜像都能跑；
+  验收脚本默认优先 Docker 形态（本地有镜像即可离线执行），宿主装 nginx 只是备选。
