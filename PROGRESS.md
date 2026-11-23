@@ -81,6 +81,22 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**据实订正 W-MB 轮遗留的一处真实缺陷 + `check_docs.py` 护栏补强**（随 W-MQ 收口一并回灌 master）——
+>   ①**游标表名缺陷**：W-MB 持久层改造轮（`a8354a7`）把 `OutboxMapper` 三处**游标表名写成不存在的
+>   `core.event_offsets`**（V1 建的表实为 `core.consumer_offsets`）→ `insertOffsetIfAbsent` 抛
+>   `BadSqlGrammarException` → `RfEventDispatcher.poll()` 逐 consumer catch → **事件消费整条静默停摆**，
+>   全部事件滞留 `PENDING`、征信完成事件不再推进审查状态机（前端页面冒烟级联失败 8 项）。
+>   **该故障只在日志里留一行 WARN**，极易被误判为「环境数据脏 / outbox 积压」——本轮即先误判一轮。
+>   修法：三处 SQL 对齐 master 写法（表名 `core.consumer_offsets` + `writeOffset` 补 `updated_at = now()`），
+>   与 **W-MB 改造前的 JdbcTemplate 版逐字一致**（B-12：持久层改造不改语义），与 master 侧逐字相同
+>   （合并零冲突）。验证记录见 §6「游标表名缺陷订正」行；并新增 §7 第 16 条警示（静默停摆的判别与排查顺序）。
+>   ②**`scripts/check_docs.py` 护栏补强**（**共享禁区，已获用户授权**）：**C2** 由「硬编码 15 份 / 001–015」
+>   改为「缺号只接受 §2 登记为预留的号段」；**C4** 跨文档引用的 ADR 登记表由硬编码 `range(1,16)` 改为
+>   「磁盘实有 ∪ 已登记预留」；**C13** 由「根 5 + docs 13 + ADR 15 + 脚本 3 = 36」改为内部一致性校验
+>   （根文件含 `.gitattributes`、核心脚本 2 份固定、并行流的冒烟脚本单独计数、ADR 取「索引声明 ≥ 磁盘实有」）。
+>   **动机**：master 上仍有 `wt/statemachine` / `wt/ratelimit` 两条并行流在跑，它们各自落 ADR 与冒烟脚本——
+>   硬编码期望值会在它们合入时**假失败**（这类护栏只认固定数字，就会在并行工作流下失去意义）。
+>   **未改任何业务代码与已执行迁移字节**；`PROGRESS.md` / `scripts/check_docs.py` 属共享禁区，本轮经用户授权修改。
 > - 2026-11-24：**用户指示**「把当前分支合并到 master」+「两套限流实现都合并，用一个配置作为开关，来采用哪种限流方式」
 >   —— 实施 **W-RL 网关限流双模式合入**（合并 `wt/ratelimit`）。
 >   改动面：`gateway/.../ratelimit/`（新增 `InMemoryRateLimitFilter` / `InMemoryRateLimitProperties` / `InMemoryRateLimitConfig` /
@@ -311,6 +327,7 @@
 
 | 2026-11-24 | **W-LOCK 分布式锁合入 master**（用户指令「提交吧」） | **PASS**：①`mvn -B package` → **18 模块 BUILD SUCCESS**（surefire 类级汇总 **484 测试 / 70 个测试类 / 0 失败 0 错误 0 跳过**；= master 的 468 + 本轮锁单测 16：`DistributedLockManagerTest` 11 + `ApplicationIntakeLockTest` 5）②`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 权威口径 = 484）③**锁专项应用级实测 20/20 PASS**（`scripts/smoke_w_lock.py`；**合并后的代码** + **全新隔离库 `retail_finance_lock`**（Flyway **V1–V20 干净应用**，20 条全 success）+ 真实 Redis `retail-finance-lock-redis`:6381；备用端口段 19xxx）：并发 5 条同客户同车只受理 1 条、其余 `RF_APP_001`、库内 1 行事件 1 条；同幂等键并发重放返回同一申请号；Redis 不可达 → 503 `RF_LOCK_002` 且未落库、恢复后可写；重复回执 + DMZ 换 nonce 重推均幂等、库内 1 行事件 1 条。④**合并协调**：master 期间再推 3 个提交（W-MERGE 回写 / Windows 行尾纪律固化 / W-MQ 合入 V20+ADR-RF-014），本分支**先并入 master 再逐项解冲突**（**15 个冲突文件，两侧改动均保留**）；**ADR 编号让位到 ADR-RF-015**（012 缓存/限流、013 回调幂等、014 MQ），`ADR-RF-013` 加**修订注**（原裁决原文保留，仅结论 4 按用户指令修订，结论 1–3/5–6 继续有效）；**R10 断言组顺延为 J 组 A39–A42**（master 的 I 组已占 A37–A38），`scripts/smoke_w_lock.py` 同步改号；**V19 回调幂等唯一索引与 master 字节一致 → 合并零冲突**，号段仍 V1–V20 连续，**已执行迁移字节未动**。⑤**未复跑**：走网关冒烟 33/33 与 E2E 104/104 为 master 的实测记录（原记录），本轮因注册端口段 8090–8099/18081/18091 被并行会话占用未复跑；**默认库 `retail_finance` 已由 master 重建并应用 20 条迁移**，但本轮锁专项在隔离库完成（**隔离库跑绿 ≠ 默认库验收**，默认库回跑待端口释放后补） |
 | 2026-11-23 | **W-LOCK 分布式锁实施与验证**（用户指示「在新的 worktree 里处理 Redisson 分布式锁防重复进件 / 回调幂等」+ 裁定 fail-closed） | **PASS**：`mvn -B package` → 17 模块 BUILD SUCCESS（surefire 类级汇总 **418 测试 0 失败 0 错误**，58 个测试类；新增锁单测 20 例：`DistributedLockManagerTest` 11 + `ApplicationIntakeLockTest` 5 + `RegistryReceiptIdempotencyTest` 4）；**真实 Redis + 真实 PG 应用级实测 20/20 全绿**（`scripts/smoke_w_lock.py`，走网关 19181 + DMZ 19191，**备用端口段**——注册段 8090–8099/18081/18091 被并行会话的栈占用）：①**并发 5 条同客户同车进件 → 只受理 1 条**，其余 4 条 `RF_APP_001`，库内该客户该车申请行数 = 1、`APPLICATION_SUBMITTED` 事件数 = 1；②**同幂等键并发 → 后到者 `replayed=true` 返回同一申请号**，库内 1 行；③**Redis 宕机 → 503 `RF_LOCK_002` fail-closed 拒写且未落库**，Redis 恢复后写路径恢复（200）；④**同一业务回执重复登记 + DMZ 换 nonce 重推 → 幂等返回**，库内回执行数 = 1、`TITLE_RELEASE_REGISTERED` 事件数 = 1；**Flyway V1–V19 干净应用**（19 条全部 success，含 V19 `uk_receipt_order_authority_ref`）。**实测暴露并修复 1 个真实缺陷**：Redis 宕机时 Redisson 抛的是包装异常 `RedisException("Unexpected exception while processing command")` 而非 `RedisConnectionException`，原实现漏判 → 落成 500 `SYS_001`；已改为按异常链判定 Redis 类故障（`isRedisFailure`），补 2 例单测（包装异常 → 503；非 Redis 异常原样抛出），并加固释放路径（释放失败只告警，不把已成功的写翻成 500）。**未改已执行迁移字节**（V1–V18 不动），新迁移落 **V19**（V18 已被 master 的产品档位迁移占用并执行）；**走网关冒烟 33/33 与 E2E 104/104 为 master 的实测记录（原记录），本轮因注册端口段被并行会话占用未复跑**；**默认库 `retail_finance` 本轮未回跑**——并行会话的 `wt/mq` 已把 **V20（mq envelope channel）** out-of-order 应用进默认库（V19 缺失），Flyway 校验直接拒绝启动，故本轮应用级实测在**隔离库 `retail_finance_lock`** 完成（隔离库跑绿 ≠ 默认库验收，默认库回跑待号段状态理顺后补） |
+| 2026-11-24 | **游标表名缺陷订正（W-MB 轮遗留回归的据实订正；随 W-MQ 收口一并回灌 master）** | **PASS**：根因——W-MB 持久层改造轮（`a8354a7`）把 `OutboxMapper` 三处**游标表名写成不存在的 `core.event_offsets`**（V1 建的表实为 `core.consumer_offsets`）→ `insertOffsetIfAbsent` 抛 `BadSqlGrammarException` → `RfEventDispatcher.poll()` 逐 consumer catch → **事件消费整条静默停摆**（全部事件滞留 `PENDING`、征信完成事件不再推进审查状态机 → 前端页面冒烟级联失败 8 项）。**该故障只在日志留一行 WARN**（`事件消费轮询异常 … relation "core.event_offsets" does not exist`），极易被误判为「环境数据脏 / outbox 积压」——本轮即先误判一轮。修法——三处 SQL 对齐 master 写法（表名 `core.consumer_offsets` + `writeOffset` 补 `updated_at = now()`），与 **W-MB 改造前的 JdbcTemplate 版逐字一致**（B-12：持久层改造不改语义），且与 master 侧逐字相同（合并零冲突）。**验证**（W-MQ 分支收口轮实测，当时口径）：修后游标实测推进（`underwriting-service` 935 → **954**，SENT 事件 197 → 199，积压开始消化）；`mvn -B package` → BUILD SUCCESS；走网关冒烟 **26/26** + 前端页面 **46/46** + **MQ 通道 11/11 EXIT 0**（前端 46/46 是修复前后的关键分水岭）；`scripts/e2e_w8.py` → **98/98 EXIT 0**；`check_docs.py` → **PASS 15/15 EXIT 0**。另加一道自查：脚本比对**全部 Mapper / Repository 引用的表名与数据库实有表清单**，确认除本处外无同类错名（`core.v_recon_inv` 与 `set` 为正则截断误报）。**未改任何已执行迁移字节** |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 
@@ -381,6 +398,16 @@
     （`run-microservices.sh` 归一后 diff 由 310/281 收敛为 38/9）。**未改仓库配置**——`core.autocrlf` 属共享环境配置，
     其他并行会话在用，不擅自改（`AGENTS.md` §7）。**master 已于 2026-11-23 固化 `.gitattributes` 行尾纪律**（`AGENTS.md` §4.1 + 反模式 A-21），本条是该纪律在本 worktree 的补充实证。
 15. **注册端口段被并行会话占用 → W-LOCK 轮全栈验收走备用端口段**：Windows 与 WSL 共享网络命名空间（mirrored），并行会话的栈占着 8090–8099 / 18081 / 18091，该轮实测在 **19xxx 备用段**（core 19090 / auth 19091 / customer 19092 / application 19093 / title-release 19097 / DMZ 19191 / 网关 19181）起「锁相关最小栈」，启动器 `logs/launch_lock_stack.py`（在 gitignore 的 `logs/` 下，不入库）。**注册端口段的标准走网关冒烟 33/33 与 E2E 104/104 该轮未复跑**（端口被占，非代码回归），待端口释放后补。
+16. **「轮询 catch 住异常」会把整条链路变成静默停摆**：调度线程的异常若被兜底成一行 WARN，
+    表面看是「服务正常、事件积压」，实际是**消费端一次都没跑过**（W-MQ 实测：游标表名写错 →
+    `insertOffsetIfAbsent` 每轮抛 `BadSqlGrammarException` → 逐 consumer catch → 全部事件滞留 `PENDING`、
+    状态机不推进）。**判别方法**：`core.consumer_offsets` 有没有行 / 游标是否在推进——
+    游标不动 = 停摆，而不是「积压」。**排查顺序**：先看该服务日志里的 `事件消费轮询异常`，
+    再看 `core.consumer_offsets` 的 `last_event_id` 是否推进；**别先怀疑数据脏**。
+    另：SQL 里的**表名写错不会编译报错、不会启动失败**，只会在第一次执行时炸——
+    持久层改造轮（W-MB）就栽在这一处（见 §6「游标表名缺陷订正」行）。
+    自查手法：脚本比对**全部 Mapper / Repository 引用的表名与数据库实有表清单**。
+
 
 ---
 

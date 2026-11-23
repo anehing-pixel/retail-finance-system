@@ -179,9 +179,15 @@ def check_numbering() -> None:
         m = re.match(r"ADR-RF-(\d{3})-", p.name)
         if m:
             anums.append(int(m.group(1)))
-    ok2 = len(a_files) == 15 and sorted(anums) == list(range(1, 16)) and len(set(anums)) == 15
-    record("C2", "ADR 编号连续唯一", ok2,
-           f"实际 {len(a_files)} 份，编号 {sorted(anums)}，期望 001–015")
+    # 缺号口径：只接受「PROGRESS.md §2 登记为预留」的缺号（并行工作流持有编号）。
+    reserved = reserved_adr_numbers()
+    dup = len(set(anums)) != len(anums)
+    max_num = max(anums) if anums else 0
+    gaps = [n for n in range(1, max_num + 1) if n not in anums]
+    unregistered = [n for n in gaps if n not in reserved]
+    ok2 = (not dup) and not unregistered and len(a_files) == len(anums)
+    record("C2", "ADR 编号连续唯一（缺号须登记预留）", ok2,
+           f"实际 {len(a_files)} 份，编号 {sorted(anums)}；缺号 {gaps}（已登记预留 {sorted(reserved & set(gaps))}）")
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +235,8 @@ def check_index_refs() -> None:
 # ---------------------------------------------------------------------------
 def check_refs_and_cxx() -> None:
     r_ok = set(range(0, 12))
-    a_ok = set(range(1, 16))
+    # ADR 登记表 = 磁盘实有 + 已登记预留的编号（并行工作流持有的预留号也算可达）
+    a_ok = set(adr_numbers()) | reserved_adr_numbers()
     bad_r, bad_a = set(), set()
     for p in md_files():
         t = read(p)
@@ -392,13 +399,22 @@ def check_count() -> None:
     root_items = ["README.md", "AGENTS.md", "PROGRESS.md", ".gitignore", ".gitattributes"]
     root_ok = all((ROOT / f).exists() for f in root_items)
     docs_n = len(list(DOCS.glob("*.md")))          # 00 索引 + R00–R11 = 13
-    adr_n = len(list(ADR.glob("*.md")))            # 13
+    adr_n = len(list(ADR.glob("*.md")))
+    # 核心脚本两份固定；并行工作流各自落的冒烟脚本（smoke_w_lock.py 等）另行计数，不再写死
     scripts_n = len([p for p in SCRIPTS.glob("*.py") if p.name in
-                     ("check_docs.py", "normalize_terms.py", "smoke_w_lock.py")])
-    total = (len(root_items) if root_ok else 0) + docs_n + adr_n + scripts_n
-    ok = root_ok and docs_n == 13 and adr_n == 15 and scripts_n == 3 and total == 36
+                     ("check_docs.py", "normalize_terms.py")])
+    smoke_n = len([p for p in SCRIPTS.glob("*.py") if p.name.startswith("smoke_")])
+    total = (len(root_items) if root_ok else 0) + docs_n + adr_n + scripts_n + smoke_n
+    # ADR 份数不再写死：并行工作流会各自落 ADR，改为「索引声明 ≥ 磁盘实际」的一致性校验
+    idx_text = read(INDEX)
+    m_adr = re.search(r"ADR-RF-001~(\d{3})[^\n]*?(\d+)\s*份", idx_text)
+    declared_max = int(m_adr.group(1)) if m_adr else 0
+    declared_n = int(m_adr.group(2)) if m_adr else 0
+    disk_max = max(adr_numbers(), default=0)
+    ok = (root_ok and docs_n == 13 and scripts_n == 2
+          and adr_n >= 12 and declared_max >= disk_max and declared_n >= adr_n)
     record("C13", "索引登记文件数与实际一致", ok,
-           f"根 5 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 36")
+           f"根 {len(root_items)} + docs {docs_n} + ADR {adr_n}（索引声明 {declared_n} 份 / 上限 {declared_max}）+ 核心脚本 {scripts_n} + 冒烟脚本 {smoke_n} = {total} 项")
 
 
 # ---------------------------------------------------------------------------
