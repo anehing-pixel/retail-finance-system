@@ -88,12 +88,16 @@ public class TitleReleaseApplicationService {
         }
         java.util.Optional<TitleRepositoryPort.TitleRow> existing = titleRepository.findByLoanId(loanId);
         if (existing.isPresent()) {
-            // 幂等返回（W-SIM2）：LOAN_SETTLED 事件驱动的兜底建单（vin=UNKNOWN）与操作员主动登记
-            // 存在竞态（uk_title_loan），重复登记返回既有记录而非 409——与 createReleaseOrderFromEvent
-            // 的消费幂等同款语义；真实 vin 以事件建单后的登记变更流程订正
+            TitleRepositoryPort.TitleRow row = existing.get();
+            if (TitleRetention.isPlaceholder(loanId, row.vin())) {
+                // 挡板占位行 → 正式登记：订正 VIN 并补发一次登记事件（用户裁决 2026-11-23）。
+                return correctPlaceholderRegistration(row, vin, contractualOnly, traceId);
+            }
+            // 幂等返回（W-SIM2）：重复登记返回既有记录而非 409，且不重复发布登记事件
+            // （与 createReleaseOrderFromEvent 的消费幂等同款语义）。
             log.info("保留登记已存在，幂等返回 loanId={} titleId={} vin={}",
-                    loanId, existing.get().titleId(), existing.get().vin());
-            return toRetentionView(existing.get());
+                    loanId, row.titleId(), row.vin());
+            return toRetentionView(row);
         }
         TitleRetention retention = TitleRetention.register(loanId, vin, contractualOnly);
         long titleId = titleRepository.insert(loanId, vin, retention.status().name(),
@@ -101,28 +105,74 @@ public class TitleReleaseApplicationService {
                 retention.registeredAt() == null ? null : Timestamp.from(retention.registeredAt()),
                 traceId);
         if (titleId == 0) {
-            // 并发兜底（uk_title_loan）：LOAN_SETTLED 兜底建单抢在本次 INSERT 之前提交 →
-            // 幂等返回既有记录，不重复发布登记事件（真实 vin 以登记变更流程订正）。
+            // 并发兜底（uk_title_loan）：LOAN_SETTLED 兜底建单抢在本次 INSERT 之前提交。
             // 该分支曾以 500 暴露：唯一键异常直接冒泡（前端冒烟 F11 偶发失败）。
             TitleRepositoryPort.TitleRow row = titleRepository.findByLoanId(loanId)
                     .orElseThrow(() -> new BusinessException(RFErrorCode.RF_SYS_001,
                             Map.of("reason", "TITLE_RETENTION_CONFLICT")));
+            if (TitleRetention.isPlaceholder(loanId, row.vin())) {
+                // 对方建的是挡板占位行 → 本次正式登记订正它并补发事件。
+                return correctPlaceholderRegistration(row, vin, contractualOnly, traceId);
+            }
             log.info("保留登记并发冲突（uk_title_loan），幂等返回既有记录 loanId={} titleId={} vin={}",
                     loanId, row.titleId(), row.vin());
             return toRetentionView(row);
         }
 
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("titleId", titleId);
-        payload.put("loanId", loanId);
-        payload.put("status", retention.status().name());
-        payload.put("traceId", traceId);
-        outbox.publish(OutboxPublisher.TITLE_RETENTION_REGISTERED, String.valueOf(titleId),
-                mapperHolder.writeJson(payload));
+        publishRetentionRegistered(titleId, loanId, retention.status().name(), traceId);
 
         log.info("保留登记完成 loanId={} titleId={} mode={}", loanId, titleId, retention.registrationMode());
         return new TitleRetentionView(titleId, loanId, vin, retention.status().name(),
                 retention.registrationMode(), retention.registeredAt());
+    }
+
+    /**
+     * 登记订正：把挡板占位行（{@code vin=UNKNOWN-<loanId>}）订正为正式登记，并**补发一次**登记事件。
+     *
+     * <p>为什么补发（用户裁决 2026-11-23）：占位行只是链路挡板，不是「已登记」的业务事实；
+     * 不补发则证据链缺「所有权保留登记」这一环（E2E S11 的 TITLE_RETENTION_REGISTERED 断言会失败）。</p>
+     *
+     * <p>为什么只补发一次：订正走乐观锁 + 占位 VIN 条件（{@code version} + {@code vin=占位值}），
+     * 影响行数为 1 的那一个调用方才补发；并发/重放落到 0 行 → 重读既有行幂等返回，
+     * 不重复发事件（R09 §5.4 幂等铁律）。</p>
+     */
+    private TitleRetentionView correctPlaceholderRegistration(TitleRepositoryPort.TitleRow row, String vin,
+                                                              boolean contractualOnly, String traceId) {
+        TitleRetention retention = TitleRetention.restore(row.titleId(), row.loanId(), row.vin(), row.status(),
+                row.registrationMode(),
+                row.registeredAt() == null ? null : row.registeredAt().toInstant(),
+                row.releasedAt() == null ? null : row.releasedAt().toInstant(),
+                row.version());
+        retention.correctRegistration(vin, contractualOnly);   // 领域不变量：状态机守卫
+        int affected = titleRepository.correctPlaceholderRegistration(row.titleId(),
+                TitleRetention.placeholderVin(row.loanId()), retention.vin(), retention.registrationMode(),
+                retention.registeredAt() == null ? null : Timestamp.from(retention.registeredAt()),
+                row.version());
+        if (affected == 0) {
+            // 并发：对方已订正 → 重读幂等返回，不补发事件。
+            TitleRepositoryPort.TitleRow latest = titleRepository.findByLoanId(row.loanId())
+                    .orElseThrow(() -> new BusinessException(RFErrorCode.RF_SYS_001,
+                            Map.of("reason", "TITLE_RETENTION_CORRECTION_RACE")));
+            log.info("保留登记订正并发：对方已订正，幂等返回 loanId={} titleId={} vin={}",
+                    row.loanId(), latest.titleId(), latest.vin());
+            return toRetentionView(latest);
+        }
+        log.info("保留登记订正完成（挡板占位行 → 正式登记）loanId={} titleId={} vin={} → {}",
+                row.loanId(), row.titleId(), row.vin(), retention.vin());
+        publishRetentionRegistered(row.titleId(), row.loanId(), retention.status().name(), traceId);
+        return new TitleRetentionView(row.titleId(), row.loanId(), retention.vin(),
+                retention.status().name(), retention.registrationMode(), retention.registeredAt());
+    }
+
+    /** 发布 TITLE_RETENTION_REGISTERED（登记事件；payload 无个人信息，INV-4）。 */
+    private void publishRetentionRegistered(long titleId, long loanId, String status, String traceId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("titleId", titleId);
+        payload.put("loanId", loanId);
+        payload.put("status", status);
+        payload.put("traceId", traceId);
+        outbox.publish(OutboxPublisher.TITLE_RETENTION_REGISTERED, String.valueOf(titleId),
+                mapperHolder.writeJson(payload));
     }
 
     /**
@@ -135,7 +185,7 @@ public class TitleReleaseApplicationService {
         if (titleRepository.findByLoanId(loanId).isPresent()) {
             return;
         }
-        long titleId = titleRepository.insert(loanId, "UNKNOWN-" + loanId, "REGISTERED", "REGISTERED",
+        long titleId = titleRepository.insert(loanId, TitleRetention.placeholderVin(loanId), "REGISTERED", "REGISTERED",
                 Timestamp.from(Instant.now()), null);
         if (titleId == 0) {
             log.info("保留登记兜底建单并发冲突（uk_title_loan），对方已建，跳过 loanId={}", loanId);

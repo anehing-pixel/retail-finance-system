@@ -63,6 +63,22 @@ public class JdbcTitleRepository implements TitleRepositoryPort {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 登记订正：挡板占位行 → 正式登记。三重并发守卫（title_id + version + 占位 VIN）。
+     *
+     * <p><b>不写 status</b>：同态订正，状态变更只走聚合状态机（R04 §3.5）；
+     * {@code AND vin = 占位 VIN} 保证只作用于占位行。</p>
+     */
+    @Override
+    public int correctPlaceholderRegistration(long titleId, String placeholderVin, String vin,
+                                              String registrationMode, Timestamp registeredAt, int version) {
+        return jdbc.update(
+                "UPDATE core.title_retentions SET vin = ?, registration_mode = ?, registered_at = ?, "
+                        + "version = version + 1, updated_at = now() "
+                        + "WHERE title_id = ? AND version = ? AND vin = ?",
+                vin, registrationMode, registeredAt, titleId, version, placeholderVin);
+    }
+
     /** 状态迁移（RELEASE_REGISTERED / CLOSED；乐观锁兜底）。 */
     @Override
     public int updateStatus(long titleId, String status, Timestamp releasedAt, int version) {

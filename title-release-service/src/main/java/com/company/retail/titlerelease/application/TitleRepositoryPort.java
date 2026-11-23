@@ -36,6 +36,26 @@ public interface TitleRepositoryPort {
     /** 状态迁移（RELEASE_REGISTERED / CLOSED；乐观锁兜底）。 */
     int updateStatus(long titleId, String status, Timestamp releasedAt, int version);
 
+    /**
+     * 登记订正：把挡板占位行（{@code vin = UNKNOWN-<loanId>}）订正为正式登记。
+     *
+     * <p>并发守卫三重：{@code title_id} + {@code version}（乐观锁）+ {@code vin = 占位 VIN}
+     * ——只有第一个订正者能把占位行改写掉，因此「订正 + 补发登记事件」天然只发生一次：
+     * 调用方按影响行数判定是否补发事件（见
+     * {@link TitleReleaseApplicationService#registerRetention}）。</p>
+     *
+     * <p><b>不改 status</b>：订正只支持同态订正（C-04 裁决口径 REGISTERED），
+     * 状态变更只走聚合状态机方法；订正路径只作用于占位行（{@code AND vin = 占位 VIN}），
+     * 真实登记行不可能被改写，故不弱化 INV-3
+     *「{@code REGISTERED → RELEASE_REGISTERED} 唯一入口是外部登记回执」。</p>
+     *
+     * @return 影响行数：{@code 1} = 本调用方完成订正（须补发登记事件）；
+     *         {@code 0} = 已被他人订正 / 行不存在 / 版本不符（幂等返回，不补发）
+     */
+    int correctPlaceholderRegistration(long titleId, String placeholderVin, String vin,
+                                   String registrationMode, Timestamp registeredAt, int version);
+
+
     /** 保留登记行（读模型）。 */
     record TitleRow(long titleId, long loanId, String vin, String status,
                     String registrationMode, Timestamp registeredAt, Timestamp releasedAt,

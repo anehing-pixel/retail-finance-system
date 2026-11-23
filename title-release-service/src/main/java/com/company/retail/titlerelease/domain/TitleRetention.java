@@ -17,9 +17,9 @@ public class TitleRetention {
 
     private final Long titleId;
     private final long loanId;
-    private final String vin;
+    private String vin;                              // 可订正（占位行被正式登记取代时）
     private TitleRetentionStatus status;
-    private final String registrationMode;           // REGISTERED / CONTRACTUAL_ONLY（C-04）
+    private String registrationMode;                 // REGISTERED / CONTRACTUAL_ONLY（C-04）
     private java.time.Instant registeredAt;
     private java.time.Instant releasedAt;
     private final int version;
@@ -53,6 +53,50 @@ public class TitleRetention {
     public static TitleRetention restoreDefaultForLoan(long loanId, String vin, int version) {
         return new TitleRetention(null, loanId, vin, TitleRetentionStatus.REGISTERED,
                 "REGISTERED", java.time.Instant.now(), null, version);
+    }
+
+    /**
+     * 挡板兜底行的占位 VIN 约定（LOAN_SETTLED 兜底建单；与 {@link #restoreDefaultForLoan} 同源）。
+     *
+     * <p>占位行不是「已登记」的业务事实，只是链路挡板；被操作员正式登记取代时，
+     * 由 {@link #correctRegistration} 订正 VIN 并补发登记事件（用户裁决 2026-11-23）。</p>
+     */
+    public static String placeholderVin(long loanId) {
+        return "UNKNOWN-" + loanId;
+    }
+
+    /** 该行是否为挡板占位行（可被正式登记订正）。 */
+    public static boolean isPlaceholder(long loanId, String vin) {
+        return placeholderVin(loanId).equals(vin);
+    }
+
+    /**
+     * 登记订正：占位行 → 正式登记（订正 VIN / 登记模式 / 登记时间）。
+     *
+     * <p>状态机守卫：仅同态订正（REGISTERED → REGISTERED，C-04 裁决口径）放行；
+     * 任何跨态订正一律拒绝——{@code REGISTERED → RELEASE_REGISTERED} 的唯一入口
+     * 是外部登记回执（INV-3 / C-11），不得被登记订正旁路。</p>
+     */
+    public void correctRegistration(String realVin, boolean contractualOnly) {
+        if (realVin == null || realVin.isBlank()) {
+            throw new com.company.platform.exception.BusinessException(
+                    com.company.retail.domain.exception.RFErrorCode.RF_VALID_001, "vin 必填");
+        }
+        TitleRetentionStatus target = contractualOnly
+                ? TitleRetentionStatus.CONTRACTUAL_ONLY : TitleRetentionStatus.REGISTERED;
+        // 订正**不改状态**：只支持同态订正（C-04 裁决口径 REGISTERED）。
+        // 任何跨态订正一律拒绝——REGISTERED → RELEASE_REGISTERED 的唯一入口是外部登记回执（INV-3 / C-11），
+        // 登记订正不得旁路；已解押闭环（RELEASE_REGISTERED / CLOSED）的行同样不得被重新登记。
+        if (status != target) {
+            throw new com.company.platform.exception.BusinessException(
+                    com.company.retail.domain.exception.RFErrorCode.RF_VALID_002,
+                    "保留登记订正被拒：当前状态 " + status + " 不允许订正为 " + target
+                            + "（登记订正仅支持同态订正，不得改写已登记态，INV-3 唯一入口不可旁路）",
+                    java.util.Map.of("current", status.name(), "target", target.name()));
+        }
+        this.vin = realVin;
+        this.registrationMode = contractualOnly ? "CONTRACTUAL_ONLY" : "REGISTERED";
+        this.registeredAt = contractualOnly ? null : java.time.Instant.now();
     }
 
     public static TitleRetention restore(Long titleId, long loanId, String vin, String status,
