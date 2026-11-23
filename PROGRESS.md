@@ -236,6 +236,7 @@
 | 2026-11-23 | **登记订正 + 登记事件补发**（用户裁决「补发事件并订正VIN」） | **PASS**：根因——`LOAN_SETTLED` 兜底建的是**挡板占位行**（`vin=UNKNOWN-<loanId>`），占位行先于操作员正式登记落库时，显式登记命中「已存在 → 幂等返回」→ **登记事件永不发出**，证据链缺「所有权保留登记」这一环（E2E S11 的 `TITLE_RETENTION_REGISTERED` 断言失败，实测 PASS 96 / FAIL 2）。修法（口径已同步 `R04 §6` / `R09 §5.1`）：①领域 `TitleRetention` 增占位 VIN 约定（`placeholderVin` / `isPlaceholder`）与**登记订正**方法（`correctRegistration`）——只改 VIN / 登记模式 / 登记时间，**不改状态**，跨态订正一律 `RF_VALID_002` 拒绝（INV-3 唯一入口不可旁路）②端口 `TitleRepositoryPort.correctPlaceholderRegistration` + JDBC `UPDATE ... WHERE title_id=? AND version=? AND vin=?`（**三重并发守卫**：乐观锁 + 占位 VIN），**不写 status** ③用例层 `registerRetention` 命中占位行 → 订正并**补发一次** `TITLE_RETENTION_REGISTERED`（影响行数为 1 者才补发；并发/重放落到 0 行 → 幂等返回、不重复发事件）。**验证**：`mvn -B -o package` → 17 模块 BUILD SUCCESS（**构建 365 单测 0 失败 0 错误（原记录口径）**，50 个测试类；`TitleRetentionIdempotencyTest` 6→12 例，覆盖订正/补发/并发只补发一次/跨态被拒）；**真实 PG + 应用级实测 8/8 全绿**（走网关 18081 实调 `POST /api/title-retentions`：占位行 `UNKNOWN-999901` → 订正为 `VIN-REAL-999901`、`version` 0→1、登记事件 37→**38** 且仅此 1 条对应该 `titleId`、**重复登记后事件数不变**（38）、陈旧版本订正**影响 0 行**、测试数据清理残留 0）；注册端口段走网关冒烟 **26/26** + 前端页面 **46/46**、`scripts/e2e_w8.py` **98/98**、`check_docs.py` **PASS 15/15**。**未改迁移字节，未改 `scripts/` 禁区文件** |
 | 2026-11-23 | **持久层全量 MyBatis 化（W-MB，用户指示「jdbc 都换成 MyBatis」）** | **PASS**：12 个部署单元的持久层由 `JdbcTemplate` + `RowMapper` **全量迁到 MyBatis 3.0.3 注解 SQL**（无 XML、无 JPA）。红线：**SQL 语义、仓储方法签名、事务边界、对外接口一律不变**（`AGENTS.md` B-12）。改动面——①父 `pom.xml` 加 `mybatis-spring-boot-starter` 依赖管理，`infrastructure`/`external-api` 显式声明依赖；②新增共享映射件 `common/.../common/persistence/RowValues.java`（`asLong`/`asLongOrNull`/`asInt`/`asString`/`asBoolean`/`asInstant`/`asLocalDate`/`asBigDecimal`/`asTimestamp`/`asBytes`，NULL 口径对齐 `ResultSet.getXxx`：`getLong`→0、`getString`→null）；③各服务新增 `*.mapper` 包 + `@MapperScan` **显式列单一包**（精确装配，不做全包扫描，也不依赖 starter 自动扫描），共享 `infrastructure` 的 mapper 由 `RfOutboxConfig` 上的 `@MapperScan` 单独注册；④11 个服务 `application.yml` 加 `mybatis.configuration.local-cache-scope: STATEMENT`，**对齐原 JdbcTemplate「每次读都落库」的读语义**，避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存旧行；⑤唯一键幂等统一走 `ON CONFLICT` 原子语义（`ON CONFLICT DO NOTHING`，**不采用「捕获唯一键异常再重读」**——PG 事务内一旦触发唯一键错误，整笔事务即被置为 aborted），已对**真实 PG 实测**三处：`collection_cases` 部分唯一索引推断（`ON CONFLICT (loan_id) WHERE status <> 'CLOSED'` 首次 INSERT 0 1 / 再插 INSERT 0 0）、`bureau_report_triggers`（1 → 0）、`batch_runs` upsert（两次均 INSERT 0 1）；⑥MyBatis `@Options` 属性为 `keyColumn`（**单数**，无 `keyColumnNames`），自增主键统一「单 Map 参数 + `keyProperty` 回填」，等价原 `RETURNING` 空集语义。**验证**：`mvn -B clean package` → 17 模块 **BUILD SUCCESS（surefire 类级汇总 365 测试 0 失败 0 错误）**；`bash run-microservices.sh smoke` → **26/26 EXIT 0** + 前端页面 **46/46**；`scripts/e2e_w8.py` → **98/98 EXIT 0**；`external-simulator/demo_e2e.py` → **34/34**；`frontend/browser_e2e.py`（Playwright + 系统 Edge，逐按钮点击）→ **30/30**；`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C15 权威口径 365）。**未改 Flyway 迁移字节（V1–V17 全部 success、60 表）**、未引 MQ/Seata/Redis/对象存储、未改 `scripts/` 与 `run-microservices.sh`；文档口径同步回灌 `README` / `R00` / `R06` / `R10` / `AGENTS` 与 `interview/` 三份求职材料 |
 | 2026-11-23 | **W-CACHE / W-RL 产品档位配置化 + 两级缓存 + 网关限流**（用户裁决「配置化完整落地 + Caffeine L1 / Redis L2」+「网关限流补 Redis 令牌桶」） | **PASS**：`mvn -B clean package` → **BUILD SUCCESS（surefire 类级汇总 398 测试 0 失败 0 错误，55 个测试类）**；`bash run-microservices.sh smoke` → **33/33 EXIT 0**（原 26，+7：限流触发 429 / 首个请求放行 / 响应体含 `RF_GATEWAY_001` / 读档位 / 二次读走缓存 / 档位种子 / 快照三列已加）+ 前端页面 **46/46**；`scripts/e2e_w8.py` → **104/104 EXIT 0**（原 98，+6：建档位 → 按档位生成计划 → 快照落库 → 改版到版本 2 → 缓存已失效 → **历史计划快照与期次利息均不变**）；`external-simulator/demo_e2e.py` → **34/34**；`frontend/browser_e2e.py` → **30/30**；DB 实查 `flyway_schema_history` → **18 条全部 success**，四 schema **61 张表**，产品档位种子 2 条、`core.repayment_plans` 快照三列已加；`check_docs.py` → **PASS 15/15 EXIT 0**（C14 号段上限 = 18、C15 权威口径 = 398）。**关键断言实测**：改档位到版本 2（rateBp 100）后**历史计划快照仍为 `1|0`**、**历史期次利息仍为 0（不重算存量）**；限流探针路径首个请求放行、超限返回 429 且响应体含 `RF_GATEWAY_001`。**既有迁移字节未动、未引入 MQ/Seata/对象存储**；Redis 仅两类用途（只读配置 L2 + 网关限流态） |
+| 2026-11-23 | **生产就绪清单并入 R11 §2.1**（用户指示「将两轮生产就绪清单合并到 docs/R11 的投产准备阶段，并运行文档自检」） | **PASS**：两轮审计（主题分级 P0 10 项 / P1 9 项 / P2 9 项 + 模块视角 16 个 Maven 模块 + 端到端横切 8 项 + 「与现实差最远的六件事」+ 一处不要误改）合并进 `docs/R11-演进路线图与开工门禁.md` **§2.1「生产就绪清单（投产门禁展开）」**，同步 §0 文档控制（v2.1）、§1 引用口径、§2 阶段总览「投产准备」行判据、§9 自检表；**审计基线按当前 HEAD `3c46876` 复核**（Flyway 18 条迁移已执行 / 16 个 Maven 模块 / 四 schema 61 表），复核中**订正审计旧结论 2 处**：①网关**征信路径已有**专属限流规则（10 rps / 突发 20），真实缺口是**登录路径无专属规则**（落 `/api/**` 兜底 500 rps / 突发 1000）②出站 HTTP 计 **3 处裸客户端完全无超时 + 6 处只有连接超时、无读超时**（非「7 处全裸」）；另新发现 `external-api/application.yml` 的迁移条数注释与磁盘实际不符，已改写为「条数以迁移目录为准」。`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C13 文件数 31 项不变、C14 号段上限 = 18、C15 权威口径 = 398）——**隔离副本实测同结果**（剔除并行会话未提交的 `PROGRESS §9` 后复跑仍为 15/15）。**当前工作树整体 C4 FAIL 1 项，唯一原因是并行会话未提交的 `PROGRESS §9` 引用了超出 001–012 登记表的 ADR 编号**，按 `AGENTS.md §7` 不覆盖他人 WIP，待其补齐该 ADR 或改写引用即恢复。**本轮只改 1 份文档 + 1 处配置注释，未改业务代码、未改迁移字节、未碰 `scripts/` 禁区** |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 
@@ -314,3 +315,54 @@
 | 基线仓库维护（演示态） | 约 1 人 × 20–30%：依赖升级与 CVE 补丁、文档同步（R00–R11/ADR 随演进回填）、待办清单消化 |
 | 生产期长期负载 | 外部对接变更（每年数次，协议 v1→v2 适配+回归）、贷后异常处理（对账 UNMATCHED / 报送 DEAD 补发 / 放款失败人工介入）、监管应对（总量规制口径调整、检查资料输出）、安全审计与密钥轮换（三把 JWT secret）、日批窗口监控与 61 表索引/附件清理 |
 | 合理配置 | 约 **2 人长期 + 1 人按需**，约为开发团队 40% 的持续人力；低于该比例通常意味着贷后异常无人值守，风险在监管检查或对账事故中兑现 |
+
+---
+
+## 9. 并行路线合并裁决清单（W-MERGE · 2026-11-23 · 待执行）
+
+> **状态**：**尚未合并**。4 条并行路线的分支**零提交**，工作区仍是未提交 WIP，
+> 且对应会话**至今仍在写入**（判活依据：文件 mtime）。
+> **本节是合并执行的基线**，不是已完成记录——合入前每条都要走 `AGENTS.md §5` 全量验收。
+
+### 9.1 四条路线的归属与判活
+
+| 分支 | worktree | 归属会话（peer，非本会话子会话） | 提交 | 判活 |
+|---|---|---|---|---|
+| `wt/lock` | `../retail-finance-lock` | 「在 worktree 中用 Redisson 锁实现进件防重与回调幂等」 | **0** | 活跃 |
+| `wt/mq` | `../retail-finance-mq` | 「在worktree实现 Kafka/RocketMQ 削峰解密」 | **0** | 活跃 |
+| `wt/ratelimit` | `../retail-finance-ratelimit` | 「实现 Nginx 网关令牌桶限流」 | **0** | 活跃 |
+| `wt/statemachine` | `../retail-finance-statemachine` | 「在 worktree 中处理 Spring StateMachine 引擎」 | **0** | 活跃 |
+
+分支创建于 2026-11-23 21:29–21:41（基线 `1422b55`），master 随后提交 `3c46876`（W-CACHE/W-RL）。
+**用户裁决（2026-11-23）**：①**等各会话自己跑完并提交后，再逐条评估合并**（不打断在跑的会话、不合半成品）；
+②**冲突处以 master 现有口径为准，只并入不冲突的部分**。
+
+### 9.2 逐条裁决（合并时按此执行）
+
+| 路线 | 冲突点 | 裁决 | 处置动作 |
+|---|---|---|---|
+| `wt/ratelimit` | 6 个类**同名同路径**（`gateway/.../ratelimit/*`）；限流键口径不同：分支用**客户端 IP**，master 用 **Authorization 头 SHA-256 哈希** | **保留 master 实现**（哈希键按调用方限流，IP 键在 NAT/代理下会把不同调用方挤在一起；且 master 版本已过 33/33 冒烟 + 104/104 E2E） | ①master 6 个类**整体保留**，分支版本不并入；②**吸收**分支的 `RateLimitFilterTest`（master 缺过滤器级测试，需按 master 实现改写后并入）；③`nginx/` 目录为**可选部署形态**，不默认启用，可作为独立目录并入 |
+| `wt/lock` | ①ADR-RF-012 **与 master 同号**；②`V18__callback_receipt_idempotency.sql` **与 master 已执行的 V18 同号**；③引 Redisson 与 ADR-RF-012「本轮不引入 Redisson」冲突 | **拆开裁决**：**回调幂等能力合入**，**Redisson 不合** | ①**吸收**回调幂等唯一索引 `uk_receipt_order_authority_ref`（外部方换 nonce 重推同一回执，DMZ nonce 关挡不住，由唯一索引兜底——这是真实业务缺口，且用数据库唯一索引，与 master「唯一键幂等走 `ON CONFLICT`」口径一致）；迁移号改 **V19**（master V18 已执行，字节不动）；②**不合** `RedissonLockManager` 与 Redisson 依赖（正确性仍由唯一索引 + 乐观锁保证，ADR-RF-012 已写「Redis 锁不作正确性来源」）；③`DistributedLockManager` 端口 + `InProcessLockManager` **待评估**（与 master 已有的到期批量抢占锁是否重复）；④ADR 编号**顺延到 `docs/adr/` 下一个可用号**（012 已归 master 的 Redis 缓存/限流 ADR；合并时以目录实际占用为准，不在本节预占编号） |
+| `wt/mq` | 引 MQ **直接违反 `AGENTS.md` B-10**；改写 `ADR-RF-008` §4（master 口径仍是「不引 MQ」）；改 `AGENTS.md` / `scripts/check_docs.py` 等共享禁区文件（45/7 行） | **不合 MQ 本身** | ①MQ 客户端、`common/messaging`、`*Envelope*`、密文信封投递**全部不合**（与 master 的本地附件存储 ADR-RF-008 冲突）；②`EventConsumptionService` 与 master 既有 `core.event_consumptions` + outbox 消费幂等**重复**，不合；③**不得**用该分支的 `AGENTS.md` / `check_docs.py` 覆盖 master 本轮改动 |
+| `wt/statemachine` | 新增独立 Maven 模块 `statemachine/`；改 `LoanStatus` / `ReleaseOrderStatus` / `TitleRetentionStatus` 与 retail-core 三个 TxExecutor | **可合（架构不冲突）** | ①该路线把 **Spring StateMachine 引擎与手写领域状态机解耦**（引擎置于独立模块 `com.company.retail.statemachine`，`domain` 包仍零 Spring 依赖、仍可纯 JUnit 跑），不违反 `AGENTS §2` 分层纪律 → **具备并入条件**；②但它改了 `retail-core` 三个 TxExecutor 与三个状态枚举，与 master 本轮的 `RepaymentPlanApplicationService` 改动同区域，需**逐文件解冲突**；③合入后必须重跑全量构建 + 冒烟 + E2E |
+
+### 9.3 合并执行前置条件（缺一不可）
+
+1. **各会话自行提交**：分支出现提交后（`git log master..<branch>` 非空）才进入评估，
+   **不得**代提交他人未完成的工作区状态（`AGENTS.md §7`）。
+2. **号段与编号让位**：ADR 编号 `012` 归 master；`wt/lock` 的 ADR 走 `013`（`wt/mq` 若不合则 `013` 让出）。
+   迁移号：master `V18` **已执行**（18/18 success，字节不可改），`wt/lock` 的回调幂等索引走 **`V19`**；
+   `wt/mq` 的 `V20__mq_envelope_channel.sql` 若不合 MQ 则**整条弃用**。
+   ⚠️ **V19 存在两个候选用途**：`R06 §3.2` 的 G-DB-7 审计写入授权调整，与 `wt/lock` 的回调幂等唯一索引——**先落地者占用 V19**，
+   后落地者顺延到下一个空号（V20 及以后须先查 `PROGRESS §2` 号段占用表）。
+3. **共享禁区文件逐个手工合**：父 `pom.xml` / `common/pom.xml` / `run-microservices.sh` / `scripts/check_docs.py` / `AGENTS.md` / `docs/00-文档索引.md`
+   ——**以 master 版本为底**，只挑拣需要的增量，不整文件覆盖。
+4. **全量验收**：`mvn -B clean package`（0 失败）· `run-microservices.sh smoke` · `scripts/e2e_w8.py` · `python scripts/check_docs.py`；
+   **C2（ADR 编号连续唯一）与 C14（迁移号段 == 磁盘脚本数）必须仍 PASS**。
+5. **合并顺序建议**：`wt/lock`（回调幂等，V19）→ `wt/statemachine`（独立模块，冲突最少）→ `wt/ratelimit`（仅取测试与 `nginx/`）→ `wt/mq`（预期不合，仅留 ADR 留痕）。
+
+### 9.4 当前 master 状态
+
+- master HEAD `3c46876`（W-CACHE/W-RL），**领先 `origin/master` 2 个提交，未推送**（推送属对外可见动作，需用户明示）。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**。
+- **本节登记时 4 个 worktree 仍在写入**；合并动作应在它们各自收口后由收口轮执行。
