@@ -519,7 +519,7 @@
 > 以 `git merge --no-ff` 合入 master（限流实现**双轨** + `retail.gateway.rate-limit.mode` 开关 + 互斥装配）。
 > §9.2 其余裁决（`wt/lock` 只取回调幂等、`wt/mq` 不合、`wt/statemachine` 合入）**仍然有效**。
 
-- master HEAD `af9869d`（**W-LOCK Redisson 分布式锁合入 master**，合并提交；父提交 `7663bd4` = W-MQ 合入 + Windows 行尾纪律固化，再往前为 `cf78529` 合并 58 文件与 `be856e6` 收口回灌）；**领先 `origin/master` 14 个提交，未推送**（推送属对外可见动作，需用户明示）。
+- master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交），**未推送**（推送属对外可见动作，需用户明示）。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
 - 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 504）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
 - 4 条分支 worktree **均已收口**（工作区干净），合并动作已由收口轮执行完毕；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**保留待清理**。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
