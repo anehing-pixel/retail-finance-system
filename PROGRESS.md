@@ -10,7 +10,7 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **W-SIM2 终态（2026-11-23）**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`），其后追加 W-FE 前端控制台、W-SIM/W-SIM2 外部模拟器双向闭环（六向对端 + 四服务双模接线）；master HEAD `8ded5ea`，仓库单分支（master）单 worktree，验证进程已全停 |
+| 轮次 | **W-MB 持久层改造（2026-11-23，用户指示「jdbc 都换成 MyBatis」）**：12 个部署单元的持久层由 `JdbcTemplate` + `RowMapper` **全量迁到 MyBatis 3.0.3 注解 SQL**（无 XML、无 JPA），红线「**SQL 语义 / 仓储方法签名 / 事务边界 / 对外接口一律不变**」（`AGENTS.md` B-12）；新增共享映射件 `common/.../persistence/RowValues.java`；各服务 `@MapperScan` 显式列单一 mapper 包（精确装配，未做全包扫描）；一级缓存显式降为 STATEMENT 级对齐原读语义；唯一键幂等统一走 `ON CONFLICT` 原子语义；**Flyway V1–V17 字节未动、未引 MQ/Seata/Redis/对象存储**。此前：W-SIM2 终态（计划内 S0–S5 全部完成，W9 放行，tag `w9-accepted`）+ W-FE 前端控制台 + W-SIM/W-SIM2 外部模拟器双向闭环；master HEAD `8ded5ea`，仓库单分支单 worktree，验证进程已全停 |
 | 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001`）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
 | 数据库隔离口径 | **本地 11 个连库单元（10 业务服务 + DMZ；网关不连库）统一以 `postgres` 超级用户连库** → DB role 隔离**本地不生效**，是**生产侧物理兜底**；兑现前提 = **按角色分配连接账号**（`R06 §3.1`） |
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
@@ -45,6 +45,7 @@
 | 9 | 一致性与术语自检 | **15 项**机器校验落地并实测 **PASS / FAIL 0 / EXIT 0**，替代本轮无代码可编译的「冒烟全绿」；其中 C14/C15 为 2026-11-23 新增（号段与测试数口径守护） | `scripts/check_docs.py` |
 | 10 | 全中文 + 微服务口径回灌 | 全仓术语替换（假名 + 日文汉字） + 3 个 ADR 重命名 + 引用同步 + 10 份 ADR 节标题中文化；重写 `R00 §2 §3.1 §3.2` 与 `R09` 全文、修正 4 处端口段 | `scripts/normalize_terms.py` |
 | 11 | C-01 定源 + DMS 对接定源 | C-01 双形态并行（`ADR-RF-002` Accepted）；DMS 初期走数据集成商、四类业务接口与安全规范回填 `R07`（`ADR-RF-011` Accepted）；`R06` 增假名姓名字段 | `R01 §6`、`R07 §3 §4 §7`、`ADR-RF-002`、`ADR-RF-011` |
+| 12 | **持久层全量 MyBatis 化**（用户指示「jdbc 都换成 MyBatis」） | 12 个部署单元的持久层由 `JdbcTemplate` + `RowMapper` 全量迁到 **MyBatis 注解 SQL**（无 XML、无 JPA），SQL 语义 / 方法签名 / 事务边界 / 对外接口**一律不变**；新增共享 `RowValues` 行映射件；各服务 `@MapperScan` 精确装配；一级缓存 STATEMENT 级对齐原读语义；唯一键幂等走 `ON CONFLICT` 原子语义 | `AGENTS.md` §2 + B-12、`PROGRESS §2` 共享资源登记、`§6` 验证记录 |
 
 ---
 
@@ -65,8 +66,23 @@
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
 | 中台 jar | `com.company:company-platform-contracts:1.0.0-SNAPSHOT`（**✅ 已抽取**，独立仓 `../company-platform-contracts`，`mvn install` 到本地仓；34 单测全绿；RF 依赖 ≥ 此版本） | floorplan 不强制迁移（继续用 `com.company.floorplan.*` 现网类，基线全绿未动） | ✅ W1 完成 |
 | Feign 契约 | `com.company.retail.common.contract`（**✅ W2 已冻结**：`FeignContracts` 代付前 3 门禁契约（contract/consent/underwriting，fail-closed）+ `OutboxPublisher` 17 事件常量 + `EventPayloadGuard` 白名单；`w2-frozen` 后并行包只读） | `com.company.floorplan.common.contract` | 各自常量表 ✅ |
+| 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-23：**用户指示**「jdbc 都换成 MyBatis」——持久层全量由 JdbcTemplate + RowMapper 改为
+>   **MyBatis 注解 SQL**（无 XML、无 JPA）。红线：**SQL 语义、仓储方法签名、事务边界、对外接口一律不变**
+>   （`AGENTS.md` B-12）。改动面：父 `pom.xml`（新增 mybatis 依赖管理，**共享禁区，已获授权**）、
+>   `infrastructure/pom.xml` + `external-api/pom.xml`（显式声明依赖）、11 个服务的 `application.yml`
+>   （`mybatis.configuration.local-cache-scope: STATEMENT`，对齐原「每次读都落库」的读语义）、
+>   `AGENTS.md`（§2 持久层纪律 + B-12 红线，**共享禁区，已获授权**）。
+>   新增共享件：`common/.../common/persistence/RowValues.java`（行映射口径统一，NULL 语义对齐 `ResultSet.getXxx`）。
+>   **未新增 Flyway 迁移**（V1–V17 字节未动）、未引入 MQ / Seata / Redis / 对象存储。
+> - 2026-11-23：**据实订正「网关限流」的未实现声明**（收口轮自查发现）——
+>   核实 `gateway/` 仅有 `RequestIdFilter` + 启动类，**无限流实现**，但 `README`（架构图 + 服务表）、
+>   `R02`（架构图 + 服务表 + 可伸缩性行）、`ADR-RF-001`（服务表）均把「限流」写成既有能力，
+>   `R07` 的 DMZ 第四关也把「限流」与已实现的三关并列——属 `AGENTS.md` §7 所列「假完成」类漂移。
+>   处理：这 6 处一律标注**「限流未实现」/「口径待定」**，不删设计意图（投产前仍需补）。
+>   **未改任何业务代码、配置与迁移**；**求职材料本就不写限流**（`interview/` 三份均无该表述）。
 > - 2026-11-23：**用户授权**实施 V16 迁移（撤销 `retail_app_rw` 对 `pii.customer_pii` 的 SELECT）：
 >   原因——V1 的 `ALTER DEFAULT PRIVILEGES IN SCHEMA pii GRANT SELECT ON TABLES TO retail_app_rw`
 >   把 `pii.customer_pii` 也授了业务角色，与 `R06 §3` 角色表口径「不含 `pii.customer_pii`」及 `R08` PII-5 不一致。
@@ -205,6 +221,7 @@
 | 2026-11-23 | **DB 隔离口径 + 投产门禁收口验收**（本轮：口径固化 + 投产门禁 G-DB-1~G-DB-7；未改业务代码） | **PASS**：整树 `mvn -B -o package` → **BUILD SUCCESS**（surefire 类级汇总 359 测试 0 失败 0 错误）· `scripts/e2e_w8.py` → **98/98 EXIT 0**（含 S14 outbox 12 类齐全、INV-5 同意锚定对拍）· DB 实查 `flyway_schema_history` → **17 条全部 success**、四 schema **60 张**、`retail_app_rw` 在 pii schema 实测仅剩 `pii.customers : SELECT` · `python scripts/check_docs.py` → **PASS 15/15 EXIT 0**。**过程记录**：① `run-microservices.sh smoke` 首轮 25/26（`title-release` 一次性 socket 层抖动：Tomcat acceptor `Error setting socket options` + 网关 `Connection reset by peer`），复跑轮 **26/26 + 前端 46/46 EXIT 0**；② 满负载下（本机 31.8GB 内存仅余 4.9GB、421 进程、floorplan 栈并行）出现网关就绪需 105s > 脚本 90s 上限、路由检查超时等抖动，**非代码缺陷**——编排缺陷已记入 §7 第 8 条（`run-microservices.sh` 属共享禁区，本轮**未改**） |
 | 2026-11-23 | **注册端口段标准验收复跑**（本轮：补跑上一轮缺失的注册端口段验收；未改业务代码） | **PASS**：`mvn -B -o package` → **17 模块 BUILD SUCCESS（构建 359 单测 0 失败 0 错误，原记录口径**，50 个测试类，surefire 类级汇总实测）；`run-microservices.sh smoke` → **26/26 EXIT 0**（含「Flyway 迁移全部执行 17 / 17 条」「四 schema 建表 60 张」）+ 前端页面 **46/46 EXIT 0**；`scripts/e2e_w8.py` → **98/98 EXIT 0**（含 S11 保留登记→解除八步→外部回执闭环、S14 outbox 12 类齐全）；`check_docs.py` → **PASS 15/15 EXIT 0**；DB 实查 `flyway_schema_history` → **17 条全部 success**、`retail_app_rw` 在 pii schema 仅剩 `pii.customers : SELECT`、`pg_default_acl` 的 pii 默认授权仅 `retail_pii_rw`。**执行位置变更（环境事实，见 §7 第 9 条）**：Windows 侧**绑不上** 8090–8099/18081/18082/18091（`netstat` 查不到占用者，但 `bind()` 一律返回 WSAEADDRINUSE），故注册端口段验收改在 **WSL 侧执行**——`.wslconfig` 为 `networkingMode=mirrored`，WSL 与 Windows 共享同一网络命名空间，所绑即真实注册端口（Windows 侧可经 127.0.0.1 访问）；WSL 侧 JDK 为 **25.0.5.1**（项目目标 17），12 个部署单元实测全部正常启动。**过程记录**：首轮 E2E 出现 2 项失败（PASS 96 / FAIL 2，均为 S11「outbox 发出 TITLE_RETENTION_REGISTERED」），根因是 outbox 积压的 `LOAN_SETTLED` 被消费者抢先消费 → 兜底建单先于显式登记落库 → 显式登记命中「已存在」幂等分支不重复发事件（**既有语义、非本轮回归**，见 §7 第 10 条）；清空积压后复跑 **98/98** |
 | 2026-11-23 | **登记订正 + 登记事件补发**（用户裁决「补发事件并订正VIN」） | **PASS**：根因——`LOAN_SETTLED` 兜底建的是**挡板占位行**（`vin=UNKNOWN-<loanId>`），占位行先于操作员正式登记落库时，显式登记命中「已存在 → 幂等返回」→ **登记事件永不发出**，证据链缺「所有权保留登记」这一环（E2E S11 的 `TITLE_RETENTION_REGISTERED` 断言失败，实测 PASS 96 / FAIL 2）。修法（口径已同步 `R04 §6` / `R09 §5.1`）：①领域 `TitleRetention` 增占位 VIN 约定（`placeholderVin` / `isPlaceholder`）与**登记订正**方法（`correctRegistration`）——只改 VIN / 登记模式 / 登记时间，**不改状态**，跨态订正一律 `RF_VALID_002` 拒绝（INV-3 唯一入口不可旁路）②端口 `TitleRepositoryPort.correctPlaceholderRegistration` + JDBC `UPDATE ... WHERE title_id=? AND version=? AND vin=?`（**三重并发守卫**：乐观锁 + 占位 VIN），**不写 status** ③用例层 `registerRetention` 命中占位行 → 订正并**补发一次** `TITLE_RETENTION_REGISTERED`（影响行数为 1 者才补发；并发/重放落到 0 行 → 幂等返回、不重复发事件）。**验证**：`mvn -B -o package` → 17 模块 BUILD SUCCESS（**构建 365 单测 0 失败 0 错误**，50 个测试类；`TitleRetentionIdempotencyTest` 6→12 例，覆盖订正/补发/并发只补发一次/跨态被拒）；**真实 PG + 应用级实测 8/8 全绿**（走网关 18081 实调 `POST /api/title-retentions`：占位行 `UNKNOWN-999901` → 订正为 `VIN-REAL-999901`、`version` 0→1、登记事件 37→**38** 且仅此 1 条对应该 `titleId`、**重复登记后事件数不变**（38）、陈旧版本订正**影响 0 行**、测试数据清理残留 0）；注册端口段走网关冒烟 **26/26** + 前端页面 **46/46**、`scripts/e2e_w8.py` **98/98**、`check_docs.py` **PASS 15/15**。**未改迁移字节，未改 `scripts/` 禁区文件** |
+| 2026-11-23 | **持久层全量 MyBatis 化（W-MB，用户指示「jdbc 都换成 MyBatis」）** | **PASS**：12 个部署单元的持久层由 `JdbcTemplate` + `RowMapper` **全量迁到 MyBatis 3.0.3 注解 SQL**（无 XML、无 JPA）。红线：**SQL 语义、仓储方法签名、事务边界、对外接口一律不变**（`AGENTS.md` B-12）。改动面——①父 `pom.xml` 加 `mybatis-spring-boot-starter` 依赖管理，`infrastructure`/`external-api` 显式声明依赖；②新增共享映射件 `common/.../common/persistence/RowValues.java`（`asLong`/`asLongOrNull`/`asInt`/`asString`/`asBoolean`/`asInstant`/`asLocalDate`/`asBigDecimal`/`asTimestamp`/`asBytes`，NULL 口径对齐 `ResultSet.getXxx`：`getLong`→0、`getString`→null）；③各服务新增 `*.mapper` 包 + `@MapperScan` **显式列单一包**（精确装配，不做全包扫描，也不依赖 starter 自动扫描），共享 `infrastructure` 的 mapper 由 `RfOutboxConfig` 上的 `@MapperScan` 单独注册；④11 个服务 `application.yml` 加 `mybatis.configuration.local-cache-scope: STATEMENT`，**对齐原 JdbcTemplate「每次读都落库」的读语义**，避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存旧行；⑤唯一键幂等统一走 `ON CONFLICT` 原子语义（`ON CONFLICT DO NOTHING`，**不采用「捕获唯一键异常再重读」**——PG 事务内一旦触发唯一键错误，整笔事务即被置为 aborted），已对**真实 PG 实测**三处：`collection_cases` 部分唯一索引推断（`ON CONFLICT (loan_id) WHERE status <> 'CLOSED'` 首次 INSERT 0 1 / 再插 INSERT 0 0）、`bureau_report_triggers`（1 → 0）、`batch_runs` upsert（两次均 INSERT 0 1）；⑥MyBatis `@Options` 属性为 `keyColumn`（**单数**，无 `keyColumnNames`），自增主键统一「单 Map 参数 + `keyProperty` 回填」，等价原 `RETURNING` 空集语义。**验证**：`mvn -B clean package` → 17 模块 **BUILD SUCCESS（surefire 类级汇总 365 测试 0 失败 0 错误）**；`bash run-microservices.sh smoke` → **26/26 EXIT 0** + 前端页面 **46/46**；`scripts/e2e_w8.py` → **98/98 EXIT 0**；`external-simulator/demo_e2e.py` → **34/34**；`frontend/browser_e2e.py`（Playwright + 系统 Edge，逐按钮点击）→ **30/30**；`python scripts/check_docs.py` → **PASS 15/15 EXIT 0**（C15 权威口径 365）。**未改 Flyway 迁移字节（V1–V17 全部 success、60 表）**、未引 MQ/Seata/Redis/对象存储、未改 `scripts/` 与 `run-microservices.sh`；文档口径同步回灌 `README` / `R00` / `R06` / `R10` / `AGENTS` 与 `interview/` 三份求职材料 |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 

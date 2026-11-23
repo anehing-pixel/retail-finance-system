@@ -4,7 +4,7 @@ import com.company.platform.exception.BusinessException;
 import com.company.platform.idempotency.IdempotencyGuard;
 import com.company.platform.idempotency.IdempotencyRecord;
 import com.company.retail.core.integration.DisbursementGateChecker;
-import com.company.retail.core.persistence.JdbcIdempotencyStore;
+import com.company.retail.core.persistence.MyBatisIdempotencyStore;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -25,13 +25,13 @@ import java.util.Optional;
 public class DisbursementApplicationService {
 
     private final DisbursementTxExecutor txExecutor;
-    private final JdbcIdempotencyStore idempotencyStore;
+    private final MyBatisIdempotencyStore idempotencyStore;
     private final DisbursementGateChecker gateChecker;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
     private final Clock clock;
 
     public DisbursementApplicationService(DisbursementTxExecutor txExecutor,
-                                          JdbcIdempotencyStore idempotencyStore,
+                                          MyBatisIdempotencyStore idempotencyStore,
                                           DisbursementGateChecker gateChecker,
                                           DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
         this.txExecutor = txExecutor;

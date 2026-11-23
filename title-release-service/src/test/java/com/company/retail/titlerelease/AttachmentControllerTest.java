@@ -5,7 +5,7 @@ import com.company.platform.security.RequirePermission;
 import com.company.platform.security.RequireSubject;
 import com.company.platform.security.SubjectType;
 import com.company.retail.domain.model.Permission;
-import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
+import com.company.retail.titlerelease.persistence.AttachmentRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import com.company.retail.titlerelease.web.AttachmentController;
 import org.junit.jupiter.api.AfterEach;
@@ -158,7 +158,7 @@ class AttachmentControllerTest {
         String key = "release-order/2026/11/d.txt";
         byte[] content = "downloaded-doc".getBytes(StandardCharsets.UTF_8);
         String sha256 = storage.put(key, content);
-        repository.row = new JdbcAttachmentRepository.AttachmentRow(
+        repository.row = new AttachmentRepository.AttachmentRow(
                 5L, "release_order", "9", key, sha256, content.length, "STAFF001", "t1");
 
         var response = controller.download(5L);
@@ -178,7 +178,7 @@ class AttachmentControllerTest {
 
     @Test
     void download_missingFile_notFound() {
-        repository.row = new JdbcAttachmentRepository.AttachmentRow(
+        repository.row = new AttachmentRepository.AttachmentRow(
                 5L, "release_order", "9", "gone.txt", "a".repeat(64), 1, "STAFF001", "t1");
         assertEquals(404, controller.download(5L).getStatusCode().value());
     }
@@ -256,8 +256,8 @@ class AttachmentControllerTest {
     }
 
     /** 附件仓储桩（记录登记参数，绕开 DB）。 */
-    private static final class StubAttachmentRepository extends JdbcAttachmentRepository {
-        JdbcAttachmentRepository.AttachmentRow row;
+    private static final class StubAttachmentRepository extends AttachmentRepository {
+        AttachmentRepository.AttachmentRow row;
         int inserted;
         String lastBizType;
         String lastBizId;
@@ -276,7 +276,7 @@ class AttachmentControllerTest {
         }
 
         @Override
-        public Optional<JdbcAttachmentRepository.AttachmentRow> findById(long attachmentId) {
+        public Optional<AttachmentRepository.AttachmentRow> findById(long attachmentId) {
             return row == null ? Optional.empty() : Optional.of(row);
         }
     }

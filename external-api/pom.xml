@@ -14,6 +14,11 @@
   <description>DMZ 独立进程 :18091——入站验签（per-partner HMAC + nonce）、出站签名、partner scope、调用留痕</description>
 
   <dependencies>
+    <!-- 持久层：MyBatis（SqlSessionFactory 由 starter 按各服务 DataSource 自动装配） -->
+    <dependency>
+      <groupId>org.mybatis.spring.boot</groupId>
+      <artifactId>mybatis-spring-boot-starter</artifactId>
+    </dependency>
     <!-- RF_* 错误码（RF_PTNR_*）与 TraceIdFilter；DMZ 不走员工 JWT 拦截器，只取用横切小件 -->
     <dependency>
       <groupId>com.company</groupId>

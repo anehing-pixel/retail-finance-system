@@ -8,7 +8,7 @@ import java.util.Set;
  *
  * <p>实现二选一（{@code retail.dmz.registry-mode}）：
  * {@link ConfigPartnerDirectory}（CONFIG，W2 dev 口径）或
- * {@link JdbcPartnerDirectory}（DB，{@code integration.partners} 表真相源）。</p>
+ * {@link MyBatisPartnerDirectory}（DB，{@code integration.partners} 表真相源）。</p>
  */
 public interface PartnerDirectory {
 

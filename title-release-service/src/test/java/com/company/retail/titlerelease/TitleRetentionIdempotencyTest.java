@@ -5,8 +5,8 @@ import com.company.retail.common.contract.EventPayloadGuard;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.titlerelease.application.TitleReleaseApplicationService;
 import com.company.retail.titlerelease.application.TitleRepositoryPort;
-import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
-import com.company.retail.titlerelease.persistence.JdbcReleaseOrderRepository;
+import com.company.retail.titlerelease.persistence.AttachmentRepository;
+import com.company.retail.titlerelease.persistence.ReleaseOrderRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -138,8 +138,8 @@ class TitleRetentionIdempotencyTest {
     private TitleReleaseApplicationService service(TitleRepositoryPort repo, OutboxPublisher outbox,
                                                    Path tempDir) {
         return new TitleReleaseApplicationService(repo,
-                new JdbcReleaseOrderRepository(null),   // 本组用例不触达解除订单
-                new JdbcAttachmentRepository(null),      // 本组用例不触达附件
+                new ReleaseOrderRepository(null),   // 本组用例不触达解除订单
+                new AttachmentRepository(null),      // 本组用例不触达附件
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()));

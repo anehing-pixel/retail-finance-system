@@ -1,7 +1,7 @@
 package com.company.retail.core.application;
 
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.company.retail.core.mapper.BatchRunMapper;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +20,12 @@ public class ScheduleDueJobService {
 
     public static final String JOB_NAME = "schedule-due-rollup";
 
-    private final JdbcRepaymentPlanRepository planRepository;
-    private final JdbcTemplate jdbc;
+    private final RepaymentPlanRepository planRepository;
+    private final BatchRunMapper batchRunMapper;
 
-    public ScheduleDueJobService(JdbcRepaymentPlanRepository planRepository, JdbcTemplate jdbc) {
+    public ScheduleDueJobService(RepaymentPlanRepository planRepository, BatchRunMapper batchRunMapper) {
         this.planRepository = planRepository;
-        this.jdbc = jdbc;
+        this.batchRunMapper = batchRunMapper;
     }
 
     /** 触发到期批量（POST /api/jobs/schedule-due-rollup，权限点 JOB_TRIGGER）。 */
@@ -35,9 +35,7 @@ public class ScheduleDueJobService {
         int overdueCount = planRepository.rollOverdue(bizDate);
 
         // 批次留痕（uk_batch_job_date；同日重跑幂等——ON CONFLICT 不改历史）
-        jdbc.update("INSERT INTO core.batch_runs (job_name, biz_date, status, finished_at, trace_id) "
-                        + "VALUES (?, ?, 'DONE', now(), ?) ON CONFLICT (job_name, biz_date) DO NOTHING",
-                JOB_NAME, java.sql.Date.valueOf(bizDate), traceId);
+        batchRunMapper.recordDone(JOB_NAME, bizDate, traceId);
 
         return Map.of("jobName", JOB_NAME, "bizDate", bizDate.toString(),
                 "dueCount", dueCount, "overdueCount", overdueCount);

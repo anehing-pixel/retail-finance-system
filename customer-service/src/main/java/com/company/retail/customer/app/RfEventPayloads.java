@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * 事件 payload 构造器（BC-2 生产方）：只允许白名单键（R09 §5.2），
- * 发布前仍由 {@code RfJdbcOutboxPublisher → EventPayloadGuard} 兜底校验（INV-4 默认拒绝）。
+ * 发布前仍由 {@code MyBatisOutboxPublisher → EventPayloadGuard} 兜底校验（INV-4 默认拒绝）。
  *
  * <p>口径：客户信息一律只带 {@code customerId} 等内部非个人信息引用（R09 §5.3）。</p>
  */

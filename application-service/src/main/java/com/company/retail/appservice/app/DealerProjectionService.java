@@ -1,6 +1,6 @@
 package com.company.retail.appservice.app;
 
-import com.company.retail.appservice.repo.JdbcDealerPartnerRepository;
+import com.company.retail.appservice.repo.DealerPartnerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +14,9 @@ import java.util.Map;
 @Service
 public class DealerProjectionService {
 
-    private final JdbcDealerPartnerRepository dealers;
+    private final DealerPartnerRepository dealers;
 
-    public DealerProjectionService(JdbcDealerPartnerRepository dealers) {
+    public DealerProjectionService(DealerPartnerRepository dealers) {
         this.dealers = dealers;
     }
 

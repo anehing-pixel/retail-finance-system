@@ -30,7 +30,7 @@
 
 | 服务 | 端口 | 职责 | 数据真相源 |
 |---|---|---|---|
-| `api-gateway` | 18081 | 按路径切流、`X-Request-Id`、限流、CORS | — |
+| `api-gateway` | 18081 | 按路径切流、`X-Request-Id`、限流（**限流尚未实现**）、CORS | — |
 | `external-api` | 18091 | **DMZ**：入站验签 / 出站签名 / nonce / partner scope / 调用留痕 | `integration.*` |
 | `retail-core` | 8090 | **核心账务（不拆）**：债权/还款计划/代付/入金核销/结清；**唯一跑 Flyway** | `loans` `repayment_plans` `schedule_items` `disbursements` `payments` `payment_allocations` |
 | `auth-service` | 8091 | 员工侧 + 客户侧**双主体** JWT 签发/验签 | `users` `user_roles` `pii.customer_identities` |

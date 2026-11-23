@@ -2,10 +2,13 @@ package com.company.retail.appservice.repo;
 
 import com.company.platform.idempotency.IdempotencyRecord;
 import com.company.platform.idempotency.IdempotencyStore;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.company.retail.appservice.mapper.IdempotencyMapper;
+import com.company.retail.common.persistence.RowValues;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -16,10 +19,10 @@ import java.util.Optional;
 @Repository
 public class ApplicationIdempotencyStore implements IdempotencyStore {
 
-    private final JdbcTemplate jdbc;
+    private final IdempotencyMapper mapper;
 
-    public ApplicationIdempotencyStore(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ApplicationIdempotencyStore(IdempotencyMapper mapper) {
+        this.mapper = mapper;
     }
 
     @Override
@@ -27,26 +30,22 @@ public class ApplicationIdempotencyStore implements IdempotencyStore {
         if (key == null) {
             return Optional.empty();
         }
-        var rows = jdbc.queryForList(
-                "SELECT idempotency_key, request_fingerprint, created_at FROM core.applications "
-                        + "WHERE idempotency_key = ?", key);
+        List<Map<String, Object>> rows = mapper.findIdempotencyRows(key);
         if (rows.isEmpty()) {
             return Optional.empty();
         }
-        var row = rows.get(0);
-        Object createdAt = row.get("created_at");
+        Map<String, Object> row = rows.get(0);
+        Timestamp createdAt = RowValues.asTimestamp(row, "created_at");
         return Optional.of(new IdempotencyRecord(
-                (String) row.get("idempotency_key"),
-                (String) row.get("request_fingerprint"),
-                createdAt == null ? null : ((Timestamp) createdAt).toInstant()));
+                RowValues.asString(row, "idempotency_key"),
+                RowValues.asString(row, "request_fingerprint"),
+                createdAt == null ? null : createdAt.toInstant()));
     }
 
     /** 业务插入即写入指纹（同事务）；本方法仅用于显式补写场景（如按 no 回填）。 */
     @Override
     public void save(IdempotencyRecord record) {
-        jdbc.update(
-                "UPDATE core.applications SET request_fingerprint = ? WHERE idempotency_key = ?",
-                record.requestFingerprint(), record.key());
+        mapper.updateRequestFingerprint(record.requestFingerprint(), record.key());
     }
 
     /** 重放定位：按键取首次受理的申请。 */
@@ -54,8 +53,7 @@ public class ApplicationIdempotencyStore implements IdempotencyStore {
         if (key == null) {
             return Optional.empty();
         }
-        var ids = jdbc.queryForList(
-                "SELECT application_id FROM core.applications WHERE idempotency_key = ?", Long.class, key);
+        List<Long> ids = mapper.findApplicationIdsByKey(key);
         return ids.isEmpty() ? Optional.empty() : Optional.of(ids.get(0));
     }
 }

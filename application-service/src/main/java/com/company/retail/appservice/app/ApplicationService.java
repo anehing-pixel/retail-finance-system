@@ -6,7 +6,7 @@ import com.company.retail.appservice.domain.Application;
 import com.company.retail.appservice.domain.ApplicationStatus;
 import com.company.retail.appservice.domain.DuplicateApplicationDetector;
 import com.company.retail.appservice.repo.ApplicationIdempotencyStore;
-import com.company.retail.appservice.repo.JdbcApplicationRepository;
+import com.company.retail.appservice.repo.ApplicationRepository;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,12 +24,12 @@ import java.util.Map;
 @Service
 public class ApplicationService {
 
-    private final JdbcApplicationRepository applications;
+    private final ApplicationRepository applications;
     private final ApplicationIdempotencyStore idempotencyStore;
     private final OutboxPublisher outbox;
     private final Duration duplicateWindow;
 
-    public ApplicationService(JdbcApplicationRepository applications,
+    public ApplicationService(ApplicationRepository applications,
                               ApplicationIdempotencyStore idempotencyStore,
                               OutboxPublisher outbox,
                               @Value("${retail.application.duplicate-window-hours:72}") long duplicateWindowHours) {

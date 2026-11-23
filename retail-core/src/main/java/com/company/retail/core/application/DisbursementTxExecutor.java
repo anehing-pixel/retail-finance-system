@@ -4,8 +4,8 @@ import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.integration.BankPayAdapter;
-import com.company.retail.core.persistence.JdbcDisbursementRepository;
-import com.company.retail.core.persistence.JdbcLoanRepository;
+import com.company.retail.core.persistence.DisbursementRepository;
+import com.company.retail.core.persistence.LoanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +27,15 @@ public class DisbursementTxExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(DisbursementTxExecutor.class);
 
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcDisbursementRepository disbursementRepository;
+    private final LoanRepository loanRepository;
+    private final DisbursementRepository disbursementRepository;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
     /** 银行代付网关（W-SIM2 双模：挡板/HTTP，配置 retail.core.bank-pay-url）。 */
     private final BankPayAdapter bankPayAdapter;
 
-    public DisbursementTxExecutor(JdbcLoanRepository loanRepository,
-                                  JdbcDisbursementRepository disbursementRepository,
+    public DisbursementTxExecutor(LoanRepository loanRepository,
+                                  DisbursementRepository disbursementRepository,
                                   OutboxPublisher outbox,
                                   ObjectMapperHolder mapperHolder,
                                   BankPayAdapter bankPayAdapter) {

@@ -3,8 +3,8 @@ package com.company.retail.customer.app;
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.customer.domain.Consent;
-import com.company.retail.customer.repo.JdbcConsentRepository;
-import com.company.retail.customer.repo.JdbcPiiRepository;
+import com.company.retail.customer.repo.ConsentRepository;
+import com.company.retail.customer.repo.PiiRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +22,11 @@ import java.util.Map;
 @Service
 public class ConsentService {
 
-    private final JdbcConsentRepository consents;
-    private final JdbcPiiRepository piiRepository;
+    private final ConsentRepository consents;
+    private final PiiRepository piiRepository;
     private final OutboxPublisher outbox;
 
-    public ConsentService(JdbcConsentRepository consents, JdbcPiiRepository piiRepository,
+    public ConsentService(ConsentRepository consents, PiiRepository piiRepository,
                           OutboxPublisher outbox) {
         this.consents = consents;
         this.piiRepository = piiRepository;

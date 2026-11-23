@@ -4,7 +4,8 @@ import com.company.platform.exception.BusinessException;
 import com.company.platform.response.ApiResponse;
 import com.company.platform.security.SubjectType;
 import com.company.retail.auth.RolePermissions;
-import com.company.retail.auth.repository.JdbcStaffUserRepository;
+import com.company.retail.auth.repository.StaffUser;
+import com.company.retail.auth.repository.StaffUserRepository;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.common.security.JwtTokenVerifier;
 import com.company.retail.domain.exception.RFErrorCode;
@@ -34,14 +35,14 @@ import java.util.UUID;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final JdbcStaffUserRepository userRepository;
+    private final StaffUserRepository userRepository;
     private final BCryptPasswordEncoder encoder;
     private final JwtTokenVerifier staffSigner;
     private final JwtTokenVerifier customerSigner;
     private final long tokenHours;
     private final boolean customerDevLoginEnabled;
 
-    public AuthController(JdbcStaffUserRepository userRepository,
+    public AuthController(StaffUserRepository userRepository,
                           BCryptPasswordEncoder encoder,
                           JwtTokenVerifier staffTokenVerifier,
                           @Value("${retail.customer-auth.secret:dev-only-retail-customer-secret-change-me-in-prod-01234}")
@@ -60,9 +61,9 @@ public class AuthController {
     @PostMapping("/staff/login")
     public ApiResponse<Map<String, Object>> staffLogin(@RequestBody LoginRequest req) {
         // 用户不存在与密码错误同一出口（防枚举）
-        JdbcStaffUserRepository.StaffUser user = userRepository.findByUsername(req.username)
+        StaffUser user = userRepository.findByUsername(req.username)
                 .filter(u -> encoder.matches(req.password, u.passwordHash()))
-                .filter(JdbcStaffUserRepository.StaffUser::enabled)
+                .filter(StaffUser::enabled)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_AUTH_001,
                         Map.of("reason", "BAD_CREDENTIALS")));
 

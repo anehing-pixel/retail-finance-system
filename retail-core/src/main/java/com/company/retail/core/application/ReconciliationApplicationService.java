@@ -3,10 +3,10 @@ package com.company.retail.core.application;
 import com.company.platform.exception.BusinessException;
 import com.company.retail.core.domain.BalanceReconciliation;
 import com.company.retail.core.domain.Loan;
-import com.company.retail.core.persistence.JdbcLoanRepository;
-import com.company.retail.core.persistence.JdbcPaymentRepository;
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
-import com.company.retail.core.persistence.JdbcSettlementAdjustmentRepository;
+import com.company.retail.core.persistence.LoanRepository;
+import com.company.retail.core.persistence.PaymentRepository;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
+import com.company.retail.core.persistence.SettlementAdjustmentRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.stereotype.Service;
 
@@ -21,15 +21,15 @@ import java.util.Map;
 @Service
 public class ReconciliationApplicationService {
 
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcRepaymentPlanRepository planRepository;
-    private final JdbcPaymentRepository paymentRepository;
-    private final JdbcSettlementAdjustmentRepository adjustmentRepository;
+    private final LoanRepository loanRepository;
+    private final RepaymentPlanRepository planRepository;
+    private final PaymentRepository paymentRepository;
+    private final SettlementAdjustmentRepository adjustmentRepository;
 
-    public ReconciliationApplicationService(JdbcLoanRepository loanRepository,
-                                            JdbcRepaymentPlanRepository planRepository,
-                                            JdbcPaymentRepository paymentRepository,
-                                            JdbcSettlementAdjustmentRepository adjustmentRepository) {
+    public ReconciliationApplicationService(LoanRepository loanRepository,
+                                            RepaymentPlanRepository planRepository,
+                                            PaymentRepository paymentRepository,
+                                            SettlementAdjustmentRepository adjustmentRepository) {
         this.loanRepository = loanRepository;
         this.planRepository = planRepository;
         this.paymentRepository = paymentRepository;
@@ -42,8 +42,8 @@ public class ReconciliationApplicationService {
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "债权不存在", Map.of("loanId", String.valueOf(loanId))));
 
-        JdbcPaymentRepository.AllocationTotals alloc = paymentRepository.sumAllocationsByLoan(loanId);
-        JdbcSettlementAdjustmentRepository.AdjustmentTotals adj = adjustmentRepository.sumByLoan(loanId);
+        PaymentRepository.AllocationTotals alloc = paymentRepository.sumAllocationsByLoan(loanId);
+        SettlementAdjustmentRepository.AdjustmentTotals adj = adjustmentRepository.sumByLoan(loanId);
 
         // 义务面：Σ期次未清偿（amount_due − paid − waived）+ 费用未清偿
         long scheduleOutstanding = planRepository.findPlanIdByLoanId(loanId)

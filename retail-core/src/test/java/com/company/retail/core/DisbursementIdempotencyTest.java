@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DisbursementIdempotencyTest {
 
-    /** 内存幂等存储（挡板；生产实现 JdbcIdempotencyStore 由唯一索引兜底并发）。 */
+    /** 内存幂等存储（挡板；生产实现 MyBatisIdempotencyStore 由唯一索引兜底并发）。 */
     private static final class InMemoryIdempotencyStore implements com.company.platform.idempotency.IdempotencyStore {
         final Map<String, IdempotencyRecord> records = new HashMap<>();
         final Map<String, String> responses = new HashMap<>();

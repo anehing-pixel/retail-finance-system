@@ -9,8 +9,8 @@ import com.company.retail.contract.domain.ContractStatus;
 import com.company.retail.contract.domain.StatutoryDocument;
 import com.company.retail.contract.domain.TransactionScheme;
 import com.company.retail.contract.integration.HttpDeliveryChannelAdapter;
-import com.company.retail.contract.persistence.JdbcContractRepository;
-import com.company.retail.contract.persistence.JdbcStatutoryDocumentRepository;
+import com.company.retail.contract.persistence.ContractRepository;
+import com.company.retail.contract.persistence.StatutoryDocumentRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -37,8 +37,8 @@ public class ContractApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(ContractApplicationService.class);
 
-    private final JdbcContractRepository contractRepository;
-    private final JdbcStatutoryDocumentRepository documentRepository;
+    private final ContractRepository contractRepository;
+    private final StatutoryDocumentRepository documentRepository;
     private final ContractPolicy policy;
     private final OutboxPublisher outbox;
     private final ObjectMapper objectMapper;
@@ -46,8 +46,8 @@ public class ContractApplicationService {
     /** 送达通道（W-SIM2 双模：null=未配置，纯 DB 留痕 C-08）。 */
     private final HttpDeliveryChannelAdapter deliveryAdapter;
 
-    public ContractApplicationService(JdbcContractRepository contractRepository,
-                                      JdbcStatutoryDocumentRepository documentRepository,
+    public ContractApplicationService(ContractRepository contractRepository,
+                                      StatutoryDocumentRepository documentRepository,
                                       ContractPolicy policy,
                                       OutboxPublisher outbox,
                                       ObjectMapper objectMapper,

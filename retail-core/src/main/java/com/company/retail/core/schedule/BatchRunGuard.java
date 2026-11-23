@@ -1,9 +1,8 @@
 package com.company.retail.core.schedule;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.company.retail.core.mapper.BatchRunMapper;
 import org.springframework.stereotype.Component;
 
-import java.sql.Date;
 import java.time.LocalDate;
 
 /**
@@ -21,10 +20,10 @@ import java.time.LocalDate;
 @Component
 public class BatchRunGuard {
 
-    private final JdbcTemplate jdbc;
+    private final BatchRunMapper mapper;
 
-    public BatchRunGuard(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public BatchRunGuard(BatchRunMapper mapper) {
+        this.mapper = mapper;
     }
 
     /**
@@ -33,26 +32,12 @@ public class BatchRunGuard {
      * @return true = 抢占成功（调用方执行作业并负责落终态）；false = 已有 SUCCESS 或活跃 RUNNING，跳过
      */
     public boolean tryClaim(String jobName, LocalDate bizDate, String traceId, int staleMinutes) {
-        int claimed = jdbc.update(
-                "INSERT INTO core.batch_runs (job_name, biz_date, status, trace_id) "
-                        + "VALUES (?, ?, 'RUNNING', ?) "
-                        + "ON CONFLICT (job_name, biz_date) DO UPDATE "
-                        + "SET status = 'RUNNING', started_at = now(), finished_at = NULL, "
-                        + "    trace_id = EXCLUDED.trace_id "
-                        + "WHERE core.batch_runs.status = 'FAILED' "
-                        + "   OR (core.batch_runs.status = 'RUNNING' "
-                        + "       AND core.batch_runs.started_at < now() - make_interval(mins => ?))",
-                jobName, Date.valueOf(bizDate), traceId, staleMinutes);
+        int claimed = mapper.tryClaim(jobName, bizDate, traceId, staleMinutes);
         return claimed > 0;
     }
 
     /** 落终态（upsert：异常路径下 RUNNING 行可能已随事务回滚，insert 兜底留痕）。 */
     public void markFinished(String jobName, LocalDate bizDate, String status) {
-        jdbc.update(
-                "INSERT INTO core.batch_runs (job_name, biz_date, status, finished_at) "
-                        + "VALUES (?, ?, ?, now()) "
-                        + "ON CONFLICT (job_name, biz_date) DO UPDATE "
-                        + "SET status = EXCLUDED.status, finished_at = now()",
-                jobName, Date.valueOf(bizDate), status);
+        mapper.markFinished(jobName, bizDate, status);
     }
 }

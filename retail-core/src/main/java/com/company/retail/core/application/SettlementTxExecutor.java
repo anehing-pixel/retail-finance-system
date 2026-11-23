@@ -5,10 +5,10 @@ import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.domain.ScheduleItemStatus;
 import com.company.retail.core.domain.SettlementCalculator;
-import com.company.retail.core.persistence.JdbcLoanRepository;
-import com.company.retail.core.persistence.JdbcPaymentRepository;
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
-import com.company.retail.core.persistence.JdbcSettlementAdjustmentRepository;
+import com.company.retail.core.persistence.LoanRepository;
+import com.company.retail.core.persistence.PaymentRepository;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
+import com.company.retail.core.persistence.SettlementAdjustmentRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,18 +35,18 @@ public class SettlementTxExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(SettlementTxExecutor.class);
 
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcRepaymentPlanRepository planRepository;
-    private final JdbcPaymentRepository paymentRepository;
-    private final JdbcSettlementAdjustmentRepository adjustmentRepository;
+    private final LoanRepository loanRepository;
+    private final RepaymentPlanRepository planRepository;
+    private final PaymentRepository paymentRepository;
+    private final SettlementAdjustmentRepository adjustmentRepository;
     private final ReconciliationApplicationService reconciliation;
     private final OutboxPublisher outbox;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
 
-    public SettlementTxExecutor(JdbcLoanRepository loanRepository,
-                                JdbcRepaymentPlanRepository planRepository,
-                                JdbcPaymentRepository paymentRepository,
-                                JdbcSettlementAdjustmentRepository adjustmentRepository,
+    public SettlementTxExecutor(LoanRepository loanRepository,
+                                RepaymentPlanRepository planRepository,
+                                PaymentRepository paymentRepository,
+                                SettlementAdjustmentRepository adjustmentRepository,
                                 ReconciliationApplicationService reconciliation,
                                 OutboxPublisher outbox,
                                 DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
@@ -78,13 +78,13 @@ public class SettlementTxExecutor {
             loan.settle(false, settledAt);
         } else {
             // 提前结清（C-10）：剩余本金 − 减免额 + 手续费
-            List<JdbcRepaymentPlanRepository.ItemRow> unpaidRows = loadUnpaidRows(request.loanId());
+            List<RepaymentPlanRepository.ItemRow> unpaidRows = loadUnpaidRows(request.loanId());
             List<SettlementCalculator.SettleableItem> items = new ArrayList<>();
-            for (JdbcRepaymentPlanRepository.ItemRow row : unpaidRows) {
+            for (RepaymentPlanRepository.ItemRow row : unpaidRows) {
                 items.add(new SettlementCalculator.SettleableItem(row.itemId(), row.periodNo(),
                         row.interestDue(), row.principalDue(), row.paidInterest(), row.paidPrincipal()));
             }
-            JdbcPaymentRepository.AllocationTotals allocTotals =
+            PaymentRepository.AllocationTotals allocTotals =
                     paymentRepository.sumAllocationsByLoan(request.loanId());
             long feeOutstanding = loan.feeAmount() - allocTotals.feeTotal();
 
@@ -144,7 +144,7 @@ public class SettlementTxExecutor {
     }
 
     private void assertNoUnpaidItems(long loanId) {
-        List<JdbcRepaymentPlanRepository.ItemRow> rows = unpaidRows(loanId);
+        List<RepaymentPlanRepository.ItemRow> rows = unpaidRows(loanId);
         long unpaid = rows.stream()
                 .mapToLong(r -> r.amountDue() - r.paidAmount() - r.waivedAmount())
                 .sum();
@@ -159,8 +159,8 @@ public class SettlementTxExecutor {
         }
     }
 
-    private List<JdbcRepaymentPlanRepository.ItemRow> loadUnpaidRows(long loanId) {
-        List<JdbcRepaymentPlanRepository.ItemRow> rows = unpaidRows(loanId);
+    private List<RepaymentPlanRepository.ItemRow> loadUnpaidRows(long loanId) {
+        List<RepaymentPlanRepository.ItemRow> rows = unpaidRows(loanId);
         if (rows.isEmpty()) {
             throw new BusinessException(RFErrorCode.RF_VALID_002,
                     "无未清偿期次，应走全部结清（NORMAL）而非提前结清");
@@ -168,13 +168,13 @@ public class SettlementTxExecutor {
         return rows;
     }
 
-    private List<JdbcRepaymentPlanRepository.ItemRow> unpaidRows(long loanId) {
+    private List<RepaymentPlanRepository.ItemRow> unpaidRows(long loanId) {
         Long planId = planRepository.findPlanIdByLoanId(loanId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_002,
                         "债权尚无还款计划，无法结清", Map.of("loanId", String.valueOf(loanId))));
-        List<JdbcRepaymentPlanRepository.ItemRow> rows = planRepository.findItemRows(planId);
-        List<JdbcRepaymentPlanRepository.ItemRow> unpaid = new ArrayList<>();
-        for (JdbcRepaymentPlanRepository.ItemRow row : rows) {
+        List<RepaymentPlanRepository.ItemRow> rows = planRepository.findItemRows(planId);
+        List<RepaymentPlanRepository.ItemRow> unpaid = new ArrayList<>();
+        for (RepaymentPlanRepository.ItemRow row : rows) {
             ScheduleItemStatus st = ScheduleItemStatus.valueOf(row.status());
             if (!st.isTerminal() && row.amountDue() - row.paidAmount() - row.waivedAmount() > 0) {
                 unpaid.add(row);
@@ -183,11 +183,11 @@ public class SettlementTxExecutor {
         return unpaid;
     }
 
-    private void closeItems(List<JdbcRepaymentPlanRepository.ItemRow> rows,
+    private void closeItems(List<RepaymentPlanRepository.ItemRow> rows,
                             SettlementCalculator.ClosurePlan closure) {
         Map<Long, SettlementCalculator.ItemClosure> byItem = new LinkedHashMap<>();
         closure.items().forEach(c -> byItem.put(c.itemId(), c));
-        for (JdbcRepaymentPlanRepository.ItemRow row : rows) {
+        for (RepaymentPlanRepository.ItemRow row : rows) {
             SettlementCalculator.ItemClosure c = byItem.get(row.itemId());
             if (c == null) {
                 continue;

@@ -4,9 +4,9 @@ import com.company.platform.event.DomainEvent;
 import com.company.platform.event.EventConsumer;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.underwriting.integration.HttpDmsOutboundAdapter;
+import com.company.retail.underwriting.mapper.OutboundTaskMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Set;
 
@@ -25,11 +25,12 @@ public class DmsResultNotificationConsumer implements EventConsumer {
     public static final String CONSUMER_NAME = "underwriting-service-dms";
 
     private final HttpDmsOutboundAdapter adapter;
-    private final JdbcTemplate jdbc;
+    private final OutboundTaskMapper outboundTaskMapper;
 
-    public DmsResultNotificationConsumer(HttpDmsOutboundAdapter adapter, JdbcTemplate jdbc) {
+    public DmsResultNotificationConsumer(HttpDmsOutboundAdapter adapter,
+                                         OutboundTaskMapper outboundTaskMapper) {
         this.adapter = adapter;
-        this.jdbc = jdbc;
+        this.outboundTaskMapper = outboundTaskMapper;
     }
 
     @Override
@@ -58,11 +59,7 @@ public class DmsResultNotificationConsumer implements EventConsumer {
                 decision, event.textField("reasonCode"), event.textField("traceId"));
         if (dmsRef == null) {
             // 咨询性副本推送失败：落 outbound_tasks 人工补发，不阻断事件流（R09 §5.4 例外声明）
-            jdbc.update("""
-                    INSERT INTO integration.outbound_tasks
-                        (partner_id, task_type, payload_ref, status, retry_count, trace_id)
-                    VALUES (0, 'DMS_RESULT_NOTIFY', ?, 'PENDING', 0, ?)
-                    """, String.valueOf(caseId), event.textField("traceId"));
+            outboundTaskMapper.insertPending(String.valueOf(caseId), event.textField("traceId"));
             log.warn("DMS 结果通知失败，已落 outbound_tasks 人工补发 caseId={} decision={}", caseId, decision);
             return;
         }

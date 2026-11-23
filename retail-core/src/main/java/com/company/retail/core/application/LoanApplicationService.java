@@ -2,7 +2,7 @@ package com.company.retail.core.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.core.domain.Loan;
-import com.company.retail.core.persistence.JdbcLoanRepository;
+import com.company.retail.core.persistence.LoanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -17,9 +17,9 @@ import java.util.Map;
 @Service
 public class LoanApplicationService {
 
-    private final JdbcLoanRepository loanRepository;
+    private final LoanRepository loanRepository;
 
-    public LoanApplicationService(JdbcLoanRepository loanRepository) {
+    public LoanApplicationService(LoanRepository loanRepository) {
         this.loanRepository = loanRepository;
     }
 
@@ -65,7 +65,7 @@ public class LoanApplicationService {
 
     private static LoanView view(Loan loan) {
         return new LoanView(loan.loanId(), loan.contractId(),
-                JdbcLoanRepository.loanNoOf(loan.contractId()), loan.status().name(),
+                LoanRepository.loanNoOf(loan.contractId()), loan.status().name(),
                 loan.principal(), loan.feeAmount(), loan.balance(), loan.disbursedAt(), loan.version());
     }
 

@@ -1,7 +1,7 @@
 package com.company.retail.customer.app;
 
-import com.company.retail.customer.repo.JdbcPiiAccessLogRepository;
-import com.company.retail.customer.repo.JdbcPiiRepository;
+import com.company.retail.customer.repo.PiiAccessLogRepository;
+import com.company.retail.customer.repo.PiiRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +15,10 @@ import java.util.Map;
 @Service
 public class CustomerPiiService {
 
-    private final JdbcPiiRepository piiRepository;
-    private final JdbcPiiAccessLogRepository accessLogs;
+    private final PiiRepository piiRepository;
+    private final PiiAccessLogRepository accessLogs;
 
-    public CustomerPiiService(JdbcPiiRepository piiRepository, JdbcPiiAccessLogRepository accessLogs) {
+    public CustomerPiiService(PiiRepository piiRepository, PiiAccessLogRepository accessLogs) {
         this.piiRepository = piiRepository;
         this.accessLogs = accessLogs;
     }
@@ -35,7 +35,7 @@ public class CustomerPiiService {
     public java.util.Map<String, String> maskedView(long customerId, String actor, String actorSubject,
                                                     String purpose, String traceId) {
         java.util.Map<String, String> masked = piiRepository.loadDecrypted(customerId)
-                .map(JdbcPiiRepository::maskedFields)
+                .map(PiiRepository::maskedFields)
                 .orElseThrow(() -> new com.company.platform.exception.BusinessException(
                         com.company.retail.domain.exception.RFErrorCode.RF_VALID_001,
                         Map.of("reason", "客户不存在", "customerId", String.valueOf(customerId))));

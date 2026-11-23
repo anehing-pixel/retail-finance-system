@@ -4,8 +4,8 @@ import com.company.platform.exception.BusinessException;
 import com.company.retail.core.domain.RepaymentMethod;
 import com.company.retail.core.domain.RepaymentScheduleGenerator;
 import com.company.retail.core.domain.ScheduleItem;
-import com.company.retail.core.persistence.JdbcLoanRepository;
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
+import com.company.retail.core.persistence.LoanRepository;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +20,11 @@ import java.util.List;
 @Service
 public class RepaymentPlanApplicationService {
 
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcRepaymentPlanRepository planRepository;
+    private final LoanRepository loanRepository;
+    private final RepaymentPlanRepository planRepository;
 
-    public RepaymentPlanApplicationService(JdbcLoanRepository loanRepository,
-                                           JdbcRepaymentPlanRepository planRepository) {
+    public RepaymentPlanApplicationService(LoanRepository loanRepository,
+                                           RepaymentPlanRepository planRepository) {
         this.loanRepository = loanRepository;
         this.planRepository = planRepository;
     }

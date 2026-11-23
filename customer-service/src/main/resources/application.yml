@@ -23,6 +23,11 @@ spring:
         server-addr: ${NACOS_ADDR:localhost:8848}
         fail-fast: false
 
+mybatis:
+  configuration:
+    # 一级缓存降为 STATEMENT 级：与原 JdbcTemplate「每次读都落库」的读语义对齐，
+    # 避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存的旧行
+    local-cache-scope: STATEMENT
 retail:
   kyc:
     # eKYC 供应商双模（W-SIM2，P-12 形状冻结）：空=纯人工 MANUAL（C-07），非空=HTTP 对端

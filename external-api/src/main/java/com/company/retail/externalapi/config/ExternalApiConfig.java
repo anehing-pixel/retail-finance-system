@@ -1,20 +1,21 @@
 package com.company.retail.externalapi.config;
 
 import com.company.retail.common.config.TraceIdFilter;
+import com.company.retail.externalapi.mapper.PartnerMapper;
 import com.company.retail.externalapi.security.CallLogStore;
 import com.company.retail.externalapi.security.ConfigPartnerDirectory;
 import com.company.retail.externalapi.security.DmzGatekeeper;
-import com.company.retail.externalapi.security.JdbcCallLogStore;
-import com.company.retail.externalapi.security.JdbcNonceStore;
-import com.company.retail.externalapi.security.JdbcPartnerDirectory;
+import com.company.retail.externalapi.security.MyBatisCallLogStore;
+import com.company.retail.externalapi.security.MyBatisNonceStore;
+import com.company.retail.externalapi.security.MyBatisPartnerDirectory;
 import com.company.retail.externalapi.security.NonceStore;
 import com.company.retail.externalapi.security.PartnerDirectory;
 import com.company.retail.externalapi.security.PartnerRegistry;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Clock;
 
@@ -27,6 +28,7 @@ import java.time.Clock;
  * {@code integration.*} 表。</p>
  */
 @Configuration
+@MapperScan("com.company.retail.externalapi.mapper")
 @EnableConfigurationProperties({DmzProperties.class, PartnerProperties.class})
 public class ExternalApiConfig {
 
@@ -45,9 +47,9 @@ public class ExternalApiConfig {
 
     @Bean
     public PartnerDirectory partnerDirectory(DmzProperties dmz, PartnerProperties partners,
-                                             JdbcTemplate jdbc) {
+                                             PartnerMapper partnerMapper) {
         return "DB".equalsIgnoreCase(dmz.getRegistryMode())
-                ? new JdbcPartnerDirectory(jdbc)
+                ? new MyBatisPartnerDirectory(partnerMapper)
                 : new ConfigPartnerDirectory(partners);
     }
 

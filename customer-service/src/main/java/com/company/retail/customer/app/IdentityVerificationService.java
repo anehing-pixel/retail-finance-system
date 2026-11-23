@@ -5,8 +5,8 @@ import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.customer.domain.IdentityVerification;
 import com.company.retail.customer.domain.IdentityVerificationStatus;
 import com.company.retail.customer.integration.KycProvider;
-import com.company.retail.customer.repo.JdbcIdentityVerificationRepository;
-import com.company.retail.customer.repo.JdbcPiiRepository;
+import com.company.retail.customer.repo.IdentityVerificationRepository;
+import com.company.retail.customer.repo.PiiRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,14 +24,14 @@ import java.util.Map;
 @Service
 public class IdentityVerificationService {
 
-    private final JdbcIdentityVerificationRepository verifications;
-    private final JdbcPiiRepository piiRepository;
+    private final IdentityVerificationRepository verifications;
+    private final PiiRepository piiRepository;
     private final OutboxPublisher outbox;
     /** eKYC 供应商（W-SIM2 双模：null=未配置，纯人工 MANUAL）。 */
     private final KycProvider kycProvider;
 
-    public IdentityVerificationService(JdbcIdentityVerificationRepository verifications,
-                                       JdbcPiiRepository piiRepository,
+    public IdentityVerificationService(IdentityVerificationRepository verifications,
+                                       PiiRepository piiRepository,
                                        OutboxPublisher outbox,
                                        org.springframework.beans.factory.ObjectProvider<KycProvider> kycProvider) {
         this.verifications = verifications;

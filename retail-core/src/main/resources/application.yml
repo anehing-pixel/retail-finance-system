@@ -25,6 +25,11 @@ spring:
         server-addr: ${NACOS_ADDR:localhost:8848}
         fail-fast: false
 
+mybatis:
+  configuration:
+    # 一级缓存降为 STATEMENT 级：与原 JdbcTemplate「每次读都落库」的读语义对齐，
+    # 避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存的旧行
+    local-cache-scope: STATEMENT
 retail:
   core:
     # 银行代付网关双模（W-SIM2，P-09）：空=挡板（同步假成功），非空=HTTP 对端（机构模拟器/真实银行）

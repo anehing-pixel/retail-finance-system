@@ -10,29 +10,38 @@ import com.company.retail.underwriting.application.UnderwritingCaseRepository;
 import com.company.retail.underwriting.application.UnderwritingGateProvider;
 import com.company.retail.underwriting.domain.AffordabilityPolicy;
 import com.company.retail.underwriting.domain.StubAffordabilityPolicy;
-import com.company.retail.underwriting.infrastructure.JdbcAffordabilityAssessmentRepository;
-import com.company.retail.underwriting.infrastructure.JdbcUnderwritingCaseRepository;
 import com.company.retail.underwriting.integration.HttpDmsOutboundAdapter;
+import com.company.retail.underwriting.mapper.AffordabilityAssessmentMapper;
+import com.company.retail.underwriting.mapper.OutboundTaskMapper;
+import com.company.retail.underwriting.mapper.UnderwritingCaseMapper;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 审查域精确装配（R02 §3.1 范式 1）：只按「类」装配本服务 bean，
  * 共享四层模块的 bean（outbox/鉴权）由 Application 的 @Import 提供。
  */
 @Configuration
+@MapperScan("com.company.retail.underwriting.mapper")
 public class UnderwritingServiceConfig {
 
+    /**
+     * 审查案件仓储（MyBatis 实现）。
+     *
+     * <p>实现类与端口同名（去 Jdbc 前缀），故此处以全限定名引用实现类，避免同编译单元同名冲突。</p>
+     */
     @Bean
-    public UnderwritingCaseRepository underwritingCaseRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcUnderwritingCaseRepository(jdbcTemplate);
+    public UnderwritingCaseRepository underwritingCaseRepository(UnderwritingCaseMapper mapper) {
+        return new com.company.retail.underwriting.infrastructure.UnderwritingCaseRepository(mapper);
     }
 
+    /** 支付能力评估快照仓储（MyBatis 实现）。 */
     @Bean
-    public AffordabilityAssessmentRepository affordabilityAssessmentRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcAffordabilityAssessmentRepository(jdbcTemplate);
+    public AffordabilityAssessmentRepository affordabilityAssessmentRepository(
+            AffordabilityAssessmentMapper mapper) {
+        return new com.company.retail.underwriting.infrastructure.AffordabilityAssessmentRepository(mapper);
     }
 
     /** 策略点开关（C-03 挡板）：retail.underwriting.affordability.enabled，默认开。 */
@@ -76,9 +85,9 @@ public class UnderwritingServiceConfig {
     @Bean
     public DmsResultNotificationConsumer dmsResultNotificationConsumer(
             @Value("${retail.dms.outbound-url:}") String outboundUrl,
-            JdbcTemplate jdbcTemplate) {
+            OutboundTaskMapper outboundTaskMapper) {
         HttpDmsOutboundAdapter adapter = (outboundUrl == null || outboundUrl.isBlank())
                 ? null : new HttpDmsOutboundAdapter(outboundUrl);
-        return new DmsResultNotificationConsumer(adapter, jdbcTemplate);
+        return new DmsResultNotificationConsumer(adapter, outboundTaskMapper);
     }
 }

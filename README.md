@@ -58,7 +58,7 @@
 | 语言 / 构建 | Java 17 / Maven 3.9.x | 父工程 `pom` 打包，多模块 |
 | 框架 | Spring Boot 3.2.5 · Spring Cloud 2023.0.5 · Spring Cloud Alibaba 2023.0.3.3 | BOM 顺序沿用 floorplan（spring-framework-bom 6.1.15 在 boot-dependencies 之前） |
 | 网关 | Spring Cloud Gateway（WebFlux） | `${ROUTE_*:lb://服务名}` 双模 URI，本地无 Nacos 时用环境变量覆盖直连 |
-| 持久化 | PostgreSQL 16 + Flyway + JdbcTemplate | 无 JPA / 无 MyBatis；枚举与字符串转换放 RowMapper |
+| 持久化 | PostgreSQL 16 + Flyway + MyBatis（注解 SQL，无 XML） | 无 JPA；SQL / 索引 / 锁语义完全可控，行映射统一走共享 `RowValues` |
 | 领域分层 | `domain` / `application` / `infrastructure` / `common` | `domain` 零 Spring 依赖、可纯单测；事务边界只在 application |
 | 服务装配 | 精确装配 | 每服务只扫自身包 + `@Import` 按类注入，不做全包扫描 |
 | 事务一致性 | 本地事务 + 行锁 + 唯一约束；Transactional Outbox（数据库轮询） | **不引入 MQ / Seata / 分布式事务** |
@@ -97,7 +97,7 @@ flowchart TB
     BANK[银行 / 代收机构]
     GOV[车辆登记机关]
   end
-  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流"]
+  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（未实现）"]
   DMZ["external-api :18091<br/>DMZ：验签 · 签名 · nonce · partner scope"]
   CORE["retail-core :8090<br/>核心账务（不拆）<br/>债权·还款计划·代付·入金核销·结清"]
   SVC["auth :8091 · customer(PII) :8092 · application :8093<br/>underwriting :8094 · bureau :8095 · contract :8096<br/>title-release :8097 · servicing :8098 · recon :8099"]
@@ -122,7 +122,7 @@ flowchart TB
 
 | 服务 | 端口 | 职责 |
 |---|---|---|
-| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`、限流 |
+| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流为设计口径，尚未实现**（网关当前只有 `RequestIdFilter` + 启动类） |
 | `external-api` | 18091 | DMZ：DMS / 征信机构 / 支付回调的入站验签、出站签名、nonce、partner scope |
 | `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**唯一跑 Flyway** |
 | `auth-service` | 8091 | 员工侧 + 客户侧双主体 JWT 签发/验签 |

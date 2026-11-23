@@ -3,6 +3,7 @@ package com.company.retail.customer.config;
 import com.company.retail.customer.infra.PiiCryptoService;
 import com.company.retail.customer.integration.HttpKycProvider;
 import com.company.retail.customer.integration.KycProvider;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * + eKYC 供应商双模（W-SIM2：provider-url 空=无 bean，服务走纯人工 MANUAL）。
  */
 @Configuration
+@MapperScan("com.company.retail.customer.mapper")
 public class CustomerBeansConfig {
 
     @Bean

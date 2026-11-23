@@ -4,10 +4,10 @@ import com.company.platform.exception.BusinessException;
 import com.company.platform.idempotency.IdempotencyGuard;
 import com.company.platform.idempotency.IdempotencyRecord;
 import com.company.retail.core.domain.SettlementCalculator;
-import com.company.retail.core.persistence.JdbcIdempotencyStore;
-import com.company.retail.core.persistence.JdbcLoanRepository;
-import com.company.retail.core.persistence.JdbcPaymentRepository;
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
+import com.company.retail.core.persistence.MyBatisIdempotencyStore;
+import com.company.retail.core.persistence.LoanRepository;
+import com.company.retail.core.persistence.PaymentRepository;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.springframework.stereotype.Service;
 
@@ -31,18 +31,18 @@ public class SettlementApplicationService {
     private static final Set<String> TYPES = Set.of("NORMAL", "EARLY");
 
     private final SettlementTxExecutor txExecutor;
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcRepaymentPlanRepository planRepository;
-    private final JdbcPaymentRepository paymentRepository;
-    private final JdbcIdempotencyStore idempotencyStore;
+    private final LoanRepository loanRepository;
+    private final RepaymentPlanRepository planRepository;
+    private final PaymentRepository paymentRepository;
+    private final MyBatisIdempotencyStore idempotencyStore;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
     private final Clock clock;
 
     public SettlementApplicationService(SettlementTxExecutor txExecutor,
-                                        JdbcLoanRepository loanRepository,
-                                        JdbcRepaymentPlanRepository planRepository,
-                                        JdbcPaymentRepository paymentRepository,
-                                        JdbcIdempotencyStore idempotencyStore,
+                                        LoanRepository loanRepository,
+                                        RepaymentPlanRepository planRepository,
+                                        PaymentRepository paymentRepository,
+                                        MyBatisIdempotencyStore idempotencyStore,
                                         DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
         this.txExecutor = txExecutor;
         this.loanRepository = loanRepository;
@@ -59,7 +59,7 @@ public class SettlementApplicationService {
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "债权不存在", Map.of("loanId", String.valueOf(loanId))));
         List<SettlementCalculator.SettleableItem> items = settleableItems(loanId);
-        JdbcPaymentRepository.AllocationTotals allocTotals = paymentRepository.sumAllocationsByLoan(loanId);
+        PaymentRepository.AllocationTotals allocTotals = paymentRepository.sumAllocationsByLoan(loanId);
         long feeOutstanding = loan.feeAmount() - allocTotals.feeTotal();
         long remainingPrincipal = items.stream()
                 .mapToLong(SettlementCalculator.SettleableItem::unpaidPrincipal).sum();
@@ -94,7 +94,7 @@ public class SettlementApplicationService {
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_002,
                         "债权尚无还款计划，无法结清", Map.of("loanId", String.valueOf(loanId))));
         List<SettlementCalculator.SettleableItem> items = new ArrayList<>();
-        for (JdbcRepaymentPlanRepository.ItemRow row : planRepository.findItemRows(planId)) {
+        for (RepaymentPlanRepository.ItemRow row : planRepository.findItemRows(planId)) {
             long unpaid = row.amountDue() - row.paidAmount() - row.waivedAmount();
             if (unpaid > 0) {
                 items.add(new SettlementCalculator.SettleableItem(row.itemId(), row.periodNo(),

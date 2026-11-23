@@ -22,20 +22,22 @@ import com.company.retail.bureau.acl.JiccStubAdapter;
 import com.company.retail.bureau.domain.CreditBureau;
 import com.company.retail.bureau.domain.CreditBureauReportingPolicy;
 import com.company.retail.bureau.domain.DefaultCreditBureauReportingPolicy;
-import com.company.retail.bureau.infrastructure.JdbcBureauBatchRunRepository;
-import com.company.retail.bureau.infrastructure.JdbcBureauDisputeRepository;
-import com.company.retail.bureau.infrastructure.JdbcBureauMessageLogRepository;
-import com.company.retail.bureau.infrastructure.JdbcBureauReportRepository;
-import com.company.retail.bureau.infrastructure.JdbcBureauTriggerRepository;
-import com.company.retail.bureau.infrastructure.JdbcCreditInquiryRepository;
-import com.company.retail.bureau.infrastructure.JdbcSettlementConsentAnchor;
+import com.company.retail.bureau.infrastructure.MyBatisBureauBatchRunRepository;
+import com.company.retail.bureau.mapper.BureauBatchRunMapper;
+import com.company.retail.bureau.mapper.BureauDisputeMapper;
+import com.company.retail.bureau.mapper.BureauMessageLogMapper;
+import com.company.retail.bureau.mapper.BureauReportMapper;
+import com.company.retail.bureau.mapper.BureauTriggerMapper;
+import com.company.retail.bureau.mapper.CreditInquiryMapper;
+import com.company.retail.bureau.mapper.SettlementConsentAnchorMapper;
 import com.company.retail.common.contract.ConsentGateFacade;
 import com.company.retail.common.contract.OutboxPublisher;
-import com.company.retail.infrastructure.persistence.JdbcBusinessCalendar;
+import com.company.retail.infrastructure.mapper.BusinessCalendarMapper;
+import com.company.retail.infrastructure.persistence.MyBatisBusinessCalendar;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -46,50 +48,60 @@ import java.util.stream.Collectors;
  * 征信防腐层精确装配（ADR-RF-005；挡板适配器 + C-05 裁决值策略点 + fail-closed 同意门禁）。
  */
 @Configuration
+@MapperScan("com.company.retail.bureau.mapper")
 public class BureauServiceConfig {
 
+    /**
+     * 征信查询留痕（MyBatis）。
+     *
+     * <p>实现类与端口同名（{@code CreditInquiryRepository}）：端口走 import，
+     * 实现类走全限定名，避免同一文件内同名类型冲突。</p>
+     */
     @Bean
-    public CreditInquiryRepository creditInquiryRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcCreditInquiryRepository(jdbcTemplate);
+    public CreditInquiryRepository creditInquiryRepository(CreditInquiryMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.CreditInquiryRepository(mapper);
     }
 
+    /** 报送留痕（uk_report_loan_trigger 幂等兜底；MyBatis）。 */
     @Bean
-    public BureauReportRepository bureauReportRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcBureauReportRepository(jdbcTemplate);
+    public BureauReportRepository bureauReportRepository(BureauReportMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.BureauReportRepository(mapper);
     }
 
+    /** 异议工单留痕（SLA 30 日 due_at，C-05；MyBatis）。 */
     @Bean
-    public BureauDisputeRepository bureauDisputeRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcBureauDisputeRepository(jdbcTemplate);
+    public BureauDisputeRepository bureauDisputeRepository(BureauDisputeMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.BureauDisputeRepository(mapper);
     }
 
+    /** 机构报文留痕（append-only；MyBatis）。 */
     @Bean
-    public BureauMessageLogRepository bureauMessageLogRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcBureauMessageLogRepository(jdbcTemplate);
+    public BureauMessageLogRepository bureauMessageLogRepository(BureauMessageLogMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.BureauMessageLogRepository(mapper);
     }
 
     /** 触发登记读取/状态推进（core.bureau_report_triggers 只读投影 + CONSUMED/BLOCKED 推进）。 */
     @Bean
-    public BureauTriggerPort bureauTriggerPort(JdbcTemplate jdbcTemplate) {
-        return new JdbcBureauTriggerRepository(jdbcTemplate);
+    public BureauTriggerPort bureauTriggerPort(BureauTriggerMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.BureauTriggerRepository(mapper);
     }
 
     /** 结清报送同意锚点解析（loans → contracts → underwriting_cases，跨域只读）。 */
     @Bean
-    public SettlementConsentAnchorPort settlementConsentAnchorPort(JdbcTemplate jdbcTemplate) {
-        return new JdbcSettlementConsentAnchor(jdbcTemplate);
+    public SettlementConsentAnchorPort settlementConsentAnchorPort(SettlementConsentAnchorMapper mapper) {
+        return new com.company.retail.bureau.infrastructure.SettlementConsentAnchor(mapper);
     }
 
     /** 批处理留痕（core.batch_runs；uk_batch_job_date 同日重跑复用同一行）。 */
     @Bean
-    public BureauBatchRunPort bureauBatchRunPort(JdbcTemplate jdbcTemplate) {
-        return new JdbcBureauBatchRunRepository(jdbcTemplate);
+    public BureauBatchRunPort bureauBatchRunPort(BureauBatchRunMapper mapper) {
+        return new MyBatisBureauBatchRunRepository(mapper);
     }
 
     /** 营业日历（core.holidays；报送日批的 T+1 营业日判定）。 */
     @Bean
-    public BusinessCalendar bureauBusinessCalendar(JdbcTemplate jdbcTemplate) {
-        return new JdbcBusinessCalendar(jdbcTemplate);
+    public BusinessCalendar bureauBusinessCalendar(BusinessCalendarMapper mapper) {
+        return new MyBatisBusinessCalendar(mapper);
     }
 
     /**

@@ -9,8 +9,8 @@ import com.company.retail.titlerelease.domain.ReleaseOrder;
 import com.company.retail.titlerelease.domain.ReleaseOrderStatus;
 import com.company.retail.titlerelease.domain.TitleRetention;
 import com.company.retail.titlerelease.domain.TitleRetentionStatus;
-import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
-import com.company.retail.titlerelease.persistence.JdbcReleaseOrderRepository;
+import com.company.retail.titlerelease.persistence.AttachmentRepository;
+import com.company.retail.titlerelease.persistence.ReleaseOrderRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +40,15 @@ public class TitleReleaseApplicationService {
     private static final Logger log = LoggerFactory.getLogger(TitleReleaseApplicationService.class);
 
     private final TitleRepositoryPort titleRepository;
-    private final JdbcReleaseOrderRepository orderRepository;
-    private final JdbcAttachmentRepository attachmentRepository;
+    private final ReleaseOrderRepository orderRepository;
+    private final AttachmentRepository attachmentRepository;
     private final LocalStorageAttachmentStorage attachmentStorage;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
 
     public TitleReleaseApplicationService(TitleRepositoryPort titleRepository,
-                                          JdbcReleaseOrderRepository orderRepository,
-                                          JdbcAttachmentRepository attachmentRepository,
+                                          ReleaseOrderRepository orderRepository,
+                                          AttachmentRepository attachmentRepository,
                                           LocalStorageAttachmentStorage attachmentStorage,
                                           OutboxPublisher outbox,
                                           ObjectMapperHolder mapperHolder) {
@@ -246,7 +246,7 @@ public class TitleReleaseApplicationService {
         long orderId = orderRepository.insert(loanId, titleId, source, settledEventId, null);
         if (orderId == -1) {
             // uk_release_loan 命中：重复消费/重复建单 → 返回既有订单（幂等）
-            JdbcReleaseOrderRepository.OrderRow existing = orderRepository.findByLoanId(loanId)
+            ReleaseOrderRepository.OrderRow existing = orderRepository.findByLoanId(loanId)
                     .orElseThrow();
             return toView(existing);
         }
@@ -289,7 +289,7 @@ public class TitleReleaseApplicationService {
     @Transactional
     public ReleaseOrderView issueDocuments(long releaseOrderId, String traceId) {
         ReleaseOrder order = loadOrder(releaseOrderId);
-        List<JdbcReleaseOrderRepository.DocumentRow> docs = orderRepository.findDocuments(releaseOrderId);
+        List<ReleaseOrderRepository.DocumentRow> docs = orderRepository.findDocuments(releaseOrderId);
         if (docs.size() < 4 || countDistinctTypes(releaseOrderId) != 4) {
             throw new BusinessException(RFErrorCode.RF_VALID_002,
                     "解除文件四件套未备齐，不得発行（R05 §6 第 3→4 步）");
@@ -326,9 +326,9 @@ public class TitleReleaseApplicationService {
      * 文件内容为文本版解押凭证（阶段实现），只含订单/债权标识与状态，不含客户 PII。</p>
      */
     private void storeReleaseDocuments(long releaseOrderId,
-                                       List<JdbcReleaseOrderRepository.DocumentRow> docs,
+                                       List<ReleaseOrderRepository.DocumentRow> docs,
                                        String traceId) {
-        for (JdbcReleaseOrderRepository.DocumentRow doc : docs) {
+        for (ReleaseOrderRepository.DocumentRow doc : docs) {
             if (doc.attachmentId() != null) {
                 continue;
             }
@@ -347,7 +347,7 @@ public class TitleReleaseApplicationService {
 
     /** 文本版解押文件渲染（不含客户 PII：只有订单/债权标识、状态、交付留痕）。 */
     private static byte[] renderReleaseDocument(long releaseOrderId,
-                                                JdbcReleaseOrderRepository.DocumentRow doc,
+                                                ReleaseOrderRepository.DocumentRow doc,
                                                 String traceId) {
         String body = "RELEASE DOCUMENT\n"
                 + "docType=" + doc.docType() + "\n"
@@ -455,7 +455,7 @@ public class TitleReleaseApplicationService {
 
     public EvidenceChainView evidenceChain(long releaseOrderId) {
         ReleaseOrder order = loadOrder(releaseOrderId);
-        List<JdbcReleaseOrderRepository.DocumentRow> docs = orderRepository.findDocuments(releaseOrderId);
+        List<ReleaseOrderRepository.DocumentRow> docs = orderRepository.findDocuments(releaseOrderId);
         boolean externalReceipt = orderRepository.hasExternalReceipt(releaseOrderId);
 
         boolean loanTerminal = "EVENT".equals(order.source()) || order.loanSettledEventId() != null
@@ -464,7 +464,7 @@ public class TitleReleaseApplicationService {
                 loanTerminal,
                 loanTerminal,                       // ② 结清对拍由 retail-core G10 守卫（挡板同源）
                 true,                               // ③ 无未决异议（W6 挡板：bureau_disputes 归 W7）
-                (int) docs.stream().map(JdbcReleaseOrderRepository.DocumentRow::docType).distinct().count(),
+                (int) docs.stream().map(ReleaseOrderRepository.DocumentRow::docType).distinct().count(),
                 docs.size() >= 4 && docs.stream().allMatch(d -> d.deliveredTo() != null
                         && !d.deliveredTo().isBlank()),
                 order.hasExternalSubmissionEvidence(),
@@ -487,7 +487,7 @@ public class TitleReleaseApplicationService {
     }
 
     private ReleaseOrder loadOrder(long releaseOrderId) {
-        JdbcReleaseOrderRepository.OrderRow row = orderRepository.findById(releaseOrderId)
+        ReleaseOrderRepository.OrderRow row = orderRepository.findById(releaseOrderId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "解除订单不存在", Map.of("releaseOrderId", String.valueOf(releaseOrderId))));
         return ReleaseOrder.restore(row.releaseOrderId(), row.loanId(), row.titleId(), row.status(),
@@ -508,14 +508,14 @@ public class TitleReleaseApplicationService {
 
     private int countDistinctTypes(long releaseOrderId) {
         return (int) orderRepository.findDocuments(releaseOrderId).stream()
-                .map(JdbcReleaseOrderRepository.DocumentRow::docType).distinct().count();
+                .map(ReleaseOrderRepository.DocumentRow::docType).distinct().count();
     }
 
     private ReleaseOrderView reloadView(long releaseOrderId) {
         return toView(orderRepository.findById(releaseOrderId).orElseThrow());
     }
 
-    private ReleaseOrderView toView(JdbcReleaseOrderRepository.OrderRow row) {
+    private ReleaseOrderView toView(ReleaseOrderRepository.OrderRow row) {
         return new ReleaseOrderView(row.releaseOrderId(), row.loanId(), row.titleId(), row.status(),
                 row.source(), row.externalSubmissionRef(),
                 row.confirmedAt() == null ? null : row.confirmedAt().toInstant());

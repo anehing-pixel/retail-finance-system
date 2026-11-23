@@ -23,6 +23,11 @@ spring:
         server-addr: ${NACOS_ADDR:localhost:8848}
         fail-fast: false
 
+mybatis:
+  configuration:
+    # 一级缓存降为 STATEMENT 级：与原 JdbcTemplate「每次读都落库」的读语义对齐，
+    # 避免同一事务内重复 SELECT 命中 MyBatis SESSION 级本地缓存的旧行
+    local-cache-scope: STATEMENT
 retail:
   bureau:
     # 报送日批开关（默认 false=不跑）与 cron（默认每日 08:00 JST；C-05 T+1 口径）

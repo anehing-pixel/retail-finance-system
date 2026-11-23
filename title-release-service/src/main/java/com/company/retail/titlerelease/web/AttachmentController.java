@@ -9,7 +9,7 @@ import com.company.platform.storage.AttachmentStorage.ObjectMetadata;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.company.retail.domain.model.Permission;
-import com.company.retail.titlerelease.persistence.JdbcAttachmentRepository;
+import com.company.retail.titlerelease.persistence.AttachmentRepository;
 import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
@@ -51,11 +51,11 @@ public class AttachmentController {
 
     private final ObjectProvider<DirectUploadEndpoint> endpointProvider;
     private final ObjectProvider<LocalStorageAttachmentStorage> storageProvider;
-    private final JdbcAttachmentRepository attachmentRepository;
+    private final AttachmentRepository attachmentRepository;
 
     public AttachmentController(ObjectProvider<DirectUploadEndpoint> endpointProvider,
                                 ObjectProvider<LocalStorageAttachmentStorage> storageProvider,
-                                JdbcAttachmentRepository attachmentRepository) {
+                                AttachmentRepository attachmentRepository) {
         this.endpointProvider = endpointProvider;
         this.storageProvider = storageProvider;
         this.attachmentRepository = attachmentRepository;
@@ -172,7 +172,7 @@ public class AttachmentController {
     @RequirePermission(Permission.RELEASE_DOCUMENT_ISSUE)
     @GetMapping("/api/attachments/{attachmentId}")
     public ResponseEntity<byte[]> download(@PathVariable long attachmentId) {
-        JdbcAttachmentRepository.AttachmentRow row = attachmentRepository.findById(attachmentId)
+        AttachmentRepository.AttachmentRow row = attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
                         "附件不存在", Map.of("attachmentId", String.valueOf(attachmentId))));
         LocalStorageAttachmentStorage storage = storageProvider.getIfAvailable();

@@ -60,6 +60,15 @@ gateway / external-api / 10 个业务服务
   不做全包扫描；共享 jar 被复用，隔离靠装配实现，不靠复制代码。
 - 只有 `retail-core` 跑 Flyway，其余服务 `flyway.enabled=false`。
 - 服务间**同步只走 Feign 门禁（fail-closed）、异步只走 outbox**，禁止跨域直写他表。
+- **持久层统一 MyBatis 注解 SQL**（无 XML、无 JPA）：Mapper 接口放各服务 `*.mapper` 包，
+  `@MapperScan` 显式列出**单一** mapper 包（精确装配，不做全包扫描）；
+  共享 `infrastructure` 的 mapper 由 `RfOutboxConfig` 上的 `@MapperScan` 单独注册。
+- **行映射显式化**：Mapper 一律返回 `Map<String,Object>`，由共享 `common` 的 `RowValues` 按列名取值；
+  NULL 口径对齐原 `ResultSet.getXxx`（`getLong`→0、`getString`→null），不依赖 ORM 隐式类型推断。
+- **一级缓存降为 STATEMENT 级**：各服务 `application.yml` 写 `mybatis.configuration.local-cache-scope: STATEMENT`，
+  对齐原 JdbcTemplate「每次读都落库」的读语义，避免同一事务内重复 SELECT 命中本地缓存旧行。
+- **唯一键幂等走 `ON CONFLICT` 原子语义**，不采用「捕获唯一键异常再重读」——
+  PostgreSQL 事务内一旦触发唯一键错误，整笔事务即被置为 aborted，无法继续读库。
 
 ### 实际落点（按包名前缀找代码）
 
@@ -67,9 +76,9 @@ gateway / external-api / 10 个业务服务
 |---|---|---|
 | 领域模型 / 状态机 / 领域策略 | 各服务 `*.domain` 包 | `retail-core/.../core/domain`、`underwriting-service/.../underwriting/domain` |
 | 用例编排（事务边界） | 各服务 `*.application`（或 `*.app`）包 | `retail-core/.../core/application`、`customer-service/.../customer/app` |
-| 持久化 | 各服务 `*.repo` / `*.persistence` / `*.infrastructure` 包 | `application-service/.../appservice/repo`、`title-release-service/.../titlerelease/persistence` |
+| 持久化 | 各服务 `*.mapper`（SQL）+ `*.repo` / `*.persistence` / `*.infrastructure`（行映射与仓储） | `application-service/.../appservice/{mapper,repo}`、`title-release-service/.../titlerelease/{mapper,persistence}` |
 | 横切机制（响应/异常/鉴权/审计/契约） | 共享 `common` jar | `common/.../common/{config,security,web,contract}` |
-| Outbox / Flyway / Jdbc 基建 | 共享 `infrastructure` jar | `infrastructure/.../infrastructure/{outbox,config,persistence}` |
+| Outbox / Flyway / 持久层基建 | 共享 `infrastructure` jar | `infrastructure/.../infrastructure/{outbox,config,persistence,mapper}` |
 
 > 命名不统一是**已知现状**（各服务用 `application` / `app`、`repo` / `persistence` / `infrastructure` 混用），
 > 本轮不改动；新代码**跟随所在服务既有命名**，不要跨服务强行统一。
@@ -91,6 +100,7 @@ gateway / external-api / 10 个业务服务
 | B-9 | 审计 `actor` 取验签身份；禁止从客户端头或请求体取 | `R00 §5` |
 | B-10 | **不引入 MQ / Seata / 对象存储**；文件本地、事件走 outbox | `ADR-RF-008` |
 | B-11 | **核心账务不拆**：入金核销 + 余额 + 债权终态同一本地事务，留在 `retail-core` | `ADR-RF-001` |
+| B-12 | **持久层改造不改语义**：SQL 语义、仓储方法签名、事务边界、对外接口一律不变 | `R02 §3.1`、本文件 §2 |
 
 ---
 

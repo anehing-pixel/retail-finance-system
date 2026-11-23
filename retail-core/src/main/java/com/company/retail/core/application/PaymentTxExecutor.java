@@ -5,9 +5,9 @@ import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.domain.PaymentAllocationPlanner;
 import com.company.retail.core.domain.ScheduleItemStatus;
-import com.company.retail.core.persistence.JdbcLoanRepository;
-import com.company.retail.core.persistence.JdbcPaymentRepository;
-import com.company.retail.core.persistence.JdbcRepaymentPlanRepository;
+import com.company.retail.core.persistence.LoanRepository;
+import com.company.retail.core.persistence.PaymentRepository;
+import com.company.retail.core.persistence.RepaymentPlanRepository;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,16 +30,16 @@ public class PaymentTxExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentTxExecutor.class);
 
-    private final JdbcLoanRepository loanRepository;
-    private final JdbcRepaymentPlanRepository planRepository;
-    private final JdbcPaymentRepository paymentRepository;
+    private final LoanRepository loanRepository;
+    private final RepaymentPlanRepository planRepository;
+    private final PaymentRepository paymentRepository;
     private final ReconciliationApplicationService reconciliation;
     private final OutboxPublisher outbox;
     private final DisbursementTxExecutor.ObjectMapperHolder mapperHolder;
 
-    public PaymentTxExecutor(JdbcLoanRepository loanRepository,
-                             JdbcRepaymentPlanRepository planRepository,
-                             JdbcPaymentRepository paymentRepository,
+    public PaymentTxExecutor(LoanRepository loanRepository,
+                             RepaymentPlanRepository planRepository,
+                             PaymentRepository paymentRepository,
                              ReconciliationApplicationService reconciliation,
                              OutboxPublisher outbox,
                              DisbursementTxExecutor.ObjectMapperHolder mapperHolder) {
@@ -78,12 +78,12 @@ public class PaymentTxExecutor {
         Long planId = planRepository.findPlanIdByLoanId(request.loanId())
                 .orElseThrow(() -> new BusinessException(RFErrorCode.RF_PAY_001,
                         "债权尚无还款计划，入金无法核销", Map.of("loanId", String.valueOf(request.loanId()))));
-        JdbcPaymentRepository.AllocationTotals allocTotals = paymentRepository.sumAllocationsByLoan(request.loanId());
+        PaymentRepository.AllocationTotals allocTotals = paymentRepository.sumAllocationsByLoan(request.loanId());
         long feeOutstanding = loan.feeAmount() - allocTotals.feeTotal();
 
-        List<JdbcRepaymentPlanRepository.ItemRow> rows = planRepository.findItemRows(planId);
+        List<RepaymentPlanRepository.ItemRow> rows = planRepository.findItemRows(planId);
         List<PaymentAllocationPlanner.AllocatableItem> allocatable = new ArrayList<>();
-        for (JdbcRepaymentPlanRepository.ItemRow row : rows) {
+        for (RepaymentPlanRepository.ItemRow row : rows) {
             ScheduleItemStatus st = ScheduleItemStatus.valueOf(row.status());
             PaymentAllocationPlanner.AllocatableItem item = new PaymentAllocationPlanner.AllocatableItem(
                     row.itemId(), row.periodNo(), st, row.interestDue(), row.principalDue(),
@@ -116,7 +116,7 @@ public class PaymentTxExecutor {
         // ⑦ 期次状态收编（W6 唯一写者）：先息后本拆分入账 + 状态机判定
         Map<Long, PaymentAllocationPlanner.ItemAllocation> byItem = new LinkedHashMap<>();
         plan.items().forEach(a -> byItem.put(a.itemId(), a));
-        for (JdbcRepaymentPlanRepository.ItemRow row : rows) {
+        for (RepaymentPlanRepository.ItemRow row : rows) {
             PaymentAllocationPlanner.ItemAllocation a = byItem.get(row.itemId());
             if (a == null) {
                 continue;

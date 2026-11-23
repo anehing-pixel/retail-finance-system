@@ -2,12 +2,13 @@ package com.company.retail.infrastructure.config;
 
 import com.company.platform.event.EventConsumer;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.infrastructure.mapper.OutboxMapper;
+import com.company.retail.infrastructure.outbox.MyBatisOutboxPublisher;
 import com.company.retail.infrastructure.outbox.RfEventDispatcher;
-import com.company.retail.infrastructure.outbox.RfJdbcOutboxPublisher;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -15,19 +16,23 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>服务没有消费者时 {@link RfEventDispatcher#poll} 直接空转返回，不发一条 SQL；
  * 消费者随 S2 起按 R04 §6 的事件生产消费关系逐个落进各自服务。</p>
+ *
+ * <p>持久层：共享基础设施的 Mapper 统一在 {@code com.company.retail.infrastructure.mapper}
+ * 包，由本配置显式注册（精确装配纪律：不使用组件全包扫描，也不依赖 starter 自动扫描）。</p>
  */
 @Configuration
 @EnableScheduling
+@MapperScan("com.company.retail.infrastructure.mapper")
 public class RfOutboxConfig {
 
     @Bean
-    public OutboxPublisher outboxPublisher(JdbcTemplate jdbcTemplate) {
-        return new RfJdbcOutboxPublisher(jdbcTemplate);
+    public OutboxPublisher outboxPublisher(OutboxMapper outboxMapper) {
+        return new MyBatisOutboxPublisher(outboxMapper);
     }
 
     @Bean
-    public RfEventDispatcher eventDispatcher(JdbcTemplate jdbcTemplate,
+    public RfEventDispatcher eventDispatcher(OutboxMapper outboxMapper,
                                              ObjectProvider<EventConsumer> consumerProvider) {
-        return new RfEventDispatcher(jdbcTemplate, consumerProvider);
+        return new RfEventDispatcher(outboxMapper, consumerProvider);
     }
 }
