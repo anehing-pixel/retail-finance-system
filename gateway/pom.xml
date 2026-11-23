@@ -11,7 +11,7 @@
 
   <artifactId>retail-api-gateway</artifactId>
   <name>Retail Finance :: Api Gateway</name>
-  <description>内部网关 :18081——路径切流、X-Request-Id、客户/员工 BFF 入口；本阶段不验签（鉴权下沉各服务）</description>
+  <description>内部网关 :18081——路径切流、X-Request-Id、令牌桶限流、客户/员工 BFF 入口；本阶段不验签（鉴权下沉各服务）</description>
 
   <dependencies>
     <dependency>
@@ -22,9 +22,22 @@
       <groupId>com.alibaba.cloud</groupId>
       <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
     </dependency>
+    <!-- 错误码语义层（RF_GATEWAY_001 = 429）：只取 domain 的 RFErrorCode，
+         不引 common（common 依赖 servlet Web，与 WebFlux 网关冲突） -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>retail-domain</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- 单测用：MockServerWebExchange / MockServerHttpRequest（spring-test） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

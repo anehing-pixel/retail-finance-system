@@ -1,0 +1,45 @@
+# 网关令牌桶限流冒烟专用配置（scripts/smoke_ratelimit.py 使用）。
+#
+# 这不是生产配置：
+#   · 端口与上游由脚本在运行时动态填入（__GATEWAY_PORT__ / __STUB_URI__）；
+#   · 只保留一条路由（/api/** → 本地桩上游），用于验证限流发生在转发之前；
+#   · 限流额度调成极小值，便于在秒级内触发 429。
+# 生产口径见 gateway/src/main/java/com/company/retail/gateway/ratelimit/RateLimitProperties.java
+# 与 docs/R02-总体架构设计.md §3.4。
+
+server:
+  port: __GATEWAY_PORT__
+
+spring:
+  application:
+    name: api-gateway-ratelimit-smoke
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        fail-fast: false
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: core
+          uri: __STUB_URI__
+          predicates:
+            - Path=/api/**
+
+retail:
+  ratelimit:
+    enabled: __ENABLED__
+    default-policy:
+      capacity: __CAPACITY__
+      refill-per-second: __REFILL__
+    trustedProxyCidrs: "__TRUSTED__"
+    rules:
+      # 健康检查单独一段：探活流量不应占用业务配额（生产同样建议如此）
+      - pathPrefix: /api/health
+        capacity: 50
+        refill-per-second: 50
+      - pathPrefix: /api/strict/
+        capacity: __STRICT_CAPACITY__
+        refill-per-second: __REFILL__

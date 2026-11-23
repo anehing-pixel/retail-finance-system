@@ -67,6 +67,9 @@ public enum RFErrorCode implements ErrorCode {
     RF_DMS_002("车辆重复申请", 409),
     RF_DMS_003("交易形态字段缺失（双形态下每笔申请必填）", 400),
 
+    // ---- 网关 ----
+    RF_GATEWAY_001("请求过于频繁（网关限流）", 429),
+
     // ---- 兜底 ----
     RF_SYS_001("未预期异常", 500);
 

@@ -2,7 +2,7 @@
 
 > 日本第三方信贩公司 · 面向消费者（C 端）的新车零售金融 · 与 `floorplan-system` 同公司、共享中台能力
 > **架构：Spring Cloud 微服务，直接对齐 floorplan 的微服务形态**（10 个业务服务 + 网关 + DMZ）。
-> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；16 模块代码 + 构建 365 测试 0 失败 + 走网关冒烟 26/26 + 全链路 E2E 98/98。文档全文使用中文。**
+> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；16 模块代码 + 构建 389 测试 0 失败 + 走网关冒烟 26/26 + 全链路 E2E 98/98。文档全文使用中文。**
 > 先读 [`AGENTS.md`](AGENTS.md)（怎么干活），进度以 [`PROGRESS.md`](PROGRESS.md)（唯一事实源）为准，
 > 设计理由见 [`docs/00-文档索引.md`](docs/00-文档索引.md)。
 
@@ -75,6 +75,7 @@
 | 业务服务端口 | 8080–8088 | **8090–8099** |
 | 内部网关 | 18080 | **18081** |
 | 外部 DMZ | 18090 | **18091** |
+| 边缘入口（Nginx） | — | **18076 / 18077**（限流泄洪层） |
 | 数据库端口 | 5434 | **5435**（容器 `retail-finance-db`） |
 | 数据库 / schema | `floorplan` / `public` | `retail_finance` / `core` `pii` `integration` `audit` |
 | Flyway 号段 | V1–V26 已执行，V27–V31 预分配 | **独立库、独立号段 V1 起** |
@@ -97,18 +98,21 @@ flowchart TB
     BANK[银行 / 代收机构]
     GOV[车辆登记机关]
   end
-  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（未实现）"]
+  EDGE["边缘 Nginx :18076 / 18077<br/>来源 IP 漏桶（泄洪）"]
+  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 令牌桶限流"]
   DMZ["external-api :18091<br/>DMZ：验签 · 签名 · nonce · partner scope"]
   CORE["retail-core :8090<br/>核心账务（不拆）<br/>债权·还款计划·代付·入金核销·结清"]
   SVC["auth :8091 · customer(PII) :8092 · application :8093<br/>underwriting :8094 · bureau :8095 · contract :8096<br/>title-release :8097 · servicing :8098 · recon :8099"]
   DB[("PostgreSQL :5435<br/>retail_finance<br/>core | pii | integration | audit")]
   PLAT["company-platform-contracts（共享 jar）<br/>响应/异常/Outbox/幂等/日历/加密/审计约定"]
 
-  CUST --> GW
-  DMS --> DMZ
-  BUR <--> DMZ
-  BANK <--> DMZ
-  GOV <--> DMZ
+  CUST --> EDGE
+  DMS --> EDGE
+  BUR <--> EDGE
+  BANK <--> EDGE
+  GOV <--> EDGE
+  EDGE --> GW
+  EDGE --> DMZ
   GW --> CORE
   GW --> SVC
   DMZ -->|内部命令，非外部报文| CORE
@@ -122,7 +126,7 @@ flowchart TB
 
 | 服务 | 端口 | 职责 |
 |---|---|---|
-| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流为设计口径，尚未实现**（网关当前只有 `RequestIdFilter` + 启动类） |
+| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`、**令牌桶限流**（路由段 × 客户端 IP，`retail.ratelimit.*`，见 `R02 §3.3`） |
 | `external-api` | 18091 | DMZ：DMS / 征信机构 / 支付回调的入站验签、出站签名、nonce、partner scope |
 | `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**唯一跑 Flyway** |
 | `auth-service` | 8091 | 员工侧 + 客户侧双主体 JWT 签发/验签 |
@@ -177,7 +181,7 @@ flowchart TB
 ## 5. 诚实的边界（防止把文档读成已实现）
 
 1. **已交付文档、工程约定与全部计划内代码**：16 模块（四层共享 + 10 业务服务 + 网关 + DMZ）、
-   Flyway V1–V17（60 张表实测）、构建 365 测试 0 失败、走网关冒烟 26/26、全链路 E2E 98/98（`PROGRESS §6`）。
+   Flyway V1–V17（60 张表实测）、构建 389 测试 0 失败、走网关冒烟 26/26、全链路 E2E 98/98（`PROGRESS §6`）。
    实现范围以 `PROGRESS.md`（唯一事实源）为准；外部自动对接未实现（见第 3 条）。
 2. **C-01~C-12 系统口径已定源（2026-11-22）**：`C-01` 用户签（双形态并行）；`C-02`~`C-12` 架构 AI 裁决（用户授权
    「先定合理方向，后续可按新需求改动」），裁决值与外部核实项见 `R01 §6 §7`。**法务效力判断不实现**——系统实现
