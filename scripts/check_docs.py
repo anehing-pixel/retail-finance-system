@@ -132,9 +132,9 @@ def check_numbering() -> None:
         m = re.match(r"ADR-RF-(\d{3})-", p.name)
         if m:
             anums.append(int(m.group(1)))
-    ok2 = len(a_files) == 12 and sorted(anums) == list(range(1, 13)) and len(set(anums)) == 12
+    ok2 = len(a_files) == 13 and sorted(anums) == list(range(1, 14)) and len(set(anums)) == 13
     record("C2", "ADR 编号连续唯一", ok2,
-           f"实际 {len(a_files)} 份，编号 {sorted(anums)}，期望 001–012")
+           f"实际 {len(a_files)} 份，编号 {sorted(anums)}，期望 001–013")
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ def check_index_refs() -> None:
 # ---------------------------------------------------------------------------
 def check_refs_and_cxx() -> None:
     r_ok = set(range(0, 12))
-    a_ok = set(range(1, 13))
+    a_ok = set(range(1, 14))
     bad_r, bad_a = set(), set()
     for p in md_files():
         t = read(p)
@@ -307,7 +307,7 @@ def check_structure() -> None:
         if missing:
             bad_a.append(f"{p.name} 缺 {missing}")
     record("C11", "ADR 四节齐备", not bad_a,
-           f"{bad_a}" if bad_a else "12 份 ADR 均含「状态 / 背景 / 结论 / 后果」四节")
+           f"{bad_a}" if bad_a else "13 份 ADR 均含「状态 / 背景 / 结论 / 后果」四节")
 
 
 # ---------------------------------------------------------------------------
@@ -344,13 +344,13 @@ def check_count() -> None:
     root_items = ["README.md", "AGENTS.md", "PROGRESS.md", ".gitignore"]
     root_ok = all((ROOT / f).exists() for f in root_items)
     docs_n = len(list(DOCS.glob("*.md")))          # 00 索引 + R00–R11 = 13
-    adr_n = len(list(ADR.glob("*.md")))            # 10
+    adr_n = len(list(ADR.glob("*.md")))            # 13
     scripts_n = len([p for p in SCRIPTS.glob("*.py") if p.name in
-                     ("check_docs.py", "normalize_terms.py")])
+                     ("check_docs.py", "normalize_terms.py", "smoke_w_lock.py")])
     total = (len(root_items) if root_ok else 0) + docs_n + adr_n + scripts_n
-    ok = root_ok and docs_n == 13 and adr_n == 12 and scripts_n == 2 and total == 31
+    ok = root_ok and docs_n == 13 and adr_n == 13 and scripts_n == 3 and total == 33
     record("C13", "索引登记文件数与实际一致", ok,
-           f"根 4 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 31")
+           f"根 4 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 33")
 
 
 # ---------------------------------------------------------------------------

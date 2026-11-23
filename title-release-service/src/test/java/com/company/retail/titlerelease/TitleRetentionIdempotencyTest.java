@@ -144,7 +144,7 @@ class TitleRetentionIdempotencyTest {
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
-                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-012）
+                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-013）
                 3000L);
     }
 

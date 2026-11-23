@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 进件并发去重单测（ADR-RF-012 分布式锁 + 唯一索引双兜底）。
+ * 进件并发去重单测（ADR-RF-013 分布式锁 + 唯一索引双兜底）。
  *
  * <p>覆盖：① 并发同客户同 VIN 只受理一条（另一条命中 RF_APP_001）；
  * ② 锁服务不可用 → fail-closed 拒绝受理且不落库；

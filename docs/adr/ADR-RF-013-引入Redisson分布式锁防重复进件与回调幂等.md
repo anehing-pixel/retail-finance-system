@@ -1,8 +1,10 @@
-# ADR-RF-012 · 引入 Redisson 分布式锁（防重复进件 / 回调幂等）
+# ADR-RF-013 · 引入 Redisson 分布式锁（防重复进件 / 回调幂等）
 
 ## 状态
 
 Accepted（2026-11-23；用户授权「Redisson 分布式锁防重复进件 / 回调幂等」，并裁定 **fail-closed**：锁服务不可用即拒绝写）
+
+> **编号说明**：本 ADR 原拟 ADR-RF-012，但该编号已由 W-CACHE/W-RL 的「引入 Redis 作为产品档位缓存与网关令牌桶限流」占用（已并入 master），故顺延为 **ADR-RF-013**（以 docs/adr/ 目录实际占用为准，不预占编号）。
 
 ## 背景
 
@@ -39,7 +41,7 @@ Accepted（2026-11-23；用户授权「Redisson 分布式锁防重复进件 / �
 6. **锁不是正确性来源，最终权威仍是数据库**：
    - 进件：同幂等键并发由 `uk_app_idempotency` 兜底（写入改 `ON CONFLICT (idempotency_key) DO NOTHING`，
      冲突方按请求指纹判定「重放」或 `RF_CONFLICT_001`）；
-   - 回调：新增 **V18** 迁移 `uk_receipt_order_authority_ref`（订单 + 权威 + 回执号唯一，
+   - 回调：新增 **V19** 迁移 `uk_receipt_order_authority_ref`（订单 + 权威 + 回执号唯一，
      `COALESCE(receipt_ref,'')` 表达式索引），写入走 `ON CONFLICT DO NOTHING`，
      冲突方幂等返回既有结果、不重复落库、不重复推进状态、不重复发事件。
 7. **锁键不落明文业务标识**：键格式 `retail:lock:{用途}:{SHA-256 前 16 位十六进制}`，
@@ -50,7 +52,7 @@ Accepted（2026-11-23；用户授权「Redisson 分布式锁防重复进件 / �
 - **正面**：并发重复进件与重复回调各有一道跨实例的闸；回调重复投递从「重复落库 + 重复发事件」变成幂等返回。
 - **代价**：① 受保护写路径新增硬依赖 Redis——Redis 不可用即拒绝写（可用性换正确性，金融口径的取舍）；
   ② 父 pom 与三个服务 pom 新增依赖；③ 编排脚本新增 Redis 容器（`retail-finance-lock-redis`，宿主端口 6381）；
-  ④ 新增一条 Flyway 迁移 V18（唯一索引）。
+  ④ 新增一条 Flyway 迁移 V19（唯一索引；V18 已被 W-CACHE/W-RL 的「产品档位与还款计划快照」占用并执行，字节不动）。
 - **边界**：锁只覆盖**本轮**已明确的两条链（进件、回调）；报送触发 / 日批 / DPD 快照等仍有并发窗口，
   但那些路径已有「唯一约束 + 条件更新」的原子抢占（`uk_batch_job_date` 等），不靠锁。
 - **风险与对策**：Redis 单点 → 锁服务不可用即拒写（fail-closed），业务不产生错数据，只产生拒绝；

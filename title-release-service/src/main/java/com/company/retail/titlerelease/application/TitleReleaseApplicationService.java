@@ -405,7 +405,7 @@ public class TitleReleaseApplicationService {
                     Map.of("authority", authority.name()));
         }
 
-        // 回调幂等（ADR-RF-012）：同一回执（订单 + 权威 + 回执号）的重复 / 并发投递串行化，
+        // 回调幂等（ADR-RF-013）：同一回执（订单 + 权威 + 回执号）的重复 / 并发投递串行化，
         // 锁在事务提交后释放；锁内重查既有回执 → 幂等返回首次结果。
         return locks.callWithLock(LockKeys.registryReceipt(releaseOrderId, receiptRef), lockWait,
                 () -> registerReceiptUnderLock(releaseOrderId, authority, receiptRef,

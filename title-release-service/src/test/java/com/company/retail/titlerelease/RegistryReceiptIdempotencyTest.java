@@ -30,13 +30,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 外部登记回执幂等单测（ADR-RF-012 回调幂等）。
+ * 外部登记回执幂等单测（ADR-RF-013 回调幂等）。
  *
  * <p>覆盖：① 首次外部回执 → 解押闭环 + 发一次闭环事件；
  * ② 同一回执重复登记（外部方换 nonce 重推）→ 幂等返回，不重复落库、不重复推进状态、
  * 不重复发事件；③ 并发投递同一回执 → 只落一条回执、只发一次事件。</p>
  *
- * <p>幂等三道闸（ADR-RF-012）：分布式锁（串行化）→ 锁内重查既有回执 →
+ * <p>幂等三道闸（ADR-RF-013）：分布式锁（串行化）→ 锁内重查既有回执 →
  * {@code uk_receipt_order_authority_ref} 唯一索引（最终权威，ON CONFLICT DO NOTHING）。</p>
  */
 class RegistryReceiptIdempotencyTest {
@@ -249,7 +249,7 @@ class RegistryReceiptIdempotencyTest {
                 new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
-                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-012）
+                new InProcessLockManager(),   // 单测不依赖 Redis：单进程锁（ADR-RF-013）
                 3000L);
     }
 

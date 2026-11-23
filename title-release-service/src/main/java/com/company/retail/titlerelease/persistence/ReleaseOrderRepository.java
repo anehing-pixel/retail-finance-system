@@ -111,7 +111,7 @@ public class ReleaseOrderRepository {
         return id == null ? 0L : ((Number) id).longValue();
     }
 
-    /** 按 (订单, 权威, 回执号) 读既有回执（回调幂等重放判定，ADR-RF-012）。 */
+    /** 按 (订单, 权威, 回执号) 读既有回执（回调幂等重放判定，ADR-RF-013）。 */
     public Optional<ReceiptRow> findReceiptByRef(long releaseOrderId, String authority, String receiptRef) {
         List<Map<String, Object>> rows = mapper.findReceiptByRef(releaseOrderId, authority, receiptRef);
         return rows.stream().findFirst().map(ReleaseOrderRepository::toReceiptRow);

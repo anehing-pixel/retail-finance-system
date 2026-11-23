@@ -4,8 +4,7 @@ import com.company.platform.exception.BusinessException;
 import com.company.retail.domain.exception.RFErrorCode;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.redisson.client.RedisConnectionException;
-import org.redisson.client.RedisTimeoutException;
+import org.redisson.client.RedisException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -17,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Redisson 分布式锁适配器（ADR-RF-012）。
+ * Redisson 分布式锁适配器（ADR-RF-013）。
  *
  * <p><b>fail-closed</b>：Redis 不可达 → 抛 {@code RF_LOCK_002}（503）拒绝写；
  * 等待超时（并发冲突）→ 抛 {@code RF_LOCK_001}（409）。两者都<b>不降级放行</b>——
@@ -51,10 +50,16 @@ public class RedissonLockManager implements DistributedLockManager {
             Thread.currentThread().interrupt();
             throw new BusinessException(RFErrorCode.RF_LOCK_001,
                     Map.of("lockKey", lockKey, "reason", "INTERRUPTED"));
-        } catch (RedisConnectionException | RedisTimeoutException e) {
-            // 锁服务不可用 → fail-closed 拒绝写（不降级放行）
-            throw new BusinessException(RFErrorCode.RF_LOCK_002,
-                    Map.of("lockKey", lockKey, "reason", "REDIS_UNAVAILABLE"));
+        } catch (RuntimeException e) {
+            // 锁服务不可用 → fail-closed 拒绝写（不降级放行）。
+            // 实测（Redis 宕机）：Redisson 抛的是包装后的 RedisException
+            // （"Unexpected exception while processing command"），并非直接的连接异常，
+            // 故按异常链判定 Redis 类故障，避免漏判后落成 500 SYS_001。
+            if (isRedisFailure(e)) {
+                throw new BusinessException(RFErrorCode.RF_LOCK_002,
+                        Map.of("lockKey", lockKey, "reason", "REDIS_UNAVAILABLE"));
+            }
+            throw e;
         }
         if (!acquired) {
             throw new BusinessException(RFErrorCode.RF_LOCK_001,
@@ -86,6 +91,29 @@ public class RedissonLockManager implements DistributedLockManager {
             }
         } catch (IllegalMonitorStateException e) {
             log.warn("分布式锁释放异常（锁已失效）lockKey={}", lockKey);
+        } catch (RuntimeException e) {
+            // Redis 宕机导致释放失败：只告警不抛出——写已成功，不因释放失败把结果翻成 500；
+            // 锁由租约到期自然释放（看门狗续期此刻也已失效）。
+            log.warn("分布式锁释放异常（Redis 不可用，锁将到期自动释放）lockKey={} reason={}",
+                    lockKey, e.getMessage());
         }
+    }
+
+    /**
+     * 异常链里是否含 Redisson 的 Redis 类故障（连接异常 / 超时 / 命令执行异常）。
+     *
+     * <p>Redisson 的同步 API 会把底层连接失败包装成 {@code RedisException}
+     * （"Unexpected exception while processing command"），故不能只判具体子类。</p>
+     */
+    private boolean isRedisFailure(Throwable e) {
+        Throwable cur = e;
+        int depth = 0;
+        while (cur != null && depth++ < 8) {
+            if (cur instanceof RedisException) {
+                return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
     }
 }

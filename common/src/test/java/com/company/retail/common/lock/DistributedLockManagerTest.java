@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.RedisConnectionException;
+import org.redisson.client.RedisException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -29,7 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 分布式锁机制件单测（ADR-RF-012）。
+ * 分布式锁机制件单测（ADR-RF-013）。
  *
  * <p>覆盖：锁键命名（用途分域 + 不落明文业务标识）、单进程锁的互斥与超时语义、
  * Redisson 适配器的 fail-closed 与「锁在事务提交后释放」时序。</p>
@@ -150,6 +151,34 @@ class DistributedLockManagerTest {
                 () -> manager.callWithLock("k", Duration.ofMillis(50), () -> "x"));
         assertEquals(RFErrorCode.RF_LOCK_002, ex.getErrorCode());
         assertEquals(503, ex.getErrorCode().getHttpStatus(), "锁服务不可用必须是 503，不得降级放行");
+    }
+
+    @Test
+    void Redisson适配器_Redis不可达_包装异常也failClosed() throws Exception {
+        // 实测（Redis 宕机）：Redisson 抛包装异常 RedisException("Unexpected exception...")，
+        // 不是直接的 RedisConnectionException——漏判会落成 500 SYS_001。
+        RLock lock = mock(RLock.class);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class)))
+                .thenThrow(new RedisException("Unexpected exception while processing command",
+                        new RedisConnectionException("down")));
+        RedissonLockManager manager = new RedissonLockManager(clientOf(lock));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> manager.callWithLock("k", Duration.ofMillis(50), () -> "x"));
+        assertEquals(RFErrorCode.RF_LOCK_002, ex.getErrorCode());
+        assertEquals(503, ex.getErrorCode().getHttpStatus());
+    }
+
+    @Test
+    void Redisson适配器_非Redis异常_原样抛出不被误判为锁不可用() throws Exception {
+        RLock lock = mock(RLock.class);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class)))
+                .thenThrow(new IllegalStateException("业务异常"));
+        RedissonLockManager manager = new RedissonLockManager(clientOf(lock));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> manager.callWithLock("k", Duration.ofMillis(50), () -> "x"));
+        assertEquals("业务异常", ex.getMessage());
     }
 
     @Test

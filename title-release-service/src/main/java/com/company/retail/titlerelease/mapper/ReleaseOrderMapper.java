@@ -85,7 +85,7 @@ public interface ReleaseOrderMapper {
     @Options(useGeneratedKeys = true, keyProperty = "receiptId", keyColumn = "receipt_id")
     int insertReceipt(Map<String, Object> params);
 
-    /** 按 (订单, 权威, 回执号) 读既有回执（回调幂等重放判定，ADR-RF-012）。 */
+    /** 按 (订单, 权威, 回执号) 读既有回执（回调幂等重放判定，ADR-RF-013）。 */
     @Select("SELECT receipt_id, release_order_id, authority, receipt_ref, received_at, verified_by, raw_ref "
             + "FROM core.registration_receipts WHERE release_order_id = #{releaseOrderId} "
             + "AND authority = #{authority} AND COALESCE(receipt_ref, '') = COALESCE(#{receiptRef}, '') "

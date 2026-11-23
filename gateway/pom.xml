@@ -22,6 +22,17 @@
       <groupId>com.alibaba.cloud</groupId>
       <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
     </dependency>
+    <!-- 网关限流：Redis 令牌桶（Lua 原子扣减） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
+    <!-- 共享语义层：错误码（RF_GATEWAY_001）等，保证网关与各服务同一份目录 -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>retail-domain</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

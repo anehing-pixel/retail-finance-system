@@ -2,7 +2,7 @@
 
 > 日本第三方信贩公司 · 面向消费者（C 端）的新车零售金融 · 与 `floorplan-system` 同公司、共享中台能力
 > **架构：Spring Cloud 微服务，直接对齐 floorplan 的微服务形态**（10 个业务服务 + 网关 + DMZ）。
-> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；16 模块代码 + 构建 383 测试 0 失败 + 走网关冒烟 26/26 + 全链路 E2E 98/98。文档全文使用中文。**
+> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；16 模块代码 + Flyway V1–V19 + 构建 418 测试 0 失败 + 走网关冒烟 33/33 + 全链路 E2E 104/104。文档全文使用中文。**
 > 先读 [`AGENTS.md`](AGENTS.md)（怎么干活），进度以 [`PROGRESS.md`](PROGRESS.md)（唯一事实源）为准，
 > 设计理由见 [`docs/00-文档索引.md`](docs/00-文档索引.md)。
 
@@ -62,6 +62,9 @@
 | 领域分层 | `domain` / `application` / `infrastructure` / `common` | `domain` 零 Spring 依赖、可纯单测；事务边界只在 application |
 | 服务装配 | 精确装配 | 每服务只扫自身包 + `@Import` 按类注入，不做全包扫描 |
 | 事务一致性 | 本地事务 + 行锁 + 唯一约束；Transactional Outbox（数据库轮询） | **不引入 MQ / Seata / 分布式事务** |
+| 缓存 | **两级缓存**：Caffeine L1（进程内，默认 10s）+ Redis L2（默认 60s） | 只缓存**只读业务配置**（产品档位等）；Redis 不可用自动降级直读；**绝不缓存余额 / 核销流水 / 个人信息 / 征信与审查结果**（`ADR-RF-012`） |
+| 网关限流 | Redis 令牌桶（Lua 原子扣减） | 键取 `Authorization` 头 SHA-256 哈希（不存凭据）；超限返回 429 + `Retry-After` + 统一 `ApiResponse`；Redis 不可用 **fail-open**；规则可配（`ADR-RF-012`） |
+| 分布式锁 | Redisson 3.27.2（按业务键加锁，锁在**事务提交后**释放） | 只收敛并发窗口，**正确性仍由 DB 唯一索引 + `ON CONFLICT` 保证**；Redis 不可达即 fail-closed 拒写（`RF_LOCK_002`/503），不降级放行；锁键不落明文业务标识（`ADR-RF-013`） |
 | 同步调用 | Feign，仅用于门禁（fail-closed） | 必须透传 JWT；fallback 一律拒绝而非放行 |
 | 认证 | JWT 同密钥本地验签、零信任（网关不验签） | 员工侧与客户侧**两套密钥**，见 ADR-RF-004 |
 | 文件 / 附件 | **本地文件系统** | 按公司既定口径，不引入对象存储（ADR-RF-008） |
@@ -76,6 +79,7 @@
 | 内部网关 | 18080 | **18081** |
 | 外部 DMZ | 18090 | **18091** |
 | 数据库端口 | 5434 | **5435**（容器 `retail-finance-db`） |
+| Redis 宿主端口 | — | **6382**（容器 `retail-finance-redis`；6379 被本机 WSL 侧进程占用，不复用） |
 | 数据库 / schema | `floorplan` / `public` | `retail_finance` / `core` `pii` `integration` `audit` |
 | Flyway 号段 | V1–V26 已执行，V27–V31 预分配 | **独立库、独立号段 V1 起** |
 | 配置键前缀 | `floorplan.*` | **`retail.*`** |
@@ -97,7 +101,7 @@ flowchart TB
     BANK[银行 / 代收机构]
     GOV[车辆登记机关]
   end
-  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（未实现）"]
+  GW["api-gateway :18081<br/>路径切流 · X-Request-Id · 限流（Redis 令牌桶）"]
   DMZ["external-api :18091<br/>DMZ：验签 · 签名 · nonce · partner scope"]
   CORE["retail-core :8090<br/>核心账务（不拆）<br/>债权·还款计划·代付·入金核销·结清"]
   SVC["auth :8091 · customer(PII) :8092 · application :8093<br/>underwriting :8094 · bureau :8095 · contract :8096<br/>title-release :8097 · servicing :8098 · recon :8099"]
@@ -122,7 +126,7 @@ flowchart TB
 
 | 服务 | 端口 | 职责 |
 |---|---|---|
-| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流为设计口径，尚未实现**（网关当前只有 `RequestIdFilter` + 启动类） |
+| `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流已实现**（Redis 令牌桶：键取 `Authorization` 头哈希、规则按路径 Ant 最具体优先、Redis 不可用 fail-open，配置见 `retail.gateway.rate-limit.*`） |
 | `external-api` | 18091 | DMZ：DMS / 征信机构 / 支付回调的入站验签、出站签名、nonce、partner scope |
 | `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**唯一跑 Flyway** |
 | `auth-service` | 8091 | 员工侧 + 客户侧双主体 JWT 签发/验签 |
@@ -165,9 +169,9 @@ flowchart TB
 | `R07` | 外部集成接口文档 | DMS / 征信机构 / 账户自动扣款 / 身份核验 / 登记代办 / DMZ |
 | `R08` | 权限与合规矩阵 | 双主体、权限点、职责分离、个人信息保护、访问控制 |
 | `R09` | 接口与事件契约 | 端点、错误码、Feign 契约、事件白名单（禁个人信息） |
-| `R10` | 测试与验收设计 | 验收红线、A1–A32 断言、测试留白 |
+| `R10` | 测试与验收设计 | 验收红线、A1–A36 断言、测试留白 |
 | `R11` | 演进路线图与开工门禁 | S0–S4、工作包、并行窗口、门禁、返工量评估 |
-| `ADR` | [`docs/adr/`](docs/adr/) 11 份 | 每个决策的背景 / 选项 / 结论 / 后果 |
+| `ADR` | [`docs/adr/`](docs/adr/) 12 份 | 每个决策的背景 / 选项 / 结论 / 后果 |
 
 一致性自检：`python scripts/check_docs.py`（编号唯一、引用存在、待定源登记、端口不冲突、
 术语全中文、架构口径一致、三节/四节齐备）。
@@ -177,7 +181,7 @@ flowchart TB
 ## 5. 诚实的边界（防止把文档读成已实现）
 
 1. **已交付文档、工程约定与全部计划内代码**：16 模块（四层共享 + 10 业务服务 + 网关 + DMZ）、
-   Flyway V1–V18（60 张表实测）、构建 383 测试 0 失败、走网关冒烟 26/26、全链路 E2E 98/98（`PROGRESS §6`）。
+   Flyway V1–V19（61 张表实测）、构建 418 测试 0 失败、走网关冒烟 33/33、全链路 E2E 104/104（`PROGRESS §6`）。
    实现范围以 `PROGRESS.md`（唯一事实源）为准；外部自动对接未实现（见第 3 条）。
 2. **C-01~C-12 系统口径已定源（2026-11-22）**：`C-01` 用户签（双形态并行）；`C-02`~`C-12` 架构 AI 裁决（用户授权
    「先定合理方向，后续可按新需求改动」），裁决值与外部核实项见 `R01 §6 §7`。**法务效力判断不实现**——系统实现
@@ -189,7 +193,8 @@ flowchart TB
    回填前系统按「人工路径是一等公民」预留，不实现自动对接。
 4. **中台共享 jar 已抽取（W1）**：`../company-platform-contracts`（`mvn install`，34 单测全绿），
    RF 全仓依赖 `com.company:company-platform-contracts:1.0.0-SNAPSHOT`；floorplan 基线未触碰。
-5. **不引入新中间件**：文件本地、事件走 outbox、不接 MQ/Seata/对象存储，与 floorplan 现行约束一致。
+5. **中间件只做窄引入**：文件本地、事件走 outbox、不接 MQ/Seata/对象存储，与 floorplan 现行约束一致；
+   **Redis 仅两类用途**——只读业务配置的 L2 缓存 + 网关限流状态，**不缓存**余额 / 核销流水 / 个人信息 / 征信与审查结果（`ADR-RF-012`）。
 6. **文档语言**：全文中文；法律与机构名采用中文译名，必要的拉丁缩写（CIC、JICC、DMS、VIN、JWT 等）
    与代码标识符保留原样。
 

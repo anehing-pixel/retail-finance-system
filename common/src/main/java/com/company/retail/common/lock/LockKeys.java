@@ -6,7 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * 锁键命名（{@code R00 §7} 命名定源；ADR-RF-012）。
+ * 锁键命名（{@code R00 §7} 命名定源；ADR-RF-013）。
  *
  * <p>格式：{@code retail:lock:{用途}:{业务标识摘要}}。</p>
  *
