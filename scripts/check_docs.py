@@ -11,6 +11,7 @@
   C9  架构口径统一为微服务           C10 R 文档三节齐备
   C11 ADR 四节齐备                  C12 自检脚本存在且术语映射幂等
   C13 索引登记文件数与实际一致
+  C14 Flyway 号段口径与实际迁移一致   C15 测试数口径唯一（类级 surefire 汇总）
 
 输出 PASS / FAIL + 逐项明细；EXIT 非 0 表示失败（供 CI / 收口门禁使用）。
 
@@ -352,6 +353,76 @@ def check_count() -> None:
            f"根 4 + docs {docs_n} + ADR {adr_n} + 脚本 {scripts_n} = {total} 项，期望 30")
 
 
+# ---------------------------------------------------------------------------
+# C14：Flyway 号段口径与实际迁移脚本一致
+# ---------------------------------------------------------------------------
+def check_migration_range() -> None:
+    """文档里声称「本项目已落地 V1–Vxx」的表述，其上限必须等于磁盘上真实迁移脚本数。
+
+    背景：V15（W9-A 报送执行闭环）落地后，README / PROGRESS / R02 / R06 / 00-文档索引
+    多处仍写「V1–V14」，导致文档口径与实测（15 条）脱节。本项把该口径钉死。
+
+    只校验「本项目已落地」语义的行；floorplan 的 V1–V26 与本项目「起步号段 V1–V9」
+    等历史/他项目表述不在此列（故按上下文关键词过滤）。
+    """
+    mig_dir = ROOT / "infrastructure" / "src" / "main" / "resources" / "db" / "migration"
+    scripts = sorted(p for p in mig_dir.glob("V*.sql") if p.is_file())
+    actual_n = len(scripts)
+    vers = sorted(int(re.match(r"V(\d+)__", p.name).group(1)) for p in scripts)
+    contiguous = vers == list(range(1, actual_n + 1))
+
+    # 只校验「声称当前终态已落地迁移数」的表述；
+    # 历史阶段记录（如 W2 阶段只落了 V1–V9）、他项目号段、规划号段均不在此列。
+    current_ctx = ("已落地", "当前状态", "终态", "实测 1", "共 60 张表", "Flyway V1\u2013V")
+    exclude_ctx = ("floorplan", "起步", "预留", "不撞号", "独立库", "S1-W2", "S2 落", "W2", "W9-A 落")
+
+    stale = []
+    pattern = re.compile(r"V1[\u2013-]V(\d+)")
+    for p in md_files():
+        for i, line in enumerate(read(p).splitlines(), 1):
+            if not any(k in line for k in current_ctx):
+                continue
+            if any(k in line for k in exclude_ctx):
+                continue
+            for m in pattern.finditer(line):
+                if int(m.group(1)) != actual_n:
+                    stale.append("%s:%d \u2192 V1\u2013V%s" % (p.name, i, m.group(1)))
+
+    ok = actual_n > 0 and contiguous and not stale
+    detail = ("磁盘迁移脚本 %d 条（V1\u2013V%d，号段连续=%s）；文档号段越界行 %s"
+              % (actual_n, actual_n, contiguous, stale if stale else "无"))
+    record("C14", "Flyway 号段口径与实际迁移一致", ok, detail)
+
+
+# ---------------------------------------------------------------------------
+# C15：测试数口径唯一（防「系统计」虚高数字回流）
+# ---------------------------------------------------------------------------
+def check_test_count() -> None:
+    """全仓出现的「构建/单测 N 个测试」类断言，N 必须唯一且等于权威口径。
+
+    权威口径 = surefire 类级汇总（见 PROGRESS.md 顶部校正注：类级/模块级 surefire 汇总）。
+    历史教训：曾长期以 surefire 系统计虚高值（706/748）对外表述，与实测 353 脱节。
+    """
+    allow_ctx = ("虚高", "校正", "原记录", "口径已校正")
+    pattern = re.compile(r"(?:构建|单测|测试)\s*(\d{2,4})\s*(?:个)?(?:测试|单测)")
+    hits = {}
+    for p in md_files():
+        for i, line in enumerate(read(p).splitlines(), 1):
+            if any(k in line for k in allow_ctx):
+                continue
+            for m in pattern.finditer(line):
+                hits.setdefault(m.group(1), []).append("%s:%d" % (p.name, i))
+
+    prog = read(ROOT / "PROGRESS.md")
+    m = re.search(r"构建\s*(\d{2,4})\s*单测\s*0\s*失败", prog)
+    authority = int(m.group(1)) if m else None
+
+    drift = dict((k, v) for k, v in hits.items() if int(k) != authority)
+    ok = authority is not None and not drift
+    detail = "权威口径 %s；出现过的其他测试数 %s" % (authority, drift if drift else "无")
+    record("C15", "测试数口径唯一（类级 surefire 汇总）", ok, detail)
+
+
 def main() -> int:
     print("=" * 74)
     print(f"文档一致性自检 check_docs.py · {date.today().isoformat()}")
@@ -360,6 +431,7 @@ def main() -> int:
     for fn in (
         check_numbering, check_index_refs, check_refs_and_cxx, check_ports,
         check_language, check_arch, check_structure, check_scripts, check_count,
+        check_migration_range, check_test_count,
     ):
         fn()
 

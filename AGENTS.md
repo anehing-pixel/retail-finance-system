@@ -35,6 +35,13 @@
 
 ## 2. 分层依赖与精确装配（与 floorplan 同构）
 
+> ⚠️ **落地实况（2026-11-23 实测）**：本仓的四层是**服务内分层**，不是**四层共享 jar 分层**。
+> `domain/` `application/` 两个共享模块目前**几乎是空壳**——`domain` 只有 3 个文件
+> （`RFErrorCode` / `Permission` / package-info），`application` 只有 1 个 package-info。
+> 真实业务逻辑（聚合、状态机、用例编排）落在**各服务模块自己的** `*.domain` / `*.application`
+> 包内；`common`（横切机制）与 `infrastructure`（Outbox / Flyway / Jdbc 基建）才是真正被复用的 jar。
+> **写新代码时以本节末尾的「实际落点」为准，不要往共享 `domain/` `application/` 里堆业务。**
+
 ```
 gateway / external-api / 10 个业务服务
         → application（用例编排，事务边界唯一允许层）
@@ -44,12 +51,28 @@ gateway / external-api / 10 个业务服务
 ```
 
 - `domain` **不得 import Spring / common / infrastructure**，必须可用纯 JUnit 跑。
+  （实测：全仓 53 个 domain 主文件对 `org.springframework` 零命中，纪律成立。）
 - `application` **不得 import `common`**（否则 Maven 循环依赖）；需要发布事件时定义端口接口，适配器放在服务模块内。
-- `common` 里放机制、不放业务语义：本项目 `Permission` / `UserRole` / `ErrorCode` 的**枚举内容**属业务语义，放 `domain`。
+  （注：这条约束只针对**共享 `application` jar**；服务内 `*.application` 包经由服务模块依赖 `common`，可用 `OutboxPublisher` 等契约。）
+- `common` 里放机制、不放业务语义：本项目 `Permission` / `RFErrorCode` 的**枚举内容**属业务语义，放 `domain`。
+  （`UserRole` 目前无 Java 枚举类——角色清单落在 `core.user_roles` 表 + `auth-service` 的 `RolePermissions`。）
 - **精确装配**：每服务 `@SpringBootApplication(scanBasePackages = 自身包)` + `@Import` 按类注入，
   不做全包扫描；共享 jar 被复用，隔离靠装配实现，不靠复制代码。
 - 只有 `retail-core` 跑 Flyway，其余服务 `flyway.enabled=false`。
 - 服务间**同步只走 Feign 门禁（fail-closed）、异步只走 outbox**，禁止跨域直写他表。
+
+### 实际落点（按包名前缀找代码）
+
+| 层 | 放哪 | 实例 |
+|---|---|---|
+| 领域模型 / 状态机 / 领域策略 | 各服务 `*.domain` 包 | `retail-core/.../core/domain`、`underwriting-service/.../underwriting/domain` |
+| 用例编排（事务边界） | 各服务 `*.application`（或 `*.app`）包 | `retail-core/.../core/application`、`customer-service/.../customer/app` |
+| 持久化 | 各服务 `*.repo` / `*.persistence` / `*.infrastructure` 包 | `application-service/.../appservice/repo`、`title-release-service/.../titlerelease/persistence` |
+| 横切机制（响应/异常/鉴权/审计/契约） | 共享 `common` jar | `common/.../common/{config,security,web,contract}` |
+| Outbox / Flyway / Jdbc 基建 | 共享 `infrastructure` jar | `infrastructure/.../infrastructure/{outbox,config,persistence}` |
+
+> 命名不统一是**已知现状**（各服务用 `application` / `app`、`repo` / `persistence` / `infrastructure` 混用），
+> 本轮不改动；新代码**跟随所在服务既有命名**，不要跨服务强行统一。
 
 ---
 

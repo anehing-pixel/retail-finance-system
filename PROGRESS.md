@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V14（60 表）· 构建 353 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 16 模块代码 + Flyway V1–V15（60 表）· 构建 353 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 26/26 · E2E 98/98 · 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -14,8 +14,8 @@
 | 架构口径 | **Spring Cloud 微服务，直接对齐 floorplan**（用户 2026-11-22 指示，见 `ADR-RF-001`）；12 个部署单元 = 10 业务服务 + 网关 + DMZ |
 | 文档语言 | **全文中文**（用户 2026-11-22 指示）：法律/机构名用中文译名，拉丁缩写与代码标识符保留 |
 | 交付 | 根 4 文件；`docs/00` + `R00–R11` 共 12 份；`docs/adr/ADR-RF-001~011` 共 11 份；`scripts/`（check_docs / normalize_terms / gen_w2_services / smoke_w2）；`run-microservices.sh`；`.github/workflows/docs-check.yml`；**`frontend/`（W-FE）**；**`external-simulator/`（W-SIM：外部机构模拟器 simulator.js(18100, 零依赖 Node) + 模拟对接 E2E demo_e2e.py）** |
-| 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——父 pom + 四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
-| 验证 | `mvn -B clean package` → **BUILD SUCCESS（单测 0 失败；总数以 surefire 汇总为准，见顶部校正注）**；`run-microservices.sh smoke` → **26/26**；`scripts/e2e_w8.py` 全链路 → **98/98 EXIT 0**（可重复）；`external-simulator/demo_e2e.py` → **34/34**；`frontend/smoke_frontend.py` → **46/46**；`frontend/browser_e2e.py`（Playwright/Edge）→ **30/30**；`check_docs.py` **PASS 13/13**；floorplan 基线未触碰 |
+| 代码 | **W1**：`../company-platform-contracts` 19 主类 + 34 单测全绿；**W2（本仓）**：Maven 16 模块——四层共享（domain/application/common/infrastructure）+ 10 业务服务 + 网关 + DMZ（父 pom 为聚合器，不计入 16）；单测 16（JWT 双主体 8 + 事件白名单 8）+ DMZ 验签单测 4；Flyway V1–V9 已实测执行（49 张表）；`mvn -B clean package` 16 模块 BUILD SUCCESS |
+| 验证 | `mvn -B clean package` → **BUILD SUCCESS（单测 0 失败；总数以 surefire 汇总为准，见顶部校正注）**；`run-microservices.sh smoke` → **26/26**；`scripts/e2e_w8.py` 全链路 → **98/98 EXIT 0**（可重复）；`external-simulator/demo_e2e.py` → **34/34**；`frontend/smoke_frontend.py` → **46/46**；`frontend/browser_e2e.py`（Playwright/Edge）→ **30/30**；`check_docs.py` **PASS 15/15**；floorplan 基线未触碰 |
 | 业务阻塞 | ✅ 系统口径已全部定源（`C-01` 用户签；`C-02`~`C-12` AI 裁决，`R01 §6`）；外部核实项不阻塞 |
 | 外部依赖 | 中台 jar ✅；`R07 §7`：DMS ✅ 回填（`ADR-RF-011`）；集成商选型与其余通道未回填（**不阻塞 S2 并行窗口**） |
 | 下一轮 | **计划内 S0–S5 全部完成，W9 已放行（tag `w9-accepted`）**。后续进入外部对接阶段：集成商选型与征信/银行/身份核验/登记代办/通知通道调研回填（`R07 §7`）；**各通道字段级「我方提议协议 v1」已定稿（`R07 §4.1–§4.16`，用户授权）**，随调研发出作为谈判基线，回填前仍不实现自动对接（非阻塞） |
@@ -41,7 +41,7 @@
 | 6 | ADR 决策记录 | 10 份，均含状态 / 背景 / 结论 / 后果 / 被拒选项 / 权衡 | `docs/adr/` |
 | 7 | 命名定源与号段 | 端口 8090–8099 / 18081 / 18091、库 5435、前缀 `retail.*` / `RF_*`、Flyway V1 起 | `R00 §3.1 §6 §7` |
 | 8 | 工程治理 | 反模式 16 条、共享禁区、12 进程启动编排、验收判据、开工检查单 | `AGENTS.md` |
-| 9 | 一致性与术语自检 | 13 项机器校验落地并实测 **PASS / FAIL 0 / EXIT 0**，替代本轮无代码可编译的「冒烟全绿」 | `scripts/check_docs.py` |
+| 9 | 一致性与术语自检 | **15 项**机器校验落地并实测 **PASS / FAIL 0 / EXIT 0**，替代本轮无代码可编译的「冒烟全绿」；其中 C14/C15 为 2026-11-23 新增（号段与测试数口径守护） | `scripts/check_docs.py` |
 | 10 | 全中文 + 微服务口径回灌 | 全仓术语替换（假名 + 日文汉字） + 3 个 ADR 重命名 + 引用同步 + 10 份 ADR 节标题中文化；重写 `R00 §2 §3.1 §3.2` 与 `R09` 全文、修正 4 处端口段 | `scripts/normalize_terms.py` |
 | 11 | C-01 定源 + DMS 对接定源 | C-01 双形态并行（`ADR-RF-002` Accepted）；DMS 初期走数据集成商、四类业务接口与安全规范回填 `R07`（`ADR-RF-011` Accepted）；`R06` 增假名姓名字段 | `R01 §6`、`R07 §3 §4 §7`、`ADR-RF-002`、`ADR-RF-011` |
 
@@ -73,7 +73,12 @@
 > - 2026-11-23：**用户授权**外部协议先行定源：`R07 §4.1–§4.16` 新增「我方提议协议 v1」字段级规格
 >   （通用报文规范 + P-01~P-14，覆盖全部未回填通道）；未新增文档文件与错误码家族，
 >   `check_docs.py` 文件计数与 C-xx 登记不受影响。
-> - 2026-11-23：**用户授权**全仓文档与 W9 终态对齐：清除 README / `00` / R00 / R02 / R10 / R11 /
+> - 2026-11-23：**用户授权**（2026-11-23 11:0x「好的」确认）修正文档口径漂移：
+  改动 `AGENTS.md`（共享禁区）与 `scripts/check_docs.py`（共享禁区）——
+  理由：本轮全量实测证明二者与代码/实测脱节（模块数多算父 pom；§2 分层图描述的共享 jar 实际近乎空壳），
+  且 `check_docs.py` 查不出「测试数 / 迁移号段」漂移，需加 C14/C15 守护防复发。
+  同步修正 README / PROGRESS / R02 / R03 / R06 / R10 / R11 / 00-文档索引 / `external-api/application.yml` 注释；**未改业务代码**。
+- 2026-11-23：**用户授权**全仓文档与 W9 终态对齐：清除 README / `00` / R00 / R02 / R10 / R11 /
 >   AGENTS（§4 `run-microservices.sh` 标注）中「零代码/零迁移/零进程、jar 未抽取、服务未联调」等
 >   文档初始化时代的陈旧表述，改按实测终态回填；实现事实（`PROGRESS §6` 验证记录）未改。
 
@@ -161,6 +166,7 @@
 | 2026-11-23 | 外部提议协议 v1 定稿（用户授权） | **PASS**：`R07 §4.1–§4.16` 新增通用报文规范（信封/TLS/编码/JST/BIGINT 金额/错误体/重试基线）+ P-01~P-14 字段级协议（资质预审/授信申请/审查结果/交车代付/物权同步/征信查询报送/异议/银行代付/扣款与入金文件/缴款单/eKYC/解除回执/书面送达）；I-01~I-12 状态列同步 🟦；`check_docs.py` PASS 13/13 EXIT 0 |
 | 2026-11-23 | 仓库收尾（用户指示：仅保留 master） | **PASS**：master HEAD `8ded5ea`（E2E 截图产物刷新提交）；全仓仅 `refs/heads/master` 一个分支、主目录一个 worktree（`wt/w3~w9` 已随历次合并删除，`git worktree prune` 无残留）；验证进程全停（前端 18082 / 模拟器 18100），端口释放；仓库无远程（无推送步骤） |
 | 2026-11-23 | 文档终态更新（本节） | **PASS**：§0 轮次/验证行对齐 W-SIM2 终态；§6 补收尾记录；新增 §8 工期与运维投入评估；`check_docs.py` 复跑 PASS |
+| 2026-11-23 | **口径漂移复验与修正**（用户授权「修正文档口径不一致」） | **PASS**：本轮全量实测 `mvn -B -o package` → **BUILD SUCCESS / 353 测试 0 失败**（49 个测试类，surefire 类级汇总实测）；`check_docs.py` **PASS 15/15 EXIT 0**；DB 实查 `flyway_schema_history` → **15 条迁移全部 success**，四 schema **60 表**（core 43 / integration 9 / pii 6 / audit 2）；`run-microservices.sh smoke` **EXIT 0**（前端页面 46/46）；`scripts/e2e_w8.py` **98/98**；`external-simulator/demo_e2e.py` **34/34**。修正 4 类漂移：①**测试数 706→353**（README ×2 / R02 / R10 / 00-文档索引 ×2 共 7 处）；②**迁移号段 V1–V14→V1–V15**（README / PROGRESS ×2 / R02 / R06 ×2 / 00-文档索引 ×2 / R11 历史行 / `external-api/application.yml` 注释）；③**`AGENTS.md` §2 分层图与代码实况不符**——共享 `domain`(3 文件)/`application`(1 文件) 近乎空壳，真实分层是**服务内** `*.domain`/`*.application` 包，已补「实际落点」表与 53 文件零 Spring 实测说明；④**`AGENTS.md` 模块数分解式多算父 pom**。新增守护：`check_docs.py` **C14**（号段上限必须 == 磁盘迁移数）+ **C15**（测试数口径唯一 == 353），两项均经**注入反向验证**（改回 V1–V14 / 706 → 分别 FAIL EXIT 1，恢复后 PASS）。**未改任何业务代码**；AGENTS.md 与 scripts/check_docs.py 属共享禁区，本轮经用户授权修改，理由已记入 §2 变更记录 |
 
 > 本轮唯一可跑的验收是 `check_docs.py`。在 S1/S2 之前，任何「构建全绿」「12 个服务已联通」的表述都是假的。
 
@@ -171,7 +177,7 @@
 1. `R02` 的服务边界定义**已由 W2 落地并经网关冒烟验证**；但「路由可达」≠「业务能力完整」，
    能力完备性以 `scripts/smoke_w2.py`（26 断言）与 `scripts/e2e_w8.py`（98 断言）为准，新增能力必须补断言。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
-   （V1–V14，共 60 张表，实测 success）。改表一律走新迁移，不许改已执行迁移的字节。
+   （V1–V15，共 60 张表，实测 success）。改表一律走新迁移，不许改已执行迁移的字节。
 3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 353，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
