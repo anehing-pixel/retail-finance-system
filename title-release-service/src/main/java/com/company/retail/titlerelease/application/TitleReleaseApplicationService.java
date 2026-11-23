@@ -3,6 +3,7 @@ package com.company.retail.titlerelease.application;
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
 import com.company.retail.domain.exception.RFErrorCode;
+import com.company.retail.titlerelease.application.statemachine.ReleaseTransitionService;
 import com.company.retail.titlerelease.domain.EvidenceChainPolicy;
 import com.company.retail.titlerelease.domain.ReceiptAuthority;
 import com.company.retail.titlerelease.domain.ReleaseOrder;
@@ -45,19 +46,23 @@ public class TitleReleaseApplicationService {
     private final LocalStorageAttachmentStorage attachmentStorage;
     private final OutboxPublisher outbox;
     private final ObjectMapperHolder mapperHolder;
+    /** 解除链路状态迁移入口（Spring StateMachine 引擎驱动；领域为状态图唯一事实源）。 */
+    private final ReleaseTransitionService releaseTransitions;
 
     public TitleReleaseApplicationService(TitleRepositoryPort titleRepository,
                                           ReleaseOrderRepository orderRepository,
                                           AttachmentRepository attachmentRepository,
                                           LocalStorageAttachmentStorage attachmentStorage,
                                           OutboxPublisher outbox,
-                                          ObjectMapperHolder mapperHolder) {
+                                          ObjectMapperHolder mapperHolder,
+                                          ReleaseTransitionService releaseTransitions) {
         this.titleRepository = titleRepository;
         this.orderRepository = orderRepository;
         this.attachmentRepository = attachmentRepository;
         this.attachmentStorage = attachmentStorage;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
+        this.releaseTransitions = releaseTransitions;
     }
 
     /** ObjectMapper 桥（收口一处，同 retail-core 范式）。 */
@@ -278,7 +283,8 @@ public class TitleReleaseApplicationService {
                     doc.deliveredTo(), traceId);
         }
         if (order.status() == ReleaseOrderStatus.CREATED && countDistinctTypes(releaseOrderId) == 4) {
-            order.prepareDocuments();
+            // 引擎迁移：CREATED → DOCUMENTS_PREPARED
+            releaseTransitions.prepareDocuments(order);
             updateOrderStatus(order);
         }
         return reloadView(releaseOrderId);
@@ -298,7 +304,9 @@ public class TitleReleaseApplicationService {
             throw new BusinessException(RFErrorCode.RF_VALID_002,
                     "存在未交付留痕的解除文件（证据链⑤）");
         }
-        order.issueDocuments(); // 文件出具 ≠ 解押完成（不改保留状态，两态分离）
+        // 引擎迁移：DOCUMENTS_PREPARED → DOCUMENTS_ISSUED
+        // 文件出具 ≠ 解押完成（不改保留状态，两态分离）
+        releaseTransitions.issueDocuments(order);
         updateOrderStatus(order);
 
         // W9-C：解押文件落本地存储并登记 core.attachments（ADR-RF-008）——
@@ -376,7 +384,8 @@ public class TitleReleaseApplicationService {
     @Transactional
     public ReleaseOrderView submitExternal(long releaseOrderId, String submissionRef, String traceId) {
         ReleaseOrder order = loadOrder(releaseOrderId);
-        order.submitExternal(submissionRef);
+        // 引擎迁移：DOCUMENTS_ISSUED → EXTERNAL_SUBMITTED（证据链⑥）
+        releaseTransitions.submitExternal(order, submissionRef);
         updateOrderStatus(order);
         return reloadView(releaseOrderId);
     }
@@ -396,20 +405,43 @@ public class TitleReleaseApplicationService {
                     Map.of("authority", authority.name()));
         }
 
-        // 回执先落库（append-only 留痕）
-        orderRepository.insertReceipt(releaseOrderId, authority.name(), receiptRef, verifiedBy,
-                rawRef, traceId);
+        // 回调幂等（ADR-RF-013）：外部方「换 nonce 重推」同一业务回执时，DMZ 的 nonce 关
+        // （只挡同一 nonce 重放）挡不住 —— 幂等由两道闸保证：
+        // ① 写入前查既有回执（重放判定，直接返回既有结果）；
+        // ② 写入走 uk_receipt_order_authority_ref 唯一索引（ON CONFLICT DO NOTHING，
+        //    冲突即 0 行 = 幂等；不捕获唯一键异常，避免 PostgreSQL 事务被置为 aborted）。
+        // 不引入分布式锁：唯一索引才是正确性来源，锁不作正确性来源（ADR-RF-012 白名单口径）。
+        if (orderRepository.findReceiptByRef(releaseOrderId, authority.name(), receiptRef).isPresent()) {
+            log.info("登记回执已存在，幂等返回 releaseOrderId={} receiptRef={} status={}",
+                    releaseOrderId, receiptRef, order.status());
+            return new ReceiptResult(releaseOrderId, order.status().name(), authority.name(),
+                    ReleaseOrderStatus.CLOSED == order.status(),
+                    "回执已登记（幂等重放：不重复落库、不重复推进状态、不重复发事件）");
+        }
+
+        // 回执先落库（append-only 留痕）；唯一索引冲突返回 0 行 → 幂等返回既有结果
+        long receiptId = orderRepository.insertReceipt(releaseOrderId, authority.name(), receiptRef,
+                verifiedBy, rawRef, traceId);
+        if (receiptId == 0L) {
+            log.info("登记回执并发冲突（uk_receipt_order_authority_ref），幂等返回 releaseOrderId={} receiptRef={}",
+                    releaseOrderId, receiptRef);
+            return new ReceiptResult(releaseOrderId, order.status().name(), authority.name(),
+                    ReleaseOrderStatus.CLOSED == order.status(),
+                    "回执已登记（并发幂等：不重复落库、不重复推进状态、不重复发事件）");
+        }
 
         if (authority == ReceiptAuthority.INTERNAL_WITNESS) {
             // 我方见证代录：仅中间态 MANUAL_RECORDED，绝不等于解押完成（C-11 / X-9）
-            order.recordManualWitness();
+            // 引擎迁移：→ MANUAL_RECORDED（中间态）
+            releaseTransitions.recordManualWitness(order);
             updateOrderStatus(order);
             return new ReceiptResult(releaseOrderId, order.status().name(),
                     authority.name(), false, "代录已登记（MANUAL_RECORDED 中间态；补外部回执前不得解押）");
         }
 
         // EXTERNAL_REGISTRY：唯一可推进解押完成的权威（R04 §3.5：仅 EXTERNAL_SUBMITTED / MANUAL_RECORDED 可达）
-        order.confirmRegistration(authority);
+        // 引擎迁移：→ REGISTRATION_CONFIRMED（EXTERNAL_REGISTRY：唯一可闭环的权威）
+        releaseTransitions.confirmRegistration(order, authority);
 
         // 第 7 步：改写保留状态（INV-3 唯一入口）
         TitleRepositoryPort.TitleRow titleRow = titleRepository.findById(order.titleId())
@@ -420,7 +452,8 @@ public class TitleReleaseApplicationService {
                 titleRow.registeredAt() == null ? null : titleRow.registeredAt().toInstant(),
                 titleRow.releasedAt() == null ? null : titleRow.releasedAt().toInstant(),
                 titleRow.version());
-        retention.markReleaseRegistered(order.status(), authority);
+        // 引擎迁移：REGISTERED → RELEASE_REGISTERED（保留聚合独立推进，INV-3 唯一入口）
+        releaseTransitions.markReleaseRegistered(retention, order.status(), authority);
         titleRepository.updateStatus(titleRow.titleId(), retention.status().name(),
                 retention.releasedAt() == null ? null : Timestamp.from(retention.releasedAt()),
                 titleRow.version());
@@ -428,8 +461,9 @@ public class TitleReleaseApplicationService {
         // 第 8 步：关闭订单与保留（终态）+ 闭环事件 TITLE_RELEASE_REGISTERED。
         // REGISTRATION_CONFIRMED → CLOSED 的两段迁移各自过内存状态机守卫，DB 合并为一次写
         //（避免同一 version 上的二次乐观锁更新冲突）。
-        order.close();
-        retention.close();
+        // 引擎迁移：REGISTRATION_CONFIRMED → CLOSED（订单与保留各走各的机器，DB 合并为一次写）
+        releaseTransitions.close(order);
+        releaseTransitions.close(retention);
         updateOrderStatus(order);
         TitleRepositoryPort.TitleRow latestTitle = titleRepository.findById(order.titleId())
                 .orElseThrow();

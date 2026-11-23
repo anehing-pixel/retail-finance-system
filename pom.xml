@@ -16,6 +16,8 @@
     <module>application</module>
     <module>infrastructure</module>
     <module>common</module>
+    <!-- 状态机引擎底座（Spring StateMachine；领域为状态图唯一事实源） -->
+    <module>statemachine</module>
     <!-- 10 个业务服务（端口 8090–8099） -->
     <module>retail-core</module>
     <module>auth-service</module>
@@ -44,6 +46,9 @@
     <platform-contracts.version>1.0.0-SNAPSHOT</platform-contracts.version>
     <!-- 持久层：MyBatis（Spring Boot 3.2 兼容线 3.0.x） -->
     <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
+    <!-- 状态机引擎：4.0.0 是唯一与本仓 Spring Framework 6.1.x 兼容的版本
+         （4.0.1/4.0.2 基于 Spring 6.2.x 会与本仓 BOM 打架；3.x 线是 Spring 5.3 老线） -->
+    <spring-statemachine.version>4.0.0</spring-statemachine.version>
     <jjwt.version>0.12.5</jjwt.version>
     <!-- 缓存与限流基础设施：Redis（分布式缓存 L2 + 令牌桶）+ Caffeine（本地缓存 L1）。
          版本随 Boot BOM；此处显式登记便于审计。边界与被拒方案见 docs/adr/ADR-RF-012。 -->
@@ -93,6 +98,12 @@
         <groupId>org.mybatis.spring.boot</groupId>
         <artifactId>mybatis-spring-boot-starter</artifactId>
         <version>${mybatis-spring-boot.version}</version>
+      </dependency>
+      <!-- 状态机引擎（进程内，不引外部中间件；不违反 B-10「不引 MQ/Seata/对象存储」） -->
+      <dependency>
+        <groupId>org.springframework.statemachine</groupId>
+        <artifactId>spring-statemachine-core</artifactId>
+        <version>${spring-statemachine.version}</version>
       </dependency>
       <dependency>
         <groupId>io.jsonwebtoken</groupId>

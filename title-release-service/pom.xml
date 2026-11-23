@@ -30,6 +30,12 @@
       <artifactId>retail-infrastructure</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- 状态机引擎底座（领域为状态图唯一事实源） -->
+    <dependency>
+      <groupId>com.company</groupId>
+      <artifactId>retail-statemachine</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>

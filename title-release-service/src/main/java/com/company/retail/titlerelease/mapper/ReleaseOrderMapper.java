@@ -71,11 +71,28 @@ public interface ReleaseOrderMapper {
             + "FROM core.release_documents WHERE release_order_id = #{releaseOrderId} ORDER BY document_id")
     List<Map<String, Object>> findDocuments(@Param("releaseOrderId") long releaseOrderId);
 
+    /**
+     * 登记回执（uk_receipt_order_authority_ref：订单 + 权威 + 回执号唯一）。
+     *
+     * <p>并发 / 重复投递同一业务回执时走 {@code ON CONFLICT DO NOTHING}：不插入、
+     * 生成键不回填（返回 0），由调用方按幂等语义返回既有结果——不捕获唯一键异常，
+     * 避免 PostgreSQL「唯一键错误即整笔事务 aborted」。</p>
+     */
     @Insert("INSERT INTO core.registration_receipts (release_order_id, authority, receipt_ref, "
             + "verified_by, raw_ref, trace_id) "
-            + "VALUES (#{releaseOrderId}, #{authority}, #{receiptRef}, #{verifiedBy}, #{rawRef}, #{traceId})")
+            + "VALUES (#{releaseOrderId}, #{authority}, #{receiptRef}, #{verifiedBy}, #{rawRef}, #{traceId}) "
+            + "ON CONFLICT (release_order_id, authority, COALESCE(receipt_ref, '')) DO NOTHING")
     @Options(useGeneratedKeys = true, keyProperty = "receiptId", keyColumn = "receipt_id")
     int insertReceipt(Map<String, Object> params);
+
+    /** 按 (订单, 权威, 回执号) 读既有回执（回调幂等重放判定，ADR-RF-013）。 */
+    @Select("SELECT receipt_id, release_order_id, authority, receipt_ref, received_at, verified_by, raw_ref "
+            + "FROM core.registration_receipts WHERE release_order_id = #{releaseOrderId} "
+            + "AND authority = #{authority} AND COALESCE(receipt_ref, '') = COALESCE(#{receiptRef}, '') "
+            + "ORDER BY receipt_id LIMIT 1")
+    List<Map<String, Object>> findReceiptByRef(@Param("releaseOrderId") long releaseOrderId,
+                                               @Param("authority") String authority,
+                                               @Param("receiptRef") String receiptRef);
 
     /** 证据链⑦：存在 EXTERNAL_REGISTRY 权威回执。 */
     @Select("SELECT COUNT(*) FROM core.registration_receipts "

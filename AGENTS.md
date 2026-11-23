@@ -48,6 +48,8 @@ gateway / external-api / 10 个业务服务
         → domain（聚合、状态机、不变量、领域策略；零 Spring 注解）
         ← infrastructure（Jdbc 仓储、Flyway、外部适配器、Outbox 投递）
         + common（横切：响应/异常/拦截/审计/契约）
+        + statemachine（状态机引擎底座：事件编排 / 守卫 / 动作；不落库）
+        + statemachine（可选引擎底座：Spring StateMachine 4.0.0；**领域状态图仍是唯一事实源**）
 ```
 
 - `domain` **不得 import Spring / common / infrastructure**，必须可用纯 JUnit 跑。
@@ -69,6 +71,15 @@ gateway / external-api / 10 个业务服务
   对齐原 JdbcTemplate「每次读都落库」的读语义，避免同一事务内重复 SELECT 命中本地缓存旧行。
 - **唯一键幂等走 `ON CONFLICT` 原子语义**，不采用「捕获唯一键异常再重读」——
   PostgreSQL 事务内一旦触发唯一键错误，整笔事务即被置为 aborted，无法继续读库。
+- **状态机纪律（Spring StateMachine 4.0.0，进程内、不引外部中间件）**：
+  **领域是状态图唯一事实源**——迁移边一律由领域枚举的 `graph()` 生成，引擎侧**不得另写一份状态图**；
+  `domain` 仍**零 Spring**（引擎在共享 `statemachine` 模块 + 各服务 `*.application`，不进领域层）；
+  领域尚未提供变更入口的边必须**显式登记为「未接线」**，既不登记也不接事件 → **启动装配期 fail-fast**；
+  引擎**不落库**（状态权威始终在数据库），领域方法仍是合法性的最终裁决者，对外错误码与消息一字不改。
+- **状态机引擎（可选底座，`statemachine` 共享模块）**：引擎**只做执行器，不做事实源**——
+  领域状态图（`LoanStatus` / `ReleaseOrderStatus` / `TitleRetentionStatus` 等枚举 + 允许迁移）仍是唯一事实源；
+  引擎不得侵入 `domain`（`domain` 继续零 Spring 注解、纯 JUnit 可跑），接线只放服务内 `*.application.statemachine` 包。
+  引擎**不引入外部中间件**（进程内，不违反 B-10「不引 MQ / Seata / 对象存储」）。
 
 ### 实际落点（按包名前缀找代码）
 
@@ -79,6 +90,8 @@ gateway / external-api / 10 个业务服务
 | 持久化 | 各服务 `*.mapper`（SQL）+ `*.repo` / `*.persistence` / `*.infrastructure`（行映射与仓储） | `application-service/.../appservice/{mapper,repo}`、`title-release-service/.../titlerelease/{mapper,persistence}` |
 | 横切机制（响应/异常/鉴权/审计/契约） | 共享 `common` jar | `common/.../common/{config,security,web,contract}` |
 | Outbox / Flyway / 持久层基建 | 共享 `infrastructure` jar | `infrastructure/.../infrastructure/{outbox,config,persistence,mapper}` |
+| 状态机引擎（编排，不放业务语义） | 共享 `statemachine` jar（`com.company.retail.statemachine`）+ 各服务 `*.application.statemachine`（图配置与接线） | `statemachine/.../statemachine`、`retail-core/.../core/application/statemachine` |
+| 状态机引擎底座（可选） | 共享 `statemachine` jar + 服务内 `*.application.statemachine` 接线包 | `statemachine/.../statemachine/{DomainStateMachineConfigurer,StateMachineRunner}`、`retail-core/.../core/application/statemachine/` |
 
 > 命名不统一是**已知现状**（各服务用 `application` / `app`、`repo` / `persistence` / `infrastructure` 混用），
 > 本轮不改动；新代码**跟随所在服务既有命名**，不要跨服务强行统一。
@@ -102,6 +115,7 @@ gateway / external-api / 10 个业务服务
 | B-11 | **核心账务不拆**：入金核销 + 余额 + 债权终态同一本地事务，留在 `retail-core` | `ADR-RF-001` |
 | B-12 | **持久层改造不改语义**：SQL 语义、仓储方法签名、事务边界、对外接口一律不变 | `R02 §3.1`、本文件 §2 |
 | B-13 | **Redis 用途白名单只有两类**：① **只读业务配置**的 L2 缓存（产品档位等）；② **网关限流状态**。**绝不缓存**债权余额 / 核销流水 / 个人信息 / 征信结果 / 审查结果。**改配置不得改历史计划**（计划侧落快照）；Redis 锁**不作正确性来源**；缓存不可用 → 降级直读数据源，限流不可用 → fail-open | `ADR-RF-012` §2 §3 |
+| B-14 | **状态机：领域为状态图唯一事实源**——引擎迁移边必须由领域状态图生成，**禁止在引擎侧另写一份状态图**；未提供变更入口的边必须显式登记为「未接线」，未登记即启动装配失败；**接入引擎不得改变对外语义**（错误码、消息、事务边界一律不变） | `R04 §5.3`、本文件 §2 §9 |
 
 ---
 
@@ -149,7 +163,7 @@ bash run-microservices.sh smoke      # 启动 12 个进程 → 走网关 18081 �
 - 本项目**独立数据库实例**（`retail_finance`），Flyway 从 `V1` 起，与 floorplan 的 `V1–V26` 物理隔离、不会撞号。
 - 但**端口段、配置键前缀、JWT 密钥环境变量、中台 jar 版本、Feign 契约**是跨项目共享资源，
   改动前必须在 `PROGRESS.md §2` 登记。
-- 号段规划见 `R06 §6`：V1–V9 起步地基、V10–V19 段（**V18 已占用** = 产品档位目录 + 还款计划快照列；V19 预留）、V20–V29 预留、V30+ 按波次分配、V32–V39 有意留空。
+- 号段规划见 `R06 §6`：V1–V9 起步地基、V10–V19 段（**V18 已占用** = 产品档位目录 + 还款计划快照列；**V19 已占用** = 外部登记回执幂等唯一索引）、V20–V29 预留（**V20 = G-DB-7 审计写入授权调整**）、V30+ 按波次分配、V32–V39 有意留空。
 - **已执行的迁移字节不改**（Flyway 校验和失配会让服务起不来）；调整一律走新迁移。
 - 开新分支前先查 `PROGRESS.md §2` 的号段占用表；两个并行流建同号迁移 = 启动失败（floorplan 真实事故）。
 - 新增服务端口必须从 8090–8099 未占用位分配，并同步 `R00 §6` / `README §2` / 网关路由表。
@@ -208,6 +222,7 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 | **A-14** | **把「所有权解除文件已出具」当作「解除完成」** | 出具文件 ≠ 车辆登记机关登记完成；两态分离见 `R04 §4`、`R05 §6` |
 | **A-15** | **把 floorplan 的担保登记 / 放车放证 / 担保门禁直接搬过来** | C 端是已交付车的所有权保留，不是让与担保登记；整条链废弃见 `ADR-RF-006` |
 | **A-16** | **12 个服务都起了但彼此零调用，就报「微服务已落地」** | 必须用 Feign 门禁 + outbox 事件 + 走网关冒烟证明链路已通 |
+| **A-17** | **引擎侧另写一份状态图**（领域一份、引擎一份，两份漂移） | 迁移边必须由领域 `graph()` 生成；未接线边显式登记，否则启动装配 fail-fast（B-14） |
 
 ---
 
@@ -221,6 +236,7 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 | 双主体身份与个人信息隔离 | `ADR-RF-004`、`R08` |
 | 事件载荷禁个人信息 | `R09 §5`、`ADR-RF-007` |
 | 端口 / 号段 / 前缀 | `R00 §6 §7`、本文件 §6 |
+| 状态机引擎（分层口径 / 迁移范围 / 版本选型） | `R04 §5.3`、共享 `statemachine` 模块、本文件 B-14 |
 | 参数默认值（可配置覆盖） | `R01 §7` |
 
 ---
@@ -234,6 +250,7 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 - [ ] 涉及外部方的，已确认 `R07 §7` 调研清单是否回填；未回填一律走人工路径 + 防腐层
 - [ ] 涉及个人信息 / 事件 / 权限的，已过 `R08 §5` 与 `R09 §5` 白名单检查
 - [ ] 涉及缓存 / Redis 的，已过 `ADR-RF-012` §2 用途白名单检查（B-13：只缓存只读配置与限流态，不缓存余额 / 流水 / PII / 征信与审查结果）
+- [ ] 涉及状态机的，已确认状态图仍以领域为唯一事实源（`*.Status.graph()`）、未接线边已显式登记、`domain` 未引入 Spring 依赖
 - [ ] 涉及新服务的，已确认端口位、网关路由、精确装配清单与冒烟断言归属
 - [ ] 收口时跑 `python scripts/check_docs.py`，并在 `PROGRESS.md` 记录结果
 
@@ -242,6 +259,6 @@ git commit -m "..." -- docs/R04-领域模型与状态机设计.md
 ## 12. 自检
 
 本手册覆盖：事实源优先级、分层与精确装配、口径红线、环境事实（12 进程）、验收判据、
-号段与共享资源、禁区、命名、反模式 16 条、口径索引、开工检查单。
+号段与共享资源、禁区、命名、反模式 17 条、口径索引、开工检查单。
 与 `README.md`（是什么）、`PROGRESS.md`（做到哪一步）、`docs/R00`（命名定源）无内容重复，仅互相引用。
 全文中文。

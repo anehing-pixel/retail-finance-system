@@ -2,6 +2,7 @@ package com.company.retail.core.application;
 
 import com.company.platform.exception.BusinessException;
 import com.company.retail.common.contract.OutboxPublisher;
+import com.company.retail.core.application.statemachine.LoanTransitionService;
 import com.company.retail.core.domain.Loan;
 import com.company.retail.core.integration.BankPayAdapter;
 import com.company.retail.core.persistence.DisbursementRepository;
@@ -33,17 +34,21 @@ public class DisbursementTxExecutor {
     private final ObjectMapperHolder mapperHolder;
     /** 银行代付网关（W-SIM2 双模：挡板/HTTP，配置 retail.core.bank-pay-url）。 */
     private final BankPayAdapter bankPayAdapter;
+    /** 债权状态迁移入口（Spring StateMachine 引擎驱动；领域为状态图唯一事实源）。 */
+    private final LoanTransitionService loanTransitions;
 
     public DisbursementTxExecutor(LoanRepository loanRepository,
                                   DisbursementRepository disbursementRepository,
                                   OutboxPublisher outbox,
                                   ObjectMapperHolder mapperHolder,
-                                  BankPayAdapter bankPayAdapter) {
+                                  BankPayAdapter bankPayAdapter,
+                                  LoanTransitionService loanTransitions) {
         this.loanRepository = loanRepository;
         this.disbursementRepository = disbursementRepository;
         this.outbox = outbox;
         this.mapperHolder = mapperHolder;
         this.bankPayAdapter = bankPayAdapter;
+        this.loanTransitions = loanTransitions;
     }
 
     @Transactional
@@ -60,7 +65,8 @@ public class DisbursementTxExecutor {
         }
         loan.assertDisbursementAllowed(); // INV-1（uk_disb_loan 之外的领域层守卫）
 
-        loan.startDisbursement();
+        // 引擎迁移：PENDING_DISBURSEMENT / DISBURSE_FAILED → DISBURSING（动作调用领域方法）
+        loanTransitions.startDisbursement(loan);
         java.time.Instant paidAt = java.time.Instant.now();
         String instructionRef = request.payeeAccountRef() == null || request.payeeAccountRef().isBlank()
                 ? "INS-" + loan.loanId()
@@ -81,7 +87,8 @@ public class DisbursementTxExecutor {
             // uk_disb_loan / uk_disb_idempotency：三层幂等兜底（R09 §6）
             throw new BusinessException(RFErrorCode.RF_LOAN_002, "重复代付（唯一约束兜底）");
         }
-        loan.completeDisbursement(paidAt);
+        // 引擎迁移：DISBURSING → ACTIVE（付款回调与债权状态迁移同一本地事务，R05 §5 S7–S8）
+        loanTransitions.completeDisbursement(loan, paidAt);
         if (loanRepository.updateAfterDisbursement(loan) == 0) {
             throw new BusinessException(RFErrorCode.RF_CONFLICT_001, "债权并发更新冲突（乐观锁 version）");
         }

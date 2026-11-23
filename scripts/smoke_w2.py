@@ -4,7 +4,7 @@
 断言口径：不把「进程起来了」当「链路通了」（反模式 A-16 / A-1）——
 每条断言都打网关 18081（或 DMZ 18091）真实 HTTP，验证认证/主体隔离/验签语义。
 环境变量：SMOKE_GATEWAY（默认 http://127.0.0.1:18081）、SMOKE_DMZ（http://127.0.0.1:18091）、
-DB_CONTAINER（retail-finance-db，用于核对 Flyway V1–V18）。
+DB_CONTAINER（retail-finance-db，用于核对 Flyway V1–V19）。
 
 覆盖新增能力：网关 Redis 令牌桶限流（429 + 统一错误码）、产品档位目录与还款计划快照列。
 """
