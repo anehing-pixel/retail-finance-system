@@ -26,8 +26,10 @@ import java.util.Set;
  * <p><b>ADR-RF-014</b>：记账与执行逻辑已抽到 {@link EventConsumptionService}，
  * 与 MQ 中继消费端共用同一套语义与同一张幂等表——直投与中继同时开启也不会重复执行。</p>
  *
- * <p>多实例限制（如实记录）：游标按 consumer 一行，多进程同名 consumer 会互相覆盖；
- * 当前单实例部署成立，多实例前必须改 FOR UPDATE SKIP LOCKED。</p>
+ * <p><b>多实例（P0-4）</b>：同一 {@code (event_id, consumer)} 由
+ * {@link EventConsumptionService} 原子认领（PROCESSING + 5 分钟租约），只有一个实例执行；
+ * 游标只前进（SQL 用 {@code GREATEST}），未抢到认领的事件本轮停止推进，由持有者完成后推进。
+ * at-least-once 语义不变，业务层仍由业务唯一键兜底。</p>
  */
 public class RfEventDispatcher {
 
@@ -45,10 +47,18 @@ public class RfEventDispatcher {
                              ObjectProvider<EventConsumer> consumerProvider,
                              EventConsumptionService consumption,
                              org.springframework.beans.factory.ObjectProvider<com.company.retail.infrastructure.config.MqProperties> mqPropertiesProvider) {
+        this(mapper, consumerProvider.orderedStream().toList(), consumption,
+                mqPropertiesProvider.getIfAvailable());
+    }
+
+    /** 测试/显式装配用：消费者直接传入（生产走 ObjectProvider 的精确装配）。 */
+    RfEventDispatcher(OutboxMapper mapper, List<EventConsumer> consumers,
+                      EventConsumptionService consumption,
+                      com.company.retail.infrastructure.config.MqProperties mqProperties) {
         this.mapper = mapper;
-        this.consumers = consumerProvider.orderedStream().toList();
+        this.consumers = consumers == null ? List.of() : consumers;
         this.consumption = consumption;
-        this.mqProperties = mqPropertiesProvider.getIfAvailable();
+        this.mqProperties = mqProperties;
     }
 
     /**

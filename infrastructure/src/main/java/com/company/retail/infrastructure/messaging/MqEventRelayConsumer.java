@@ -19,6 +19,9 @@ import java.util.List;
  * <p><b>与直投路径共用同一张幂等表</b>（{@code core.event_consumptions}，主键 event_id + consumer），
  * 因此「直投」与「MQ 中继」同时开启也不会重复执行业务动作：谁先到谁执行，
  * 后到的看到 DONE 直接跳过。</p>
+ *
+ * <p><b>P0-4</b>：{@link EventConsumptionService#handle} 返回 false（失败或另一实例处理中）时
+ * <b>抛出异常触发 MQ 重投</b>，不能静默 ack；已完成/终态的消费者仍按幂等跳过。</p>
  */
 public class MqEventRelayConsumer implements EnvelopeConsumer {
 
@@ -63,7 +66,11 @@ public class MqEventRelayConsumer implements EnvelopeConsumer {
         DomainEvent event = new DomainEvent(eventId, eventType, aggregateKey, payload, occurredAt);
         for (EventConsumer consumer : consumers) {
             if (consumer.eventTypes().contains(eventType)) {
-                consumption.handle(consumer, event);
+                boolean resolved = consumption.handle(consumer, event);
+                if (!resolved) {
+                    throw new IllegalStateException("事件消费未完成，触发 MQ 重投 consumer="
+                            + consumer.name() + " event_id=" + eventId);
+                }
             }
         }
     }

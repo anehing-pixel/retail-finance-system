@@ -72,25 +72,52 @@ public interface OutboxMapper {
     List<Map<String, Object>> findConsumption(@Param("eventId") long eventId,
                                                @Param("consumer") String consumer);
 
-    /** 消费成功。 */
+    /**
+     * 原子认领一条消费记录（P0-4 多实例安全）：
+     * PENDING/FAILED 可直接认领；PROCESSING 超过租约才可重新认领。
+     * 同一 (event_id, consumer) 只有一个实例能拿到行。
+     */
+    @Select("UPDATE core.event_consumptions SET status = 'PROCESSING', updated_at = now() "
+            + "WHERE event_id = #{eventId} AND consumer = #{consumer} "
+            + "  AND attempts < #{maxAttempts} "
+            + "  AND (status IN ('PENDING','FAILED') "
+            + "       OR (status = 'PROCESSING' "
+            + "           AND updated_at < now() - make_interval(secs => #{leaseSeconds}))) "
+            + "RETURNING attempts")
+    List<Map<String, Object>> claimConsumption(@Param("eventId") long eventId,
+                                               @Param("consumer") String consumer,
+                                               @Param("leaseSeconds") long leaseSeconds,
+                                               @Param("maxAttempts") int maxAttempts);
+
+    /** 消费成功（仅认领者 PROCESSING 状态可写）。 */
     @Update("UPDATE core.event_consumptions SET status = 'DONE', attempts = #{next}, "
             + "last_error = NULL, updated_at = now() "
-            + "WHERE event_id = #{eventId} AND consumer = #{consumer}")
+            + "WHERE event_id = #{eventId} AND consumer = #{consumer} AND status = 'PROCESSING'")
     int markConsumptionDone(@Param("eventId") long eventId, @Param("consumer") String consumer,
                             @Param("next") int next);
 
-    /** 消费失败（FAILED）。记录尝试次数与错误摘要。 */
+    /** 消费失败（FAILED）。记录尝试次数与错误摘要（仅认领者 PROCESSING 状态可写）。 */
     @Update("UPDATE core.event_consumptions SET status = 'FAILED', attempts = #{next}, "
             + "last_error = #{err}, updated_at = now() "
-            + "WHERE event_id = #{eventId} AND consumer = #{consumer}")
+            + "WHERE event_id = #{eventId} AND consumer = #{consumer} AND status = 'PROCESSING'")
     int markConsumptionFailed(@Param("eventId") long eventId, @Param("consumer") String consumer,
                                @Param("next") int next, @Param("err") String err);
 
-    /** 置 DEAD（已达重试上限；不再累加 attempts）。 */
+    /** 置 DEAD（已达重试上限；仅认领者 PROCESSING 状态可写）。 */
     @Update("UPDATE core.event_consumptions SET status = 'DEAD', last_error = #{err}, "
-            + "updated_at = now() WHERE event_id = #{eventId} AND consumer = #{consumer}")
+            + "updated_at = now() WHERE event_id = #{eventId} AND consumer = #{consumer} "
+            + "AND status = 'PROCESSING'")
     int markConsumptionDead(@Param("eventId") long eventId, @Param("consumer") String consumer,
                             @Param("err") String err);
+
+    /** 已达重试上限但未在 PROCESSING 状态的记录补置 DEAD（认领前判定）。 */
+    @Update("UPDATE core.event_consumptions SET status = 'DEAD', last_error = #{err}, "
+            + "updated_at = now() WHERE event_id = #{eventId} AND consumer = #{consumer} "
+            + "AND status = 'FAILED' AND attempts >= #{maxAttempts}")
+    int markConsumptionDeadIfExhausted(@Param("eventId") long eventId,
+                                       @Param("consumer") String consumer,
+                                       @Param("err") String err,
+                                       @Param("maxAttempts") int maxAttempts);
 
     /** 游标占位。 */
     @Insert("INSERT INTO core.consumer_offsets (consumer, last_event_id) VALUES (#{consumer}, 0) "
@@ -101,8 +128,9 @@ public interface OutboxMapper {
     @Select("SELECT last_event_id FROM core.consumer_offsets WHERE consumer = #{consumer}")
     Long findOffset(@Param("consumer") String consumer);
 
-    /** 推进游标。 */
-    @Update("UPDATE core.consumer_offsets SET last_event_id = #{eventId}, updated_at = now() "
+    /** 推进游标（只前进：多实例并发写不得回退）。 */
+    @Update("UPDATE core.consumer_offsets "
+            + "SET last_event_id = GREATEST(last_event_id, #{eventId}), updated_at = now() "
             + "WHERE consumer = #{consumer}")
     int writeOffset(@Param("consumer") String consumer, @Param("eventId") long eventId);
 }
