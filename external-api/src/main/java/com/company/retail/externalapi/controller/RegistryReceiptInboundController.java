@@ -5,8 +5,12 @@ import com.company.platform.response.ApiResponse;
 import com.company.retail.common.config.TraceIdFilter;
 import com.company.retail.common.lock.DistributedLockManager;
 import com.company.retail.common.lock.LockKeys;
+import com.company.retail.common.outbound.IdempotencyKeys;
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
 import com.company.retail.common.security.JwtTokenVerifier;
 import com.company.retail.domain.exception.RFErrorCode;
+import com.company.retail.externalapi.integration.RegistryReceiptForwarder;
 import com.company.retail.externalapi.security.DmzGatekeeper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,11 +20,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,15 +42,13 @@ import java.util.UUID;
 public class RegistryReceiptInboundController {
 
     private static final String PARTNER_VERIFIED_BY = "REG-SIM-01";
-    private static final Duration FORWARD_TIMEOUT = Duration.ofSeconds(10);
 
     private final DmzGatekeeper gatekeeper;
     private final JwtTokenVerifier staffVerifier;
     private final DistributedLockManager locks;
     private final java.time.Duration lockWait;
     private final String titleReleaseUrl;
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(FORWARD_TIMEOUT).build();
+    private final RegistryReceiptForwarder forwarder;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public RegistryReceiptInboundController(
@@ -59,7 +56,8 @@ public class RegistryReceiptInboundController {
             @Value("${retail.auth.secret}") String staffJwtSecret,
             @Value("${retail.clients.title-release.url}") String titleReleaseUrl,
             DistributedLockManager locks,
-            @Value("${retail.lock.wait-time-ms:3000}") long lockWaitMs) {
+            @Value("${retail.lock.wait-time-ms:3000}") long lockWaitMs,
+            OutboundHttpClientFactory outbound) {
         this.gatekeeper = gatekeeper;
         this.staffVerifier = new JwtTokenVerifier(staffJwtSecret,
                 com.company.platform.security.SubjectType.EMPLOYEE);
@@ -68,6 +66,8 @@ public class RegistryReceiptInboundController {
         this.titleReleaseUrl = titleReleaseUrl == null ? ""
                 : (titleReleaseUrl.endsWith("/")
                 ? titleReleaseUrl.substring(0, titleReleaseUrl.length() - 1) : titleReleaseUrl);
+        this.forwarder = new RegistryReceiptForwarder(
+                outbound.noRetryClient("title-release-forward", OutboundProfile.FORWARD));
     }
 
     @PostMapping("/external/registry/receipts")
@@ -103,26 +103,6 @@ public class RegistryReceiptInboundController {
                 () -> forward(request, req, releaseOrderId, receiptRef, rawRef));
     }
 
-    /** JSON 序列化（受检异常收敛为 RF_SYS_001）。 */
-    private String toJson(Object value) {
-        try {
-            return mapper.writeValueAsString(value);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new BusinessException(RFErrorCode.RF_SYS_001,
-                    Map.of("reason", "FORWARD_PAYLOAD_SERIALIZE"));
-        }
-    }
-
-    /** JSON 解析（受检异常收敛为 RF_SYS_001）。 */
-    private JsonNode parseJson(String raw) {
-        try {
-            return mapper.readTree(raw);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new BusinessException(RFErrorCode.RF_SYS_001,
-                    Map.of("reason", "FORWARD_RESPONSE_PARSE"));
-        }
-    }
-
     /** 锁内转发：签系统服务 token → 转发 title-release → 组装响应。 */
     private Object forward(HttpServletRequest request, JsonNode req, long releaseOrderId,
                            String receiptRef, String rawRef) {
@@ -140,30 +120,15 @@ public class RegistryReceiptInboundController {
         forward.put("receiptRef", receiptRef);
         forward.put("verifiedBy", PARTNER_VERIFIED_BY);
         forward.put("rawRef", rawRef.isBlank() ? "raw-" + receiptRef : rawRef);
-        HttpRequest forwardReq = HttpRequest.newBuilder()
-                .uri(URI.create(titleReleaseUrl + "/api/release-orders/" + releaseOrderId + "/receipts"))
-                .timeout(FORWARD_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + serviceToken)
-                .POST(HttpRequest.BodyPublishers.ofString(toJson(forward)))
-                .build();
-        HttpResponse<String> resp;
-        try {
-            resp = http.send(forwardReq, HttpResponse.BodyHandlers.ofString());
-        } catch (java.io.IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            throw new BusinessException(RFErrorCode.RF_SYS_001,
-                    Map.of("reason", "TITLE_RELEASE_UNREACHABLE"));
-        }
-        JsonNode upstream = parseJson(resp.body());
+        RegistryReceiptForwarder.Outcome outcome = forwarder.forward(titleReleaseUrl, releaseOrderId,
+                "Bearer " + serviceToken, forward,
+                IdempotencyKeys.of("REG-RCPT", releaseOrderId, receiptRef));
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("received", true);
         data.put("partnerCode", request.getHeader("X-Partner-Code"));
         data.put("submissionRef", req.path("submissionRef").asText(""));
-        data.put("forwardStatus", resp.statusCode());
-        data.put("upstream", upstream.path("data"));
+        data.put("forwardStatus", outcome.status());
+        data.put("upstream", outcome.body().path("data"));
         Object traceId = request.getAttribute(TraceIdFilter.ATTR);
         return ApiResponse.ok(data, traceId == null ? UUID.randomUUID().toString()
                 : String.valueOf(traceId));

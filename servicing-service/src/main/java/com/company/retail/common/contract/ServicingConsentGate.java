@@ -1,15 +1,15 @@
 package com.company.retail.common.contract;
 
+import com.company.retail.common.outbound.OutboundHttpClient;
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
+import com.company.retail.common.outbound.OutboundResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.company.retail.servicing.application.ConsentValidityGate;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * servicing 侧同意有效性门禁（INV-5 / RB-1，W7）。
@@ -30,10 +30,18 @@ public class ServicingConsentGate implements ConsentValidityGate {
     private final FeignContracts.ConsentGateClient client;
     private final String customerBaseUrl;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** P0-7：raw 兜底统一走过站客户端（GATE_RAW：连接超时 + 熔断，不重试）。 */
+    private final OutboundHttpClient rawClient;
 
     public ServicingConsentGate(FeignContracts.ConsentGateClient client, String customerBaseUrl) {
+        this(client, customerBaseUrl, OutboundHttpClientFactory.defaults());
+    }
+
+    public ServicingConsentGate(FeignContracts.ConsentGateClient client, String customerBaseUrl,
+                                OutboundHttpClientFactory outbound) {
         this.client = client;
         this.customerBaseUrl = customerBaseUrl;
+        this.rawClient = outbound.client("consent-gate-raw", OutboundProfile.GATE_RAW);
     }
 
     @Override
@@ -59,18 +67,14 @@ public class ServicingConsentGate implements ConsentValidityGate {
             return false;   // 双模 URI 空串回退 lb://：原始调用不支持 lb，直接 fail-closed
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder(
-                            URI.create(customerBaseUrl + String.format(GATE_PATH, consentId)))
-                    .timeout(Duration.ofSeconds(2))
-                    .header("Authorization", currentAuthorization())
-                    .header("X-Request-Id", java.util.UUID.randomUUID().toString())
-                    .GET().build();
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() / 100 != 2) {
+            OutboundResult response = rawClient.get(
+                    customerBaseUrl + String.format(GATE_PATH, consentId),
+                    Map.of("Authorization", currentAuthorization(),
+                            "X-Request-Id", UUID.randomUUID().toString()));
+            if (!response.is2xx()) {
                 return false;
             }
-            JsonNode body = objectMapper.readTree(response.body());
+            JsonNode body = objectMapper.readTree(response.getBody());
             if (!"OK".equals(body.path("code").asText())) {
                 return false;
             }

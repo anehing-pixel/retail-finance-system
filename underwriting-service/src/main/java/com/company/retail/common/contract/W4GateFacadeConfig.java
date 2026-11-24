@@ -1,5 +1,6 @@
 package com.company.retail.common.contract;
 
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,7 +15,8 @@ public class W4GateFacadeConfig {
     @Bean
     public ConsentGateFacade consentGateFacade(
             FeignContracts.ConsentGateClient consentGateClient,
-            @Value("${retail.clients.customer.url:}") String customerBaseUrl) {
-        return new ConsentGateFacade(consentGateClient, customerBaseUrl);
+            @Value("${retail.clients.customer.url:}") String customerBaseUrl,
+            OutboundHttpClientFactory outbound) {
+        return new ConsentGateFacade(consentGateClient, customerBaseUrl, outbound);
     }
 }

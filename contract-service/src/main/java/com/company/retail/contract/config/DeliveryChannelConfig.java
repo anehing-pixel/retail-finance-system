@@ -1,5 +1,7 @@
 package com.company.retail.contract.config;
 
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
 import com.company.retail.contract.integration.HttpDeliveryChannelAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -14,8 +16,11 @@ public class DeliveryChannelConfig {
 
     @Bean
     public HttpDeliveryChannelAdapter deliveryChannelAdapter(
-            @Value("${retail.contract.delivery-url:}") String deliveryUrl) {
+            @Value("${retail.contract.delivery-url:}") String deliveryUrl,
+            OutboundHttpClientFactory outbound) {
         return (deliveryUrl == null || deliveryUrl.isBlank())
-                ? null : new HttpDeliveryChannelAdapter(deliveryUrl);
+                ? null
+                : new HttpDeliveryChannelAdapter(deliveryUrl,
+                        outbound.client("delivery", OutboundProfile.ADVISORY));
     }
 }

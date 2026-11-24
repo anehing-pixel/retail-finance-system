@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V20（62 表）· 构建 504 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V20（62 表）· 构建 595 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 项 | 值 |
 |---|---|
+| 轮次 | **W-P0-7 出站调用统一超时 / 重试 / 熔断（2026-11-24，用户选定 R11 P0-7「改动可控、立刻提升工程可信度」）**：新增共享 `common/outbound`（7 策略档 + 三态熔断 + JDK `HttpClient` 封装 + Feign `FeignBuilderCustomizer` + 稳定幂等键）；9 处 JDK 客户端与 3 个 Feign 门禁全部迁移；`integration.outbound_tasks` 补齐消费（1m/5m/30m/2h/6h、5 次、DEAD、租约回收、`SKIP LOCKED`）与人工重触发端点（`JOB_TRIGGER`）；**不新增依赖 / Flyway 迁移 / 权限点**。构建 **595 测试 0 失败**、走网关冒烟 EXIT 0、真实 PG 状态机 SQL 验证；R11 P0-7 / E-3 置 ✅。此前：W-EXT-DECIDE 外部接口内部裁决 |
 | 轮次 | **W-EXT-DECIDE 外部接口内部裁决（2026-11-24，用户指示「外部接口这些，你能否自己智能设定一套，要符合应用场景」「都要，联调以后再说」）**：`R07 §3` 能力矩阵与 `§7` 调研清单**全部通道逐项内部裁决回填完成（☑，🟦 待联调复核，不等于对方确认）**——集成商（不指定厂商、按 §4 契约选型）、征信（CIC 主 + JICC 辅，C-05）、银行/代收（API 优先 + 全银协文件兜底、扣款前置 60 日，C-09）、身份核验（阶段一文件 + 人工，C-07）、登记（人工 + 权威回执，C-11）、通知（纸质 + 邮件留痕）、通用（窗口 / 变更 / 密钥 / SLA 基线）；**联调前仍不实现真实对接**，联调差异只改 PartnerAdapter。`README` / `docs/00` / `R02` / `R05` / `R10` / `R11` 外部标记同步为 🟦；`check_docs.py` PASS 15/15。此前：W-CLEAN 并行分支收尾 |
 | 轮次 | **W-CLEAN 并行分支收尾（2026-11-24，用户裁决「合入 90f92f2 → 归档清理 / 推送 master / 清理 CR 目录」）**：`wt/ratelimit` 的 Docker 形态验收提交 **`90f92f2` 已合入 master（合并提交 `3674ccd`）**——`scripts/smoke_ratelimit_edge.py` 扩为 Docker / 宿主双形态，并把**网关实现模式（redis/memory）与 nginx 运行形态（docker/host）拆成两个变量**，消除同名 `mode` 的语义串用；**合入后 WSL + Docker `nginx:latest` 活体复跑 → 14/14 EXIT 0**（memory 模式；Redis 6382 不可达，redis 模式双层联动未复跑）。冲突 6 份（脚本 + 5 文档）按「master 为底、只挑增量」手工解。**收尾**：打归档 tag `archived-wt-ratelimit` 后删 worktree 与分支；删除 4 个 CR 结尾空残留目录（`retail-finance-{mq,statemachine,ratelimit,system}<CR>`，仅空 `.microservice-pids` / `logs`）；`check_docs.py` **PASS 15/15 EXIT 0**。此前：W-LOCK / W-MQ / W-RL / W-MERGE / W-CACHE / W-MB 均已合入 |
 | 轮次 | **W-LOCK 分布式锁（2026-11-23，用户指示「在新的 worktree 里处理 Redisson 分布式锁防重复进件 / 回调幂等」并裁定 fail-closed；2026-11-24 用户「提交吧」→ 按用户指令合入 master）**：新增 `ADR-RF-015`（编号 013 归回调幂等 ADR、014 归 MQ ADR）；共享 `common/lock` 横切机制层（端口 `DistributedLockManager` + Redisson 适配器 + 锁键命名 + 装配），父 pom 统一 `org.redisson:redisson:3.27.2`；**进件**（`application-service` 受理按「客户 + 车辆」加锁、锁内重查去重窗口，`uk_app_idempotency` 改 `ON CONFLICT` 兜底）与**回调**（`external-api` 入站 + `title-release-service` 回执登记按「订单 + 回执号」加锁，**V19** `uk_receipt_order_authority_ref` 唯一索引兜底）两条链接锁；锁不可用 → `RF_LOCK_002`（503）**fail-closed 拒绝写**，不降级放行；锁在**事务提交后**释放、锁键不落明文业务标识；新增编排容器 `retail-finance-lock-redis`（6381）。此前：**W-MERGE 并行路线合并**（回调幂等 V19 / 状态机引擎模块 / 网关可信代理 IP / `nginx/`）+ W-MB 持久层改造（MyBatis 全量化）+ W-SIM2 终态 + W-FE 前端控制台 + W-SIM/W-SIM2 外部模拟器双向闭环。**实施于独立 worktree `retail-finance-lock`（分支 `wt/lock`）；已把 master 并入本分支并逐项解并共享文件冲突，迁移号与 ADR 号顺延避让（V19 / ADR-RF-015）；worktree 磁盘行尾已按仓库约定归一为 LF（§7 第 14 条）** |
@@ -76,6 +77,7 @@
 | Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 起预留**（G-DB-7 审计授权调整顺延至 V21） | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 网关限流配置键 | `retail.gateway.rate-limit.mode`（`redis` 缺省 / `memory`）+ `retail.gateway.rate-limit.*`（redis 模式）+ `retail.gateway.rate-limit.memory.*`（进程内模式）；环境变量 `RETAIL_GATEWAY_RATE_LIMIT_MODE` / `RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅（W-RL 引入；**两套互斥装配**，见 `ADR-RF-012` §12） |
+| 出站调用配置键 | `retail.outbound.enabled` / `circuit-enabled`；`retail.outbound.<profile>.*`（7 档 × `connect-timeout` / `read-timeout` / `max-attempts` / `retry-backoff` / `circuit.failure-threshold` / `circuit.open-duration`）；`retail.outbound.tasks.*`；环境变量 `RETAIL_OUTBOUND_*` | — | 前缀一致，不冲突 ✅（P0-7 引入；`financial` / `write` / `forward` 代码级强制不重试） |
 | 错误码前缀 | `RF_*` | `ADVANCE_*` / `CREDIT_*` 等 | 不冲突 ✅ |
 | JWT 环境变量 | `RETAIL_JWT_SECRET` / `RETAIL_CUSTOMER_JWT_SECRET` | `FLOORPLAN_JWT_SECRET` | 三把密钥互不相同 ✅ |
 | 中台 jar | `com.company:company-platform-contracts:1.0.0-SNAPSHOT`（**✅ 已抽取**，独立仓 `../company-platform-contracts`，`mvn install` 到本地仓；34 单测全绿；RF 依赖 ≥ 此版本） | floorplan 不强制迁移（继续用 `com.company.floorplan.*` 现网类，基线全绿未动） | ✅ W1 完成 |
@@ -83,6 +85,21 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**P0-7 出站调用统一超时 / 重试 / 熔断**（用户选定 R11 P0-7）——
+>   ① 新增共享 `common/outbound`：`OutboundProperties` / `OutboundPolicy` / 三态熔断 /
+>   `OutboundHttpClient` + factory / `RfFeignConfig` + `RfFeignRetryer` + `CircuitBreakerCapability` /
+>   `IdempotencyKeys`；7 个策略档（gate / gate-raw / query / write / advisory / financial / forward）。
+>   ② 9 处 JDK 客户端迁移（CIC / eKYC / DMS / 银行 / 送达 / DMZ 转发 / 3 处同意门禁 raw 兜底）；
+>   KYC / DMS / Bank / Delivery 补 `idempotencyKey`，CIC 随机键改稳定键；`financial` / `write` / `forward`
+>   由 `noRetryClient` 代码级强制不重试。③ Feign 门禁显式 connect 500ms / read 2s + 传输层 1 次重试 +
+>   按门禁路径隔离熔断；4 个服务 `@Import(RfFeignConfig)`。④ `outbound_tasks` 状态机：
+>   PENDING → IN_PROGRESS → DONE / RETRY / DEAD，`SKIP LOCKED` + 租约 + version 乐观锁；
+>   DMS 首败落任务、1m/5m/30m/2h/6h 重试 5 次；人工端点 `POST /api/underwriting/outbound-tasks/{id}/retry`
+>   （`JOB_TRIGGER`）。**新增配置键** `retail.outbound.*` / `RETAIL_OUTBOUND_*`（已登记 §2）；
+>   **未新增 Flyway 迁移**（复用 V9，V21 仍预留 G-DB-7）、**未新增权限点 / ADR / 依赖**。
+>   验证：`mvn -B clean package` → **595 测试 / 93 类 / 0 失败**；走网关冒烟 **EXIT 0**（前端 46/46 + MQ 11/11）；
+>   真实 PG 上认领 / DONE / RETRY / DEAD / 重置 SQL 全部实测；Feign 策略在 4 个服务启动日志生效；
+>   `check_docs.py` PASS 15/15。
 > - 2026-11-24：**外部接口调研清单内部裁决回填**（用户指示「外部接口这些，你来智能决定，都要；联调以后再说」）——
 >   `R07 §3` 能力矩阵与 `§7` 调研清单**全部通道逐项裁决**（`☑` = 内部裁决完成，状态仍 🟦、不等于对方确认）：
 >   集成商（不指定具体厂商，按 §4 契约选型；异步 ≤5 分钟 / 预审 ≤3 秒 / 日终对账 CSV）、
@@ -301,6 +318,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **P0-7 出站统一治理（超时 / 重试 / 熔断）** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（595 测试 / 93 类 / 0 失败 0 错误 0 跳过）**；②走网关冒烟 **EXIT 0**（前端 46/46 + MQ 11/11；新出站链路真实走通）；③Feign 策略在 retail-core / bureau / underwriting / servicing 启动日志实测生效（connect 0.5s / read 2s / circuit=true）；④真实 PG 实测 `outbound_tasks` 认领（`FOR UPDATE SKIP LOCKED`）、DONE、RETRY、DEAD、DEAD→PENDING 重置 SQL 全部成功；⑤`check_docs.py` **PASS 15/15 EXIT 0**（C15 权威口径 595）。**未新增 Flyway 迁移 / 权限点 / ADR / 依赖**；V21 仍预留 G-DB-7 |
 | 2026-11-22 | `mvn -B clean package`（floorplan，W1 前基线） | **BUILD SUCCESS，EXIT 0**（1m14s），V-9 对拍基线确立 |
 | 2026-11-22 | `mvn -B clean package`（RF 全仓 16 模块，W2） | **BUILD SUCCESS**：父 pom + 四层共享 + 10 业务服务 + 网关 + DMZ；单测 16（common）+ 4（external-api）全绿 |
 | 2026-11-22 | `bash run-microservices.sh smoke`（W2） | **26 断言 PASS / 0 FAIL / EXIT 0**：网关 10 路由段切流、DMZ 健康、员工登录（admin/admin123 BCrypt + core.users 种子）、whoami 三态（无 token 401 / 员工 200 / 客户 token 401）、伪造 token 401、X-Request-Id 贯穿、DMZ 验签四态（合法 200 / 篡改 401 / 过期 401 / 未登记 403）、Flyway V1–V9 = 9 条迁移记录、四 schema 49 张表、种子员工存在 |
@@ -365,7 +383,7 @@
    （真实 broker 活体联调）承担，单测与关闭态冒烟**都不等于** MQ 链路已通。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
    （V1 起共 20 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 504，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 595，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。
@@ -439,7 +457,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 17 模块 12 部署单元、62 表 / 20 迁移、504 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 17 模块 12 部署单元、62 表 / 20 迁移、595 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 

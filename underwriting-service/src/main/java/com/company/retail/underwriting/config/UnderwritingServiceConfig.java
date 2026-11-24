@@ -1,20 +1,27 @@
 package com.company.retail.underwriting.config;
 
 import com.company.retail.common.contract.ConsentGateFacade;
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
+import com.company.retail.common.outbound.OutboundProperties;
 import com.company.retail.underwriting.application.AffordabilityAssessmentRepository;
 import com.company.retail.underwriting.application.ConsentGateGuard;
 import com.company.retail.underwriting.application.DmsResultNotificationConsumer;
 import com.company.retail.underwriting.application.InquiryCompletedConsumer;
+import com.company.retail.underwriting.application.OutboundTaskRetryService;
 import com.company.retail.underwriting.application.UnderwritingCaseAppService;
 import com.company.retail.underwriting.application.UnderwritingCaseRepository;
 import com.company.retail.underwriting.application.UnderwritingGateProvider;
 import com.company.retail.underwriting.domain.AffordabilityPolicy;
 import com.company.retail.underwriting.domain.StubAffordabilityPolicy;
+import com.company.retail.underwriting.integration.DmsResultSender;
 import com.company.retail.underwriting.integration.HttpDmsOutboundAdapter;
 import com.company.retail.underwriting.mapper.AffordabilityAssessmentMapper;
 import com.company.retail.underwriting.mapper.OutboundTaskMapper;
 import com.company.retail.underwriting.mapper.UnderwritingCaseMapper;
+import com.company.retail.underwriting.schedule.DmsOutboundTaskScheduler;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -83,11 +90,43 @@ public class UnderwritingServiceConfig {
      * 非空=真 HTTP 推送，失败落 outbound_tasks 人工补发。
      */
     @Bean
-    public DmsResultNotificationConsumer dmsResultNotificationConsumer(
+    public DmsResultSender dmsResultSender(
             @Value("${retail.dms.outbound-url:}") String outboundUrl,
+            OutboundHttpClientFactory outbound) {
+        return (outboundUrl == null || outboundUrl.isBlank())
+                ? null
+                : new HttpDmsOutboundAdapter(outboundUrl,
+                        outbound.client("dms-result", OutboundProfile.ADVISORY));
+    }
+
+    @Bean
+    public DmsResultNotificationConsumer dmsResultNotificationConsumer(
+            ObjectProvider<DmsResultSender> senderProvider,
             OutboundTaskMapper outboundTaskMapper) {
-        HttpDmsOutboundAdapter adapter = (outboundUrl == null || outboundUrl.isBlank())
-                ? null : new HttpDmsOutboundAdapter(outboundUrl);
-        return new DmsResultNotificationConsumer(adapter, outboundTaskMapper);
+        return new DmsResultNotificationConsumer(senderProvider.getIfAvailable(), outboundTaskMapper);
+    }
+
+    @Bean
+    public OutboundTaskRetryService outboundTaskRetryService(OutboundTaskMapper outboundTaskMapper) {
+        return new OutboundTaskRetryService(outboundTaskMapper);
+    }
+
+    /**
+     * outbound_tasks 重试调度器：DMS 挡板模式（sender 不存在）或开关关闭时不启动。
+     * 独立单线程执行器，不占用 outbox 的 {@code @Scheduled} 单线程。
+     */
+    @Bean(destroyMethod = "close")
+    public DmsOutboundTaskScheduler dmsOutboundTaskScheduler(
+            ObjectProvider<DmsResultSender> senderProvider,
+            OutboundTaskMapper outboundTaskMapper,
+            OutboundProperties outboundProperties) {
+        DmsResultSender sender = senderProvider.getIfAvailable();
+        if (sender == null || !outboundProperties.getTasks().isEnabled()) {
+            return null;
+        }
+        DmsOutboundTaskScheduler scheduler =
+                new DmsOutboundTaskScheduler(outboundTaskMapper, sender, outboundProperties.getTasks());
+        scheduler.start();
+        return scheduler;
     }
 }

@@ -16,7 +16,8 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootApplication(scanBasePackages = "com.company.retail.externalapi")
 @EnableDiscoveryClient
-@Import({GlobalExceptionHandler.class, RfLockConfig.class})
+@Import({GlobalExceptionHandler.class, RfLockConfig.class,
+        com.company.retail.common.outbound.RfOutboundConfig.class})
 public class ExternalApiApplication {
 
     public static void main(String[] args) {

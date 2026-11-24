@@ -1,5 +1,7 @@
 package com.company.retail.core.config;
 
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
 import com.company.retail.core.integration.BankPayAdapter;
 import com.company.retail.core.integration.HttpBankPayAdapter;
 import com.company.retail.core.integration.StubBankPayAdapter;
@@ -16,8 +18,11 @@ public class BankGatewayConfig {
 
     @Bean
     public BankPayAdapter bankPayAdapter(
-            @Value("${retail.core.bank-pay-url:}") String bankPayUrl) {
+            @Value("${retail.core.bank-pay-url:}") String bankPayUrl,
+            OutboundHttpClientFactory outbound) {
         return (bankPayUrl == null || bankPayUrl.isBlank())
-                ? new StubBankPayAdapter() : new HttpBankPayAdapter(bankPayUrl);
+                ? new StubBankPayAdapter()
+                : new HttpBankPayAdapter(bankPayUrl,
+                        outbound.client("bank-pay", OutboundProfile.FINANCIAL));
     }
 }

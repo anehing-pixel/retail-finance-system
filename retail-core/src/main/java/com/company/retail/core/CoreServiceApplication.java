@@ -19,7 +19,8 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.core")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class, RfOutboxConfig.class, RfCacheConfig.class, MqEnvelopeConfig.class})
+@Import({RfSecurityConfig.class, RfOutboxConfig.class, RfCacheConfig.class, MqEnvelopeConfig.class,
+        com.company.retail.common.outbound.RfFeignConfig.class})
 public class CoreServiceApplication {
 
     public static void main(String[] args) {

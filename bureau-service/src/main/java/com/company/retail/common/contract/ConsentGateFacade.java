@@ -1,16 +1,16 @@
 package com.company.retail.common.contract;
 
+import com.company.retail.common.outbound.OutboundHttpClient;
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
+import com.company.retail.common.outbound.OutboundResult;
 import com.company.retail.common.security.JwtTokenVerifier;
 import com.company.platform.security.SubjectType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 同意门禁 fail-closed 消费 Facade（W4）。
@@ -44,17 +44,25 @@ public class ConsentGateFacade {
     private volatile String cachedServiceToken;
     private volatile long serviceTokenExpireAtMs;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** P0-7：raw 兜底统一走过站客户端（GATE_RAW：连接超时 + 熔断，不重试）。 */
+    private final OutboundHttpClient rawClient;
 
     public ConsentGateFacade(FeignContracts.ConsentGateClient client, String customerBaseUrl) {
-        this(client, customerBaseUrl, null);
+        this(client, customerBaseUrl, null, OutboundHttpClientFactory.defaults());
     }
 
     public ConsentGateFacade(FeignContracts.ConsentGateClient client, String customerBaseUrl,
                              String staffJwtSecret) {
+        this(client, customerBaseUrl, staffJwtSecret, OutboundHttpClientFactory.defaults());
+    }
+
+    public ConsentGateFacade(FeignContracts.ConsentGateClient client, String customerBaseUrl,
+                             String staffJwtSecret, OutboundHttpClientFactory outbound) {
         this.client = client;
         this.customerBaseUrl = customerBaseUrl;
         this.serviceVerifier = (staffJwtSecret == null || staffJwtSecret.isBlank()) ? null
                 : new JwtTokenVerifier(staffJwtSecret, SubjectType.EMPLOYEE);
+        this.rawClient = outbound.client("consent-gate-raw", OutboundProfile.GATE_RAW);
     }
 
     /** 同意有效且未撤回才返回 true；任何异常/UNKNOWN 一律 false（fail-closed）。 */
@@ -87,18 +95,14 @@ public class ConsentGateFacade {
             return false;
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder(
-                            URI.create(customerBaseUrl + String.format(GATE_PATH, consentId)))
-                    .timeout(Duration.ofSeconds(2))
-                    .header("Authorization", currentAuthorization())
-                    .header("X-Request-Id", java.util.UUID.randomUUID().toString())
-                    .GET().build();
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() / 100 != 2) {
+            OutboundResult response = rawClient.get(
+                    customerBaseUrl + String.format(GATE_PATH, consentId),
+                    Map.of("Authorization", currentAuthorization(),
+                            "X-Request-Id", UUID.randomUUID().toString()));
+            if (!response.is2xx()) {
                 return false;
             }
-            JsonNode body = objectMapper.readTree(response.body());
+            JsonNode body = objectMapper.readTree(response.getBody());
             if (!"OK".equals(body.path("code").asText())) {
                 return false;
             }

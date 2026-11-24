@@ -1,5 +1,7 @@
 package com.company.retail.customer.config;
 
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
+import com.company.retail.common.outbound.OutboundProfile;
 import com.company.retail.customer.infra.PiiCryptoService;
 import com.company.retail.customer.integration.HttpKycProvider;
 import com.company.retail.customer.integration.KycProvider;
@@ -26,8 +28,11 @@ public class CustomerBeansConfig {
 
     /** eKYC 供应商（P-12）：url 为空时不注册 bean → IdentityVerificationService 走 ObjectProvider 缺省。 */
     @Bean
-    public KycProvider kycProvider(@Value("${retail.kyc.provider-url:}") String providerUrl) {
-        return (providerUrl == null || providerUrl.isBlank()) ? null : new HttpKycProvider(providerUrl);
+    public KycProvider kycProvider(@Value("${retail.kyc.provider-url:}") String providerUrl,
+                                   OutboundHttpClientFactory outbound) {
+        return (providerUrl == null || providerUrl.isBlank())
+                ? null
+                : new HttpKycProvider(providerUrl, outbound.client("kyc", OutboundProfile.ADVISORY));
     }
 }
 

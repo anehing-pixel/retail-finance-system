@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
 @Import({RfSecurityConfig.class, RfOutboxConfig.class,
+        com.company.retail.common.outbound.RfFeignConfig.class,
         com.company.retail.servicing.config.ServicingServiceConfig.class,
         com.company.retail.common.contract.ServicingGateConfig.class})
 public class ServicingServiceApplication {

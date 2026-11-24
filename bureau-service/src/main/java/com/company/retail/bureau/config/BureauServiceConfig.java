@@ -111,9 +111,10 @@ public class BureauServiceConfig {
      */
     @Bean
     public Map<CreditBureau, BureauAdapter> bureauAdapters(
-            @Value("${retail.bureau.cic-url:}") String cicUrl) {
+            @Value("${retail.bureau.cic-url:}") String cicUrl,
+            com.company.retail.common.outbound.OutboundHttpClientFactory outbound) {
         BureauAdapter cic = (cicUrl == null || cicUrl.isBlank())
-                ? new CicStubAdapter() : new HttpCicAdapter(cicUrl);
+                ? new CicStubAdapter() : new HttpCicAdapter(cicUrl, outbound);
         List<BureauAdapter> list = List.of(cic, new JiccStubAdapter());
         return list.stream().collect(Collectors.toUnmodifiableMap(BureauAdapter::bureau, Function.identity()));
     }

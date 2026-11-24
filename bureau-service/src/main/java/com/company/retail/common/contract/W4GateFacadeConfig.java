@@ -1,5 +1,6 @@
 package com.company.retail.common.contract;
 
+import com.company.retail.common.outbound.OutboundHttpClientFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,8 +16,9 @@ public class W4GateFacadeConfig {
     public ConsentGateFacade consentGateFacade(
             FeignContracts.ConsentGateClient consentGateClient,
             @Value("${retail.clients.customer.url:}") String customerBaseUrl,
-            @Value("${retail.auth.secret:}") String staffJwtSecret) {
+            @Value("${retail.auth.secret:}") String staffJwtSecret,
+            OutboundHttpClientFactory outbound) {
         // W-SIM：注入员工侧密钥，机器场景（事件消费/日批）自动签系统服务 token
-        return new ConsentGateFacade(consentGateClient, customerBaseUrl, staffJwtSecret);
+        return new ConsentGateFacade(consentGateClient, customerBaseUrl, staffJwtSecret, outbound);
     }
 }
