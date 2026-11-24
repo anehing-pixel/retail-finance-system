@@ -61,7 +61,7 @@
 | 持久化 | PostgreSQL 16 + Flyway + MyBatis（注解 SQL，无 XML） | 无 JPA；SQL / 索引 / 锁语义完全可控，行映射统一走共享 `RowValues` |
 | 领域分层 | `domain` / `application` / `infrastructure` / `common` | `domain` 零 Spring 依赖、可纯单测；事务边界只在 application |
 | 服务装配 | 精确装配 | 每服务只扫自身包 + `@Import` 按类注入，不做全包扫描 |
-| 事务一致性 | 本地事务 + 行锁 + 唯一约束；Transactional Outbox（数据库轮询） | **不引入 MQ / Seata / 分布式事务** |
+| 事务一致性 | 本地事务 + 行锁 + 唯一约束；Transactional Outbox（数据库轮询）；MQ 仅作 outbox 之上的削峰缓冲（默认关闭、密文信封、不参与事务） | **不引入 Seata / 分布式事务**；MQ 不取代 outbox |
 | 缓存 | **两级缓存**：Caffeine L1（进程内，默认 10s）+ Redis L2（默认 60s） | 只缓存**只读业务配置**（产品档位等）；Redis 不可用自动降级直读；**绝不缓存余额 / 核销流水 / 个人信息 / 征信与审查结果**（`ADR-RF-012`） |
 | 网关限流 | **双模式 + 一个开关**：`redis` = Redis 令牌桶（Lua 原子扣减，**缺省**）／`memory` = 进程内令牌桶 | 开关 `retail.gateway.rate-limit.mode`（`redis` \| `memory`），两套**互斥装配**（同一时刻只注册一个限流过滤器，不会双重限流）；`redis` 模式键取 `Authorization` 头 SHA-256 哈希（不存凭据）、超限 429 + `Retry-After` + 统一 `ApiResponse`、Redis 不可用 **生产 fail-closed（503）**（本地 dev 显式 fail-open）；`memory` 模式零外部依赖但为**单实例口径**（`ADR-RF-012` §12、`R02 §3.3`） |
 | 分布式锁 | Redisson 3.27.2（按业务键加锁，锁在**事务提交后**释放） | 只收敛并发窗口，**正确性仍由 DB 唯一索引 + `ON CONFLICT` 保证**；Redis 不可达即 fail-closed 拒写（`RF_LOCK_002`/503），不降级放行；锁键不落明文业务标识（`ADR-RF-015`） |
@@ -90,7 +90,7 @@
 
 ---
 
-## 3. 微服务架构（12 个部署单元）
+## 3. 微服务架构（12 个长驻部署单元 + db-migration 作业）
 
 ```mermaid
 flowchart TB
@@ -106,6 +106,8 @@ flowchart TB
   CORE["retail-core :8090<br/>核心账务（不拆）<br/>债权·还款计划·代付·入金核销·结清"]
   SVC["auth :8091 · customer(PII) :8092 · application :8093<br/>underwriting :8094 · bureau :8095 · contract :8096<br/>title-release :8097 · servicing :8098 · recon :8099"]
   DB[("PostgreSQL :5435<br/>retail_finance<br/>core | pii | integration | audit")]
+  REDIS["Redis Sentinel（生产 HA）:26379-26381<br/>网关限流状态 · 生产 fail-closed"]
+  MIG["db-migration（非长驻）<br/>Flyway 迁移作业 · 迁移账号"]
   PLAT["company-platform-contracts（共享 jar）<br/>响应/异常/Outbox/幂等/日历/加密/审计约定"]
 
   CUST --> GW
@@ -117,8 +119,11 @@ flowchart TB
   GW --> SVC
   DMZ -->|内部命令，非外部报文| CORE
   DMZ --> SVC
-  CORE --> DB
-  SVC --> DB
+  CORE -->|retail_app_rw| DB
+  SVC -->|app_rw；customer 用 pii_rw| DB
+  DMZ -->|retail_dmz_rw| DB
+  MIG -->|迁移账号 DDL| DB
+  GW -.->|令牌桶| REDIS
   CORE -.-> PLAT
   SVC -.-> PLAT
   DMZ -.-> PLAT
@@ -141,6 +146,19 @@ flowchart TB
 
 > **非长驻部署单元**：`db-migration`（独立 Flyway 迁移作业，无端口；发布前先执行，`R11 P0-10`）。
 > 所有服务（含 `retail-core`）`spring.flyway.enabled=false`。
+>
+> **运行期数据库账号**：业务 9 服务 → `retail_app_rw`；customer-service → `retail_pii_rw`；
+> external-api → `retail_dmz_rw`；迁移作业 → 独立迁移账号。超管与未知角色在启动期直接拒绝（`R11 P0-1`）。
+
+**发布顺序（先迁移、再滚动发布）**：
+
+```mermaid
+flowchart LR
+  BUILD["构建 18 模块<br/>服务 jar + db-migration jar"] --> MIGRUN["① 执行 db-migration<br/>Flyway（迁移账号）"]
+  MIGRUN -->|成功| ROLL["② 滚动发布 12 个长驻单元<br/>全部 flyway.enabled=false"]
+  MIGRUN -->|失败| STOP["fail-closed<br/>停止发布"]
+  ROLL --> SMOKE["③ 健康检查 + 冒烟"]
+```
 
 **四条与 floorplan 对齐的工程范式**：
 
@@ -151,7 +169,7 @@ flowchart TB
    每类数据只有一个权威写者，跨服务只读走 Feign 或事件。独立实例是**相对 floorplan** 而言。
 
 **通信**：同步 Feign 只用于门禁（代付前问合同 / 审查；同意门禁由 bureau / underwriting / servicing 合规链路消费，任一超时或 UNKNOWN 即拒付）；
-事后同步走 outbox 事件（允许秒级最终一致）；不使用 MQ / Seata。核心账务不拆，因为入金核销、
+事后同步走 outbox 事件（允许秒级最终一致）；MQ 仅作 outbox 之上的削峰缓冲层（默认关闭，`ADR-RF-014`），不使用 Seata。核心账务不拆，因为入金核销、
 余额与债权终态是同一笔强一致事务。
 
 ---
