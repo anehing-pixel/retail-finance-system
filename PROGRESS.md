@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V20（62 表）· 构建 595 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 595 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 项 | 值 |
 |---|---|
+| 轮次 | **W-GDB7 审计写入授权落地（2026-11-24，用户选定 R11 P0-2）**：新增迁移 **V21**（`V21__g_db_7_audit_write_authorization.sql`）——按 `G-DB-2` 实际连接角色授权：`retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列 `USAGE` / `SELECT`），`retail_audit_ins` 两表保留；三角色显式禁 `UPDATE` / `DELETE` / `TRUNCATE`（append-only 不变）。**不新增表 / 不改代码 / 不改已执行迁移字节**。Flyway V21 实测 applied；三角色写 / 禁改删 / 禁跨表实测通过；冒烟 **33/33 EXIT 0**。R11 P0-2 置 ✅。此前：W-P0-7 出站统一治理 |
 | 轮次 | **W-P0-7 出站调用统一超时 / 重试 / 熔断（2026-11-24，用户选定 R11 P0-7「改动可控、立刻提升工程可信度」）**：新增共享 `common/outbound`（7 策略档 + 三态熔断 + JDK `HttpClient` 封装 + Feign `FeignBuilderCustomizer` + 稳定幂等键）；9 处 JDK 客户端与 3 个 Feign 门禁全部迁移；`integration.outbound_tasks` 补齐消费（1m/5m/30m/2h/6h、5 次、DEAD、租约回收、`SKIP LOCKED`）与人工重触发端点（`JOB_TRIGGER`）；**不新增依赖 / Flyway 迁移 / 权限点**。构建 **595 测试 0 失败**、走网关冒烟 EXIT 0、真实 PG 状态机 SQL 验证；R11 P0-7 / E-3 置 ✅。此前：W-EXT-DECIDE 外部接口内部裁决 |
 | 轮次 | **W-EXT-DECIDE 外部接口内部裁决（2026-11-24，用户指示「外部接口这些，你能否自己智能设定一套，要符合应用场景」「都要，联调以后再说」）**：`R07 §3` 能力矩阵与 `§7` 调研清单**全部通道逐项内部裁决回填完成（☑，🟦 待联调复核，不等于对方确认）**——集成商（不指定厂商、按 §4 契约选型）、征信（CIC 主 + JICC 辅，C-05）、银行/代收（API 优先 + 全银协文件兜底、扣款前置 60 日，C-09）、身份核验（阶段一文件 + 人工，C-07）、登记（人工 + 权威回执，C-11）、通知（纸质 + 邮件留痕）、通用（窗口 / 变更 / 密钥 / SLA 基线）；**联调前仍不实现真实对接**，联调差异只改 PartnerAdapter。`README` / `docs/00` / `R02` / `R05` / `R10` / `R11` 外部标记同步为 🟦；`check_docs.py` PASS 15/15。此前：W-CLEAN 并行分支收尾 |
 | 轮次 | **W-CLEAN 并行分支收尾（2026-11-24，用户裁决「合入 90f92f2 → 归档清理 / 推送 master / 清理 CR 目录」）**：`wt/ratelimit` 的 Docker 形态验收提交 **`90f92f2` 已合入 master（合并提交 `3674ccd`）**——`scripts/smoke_ratelimit_edge.py` 扩为 Docker / 宿主双形态，并把**网关实现模式（redis/memory）与 nginx 运行形态（docker/host）拆成两个变量**，消除同名 `mode` 的语义串用；**合入后 WSL + Docker `nginx:latest` 活体复跑 → 14/14 EXIT 0**（memory 模式；Redis 6382 不可达，redis 模式双层联动未复跑）。冲突 6 份（脚本 + 5 文档）按「master 为底、只挑增量」手工解。**收尾**：打归档 tag `archived-wt-ratelimit` 后删 worktree 与分支；删除 4 个 CR 结尾空残留目录（`retail-finance-{mq,statemachine,ratelimit,system}<CR>`，仅空 `.microservice-pids` / `logs`）；`check_docs.py` **PASS 15/15 EXIT 0**。此前：W-LOCK / W-MQ / W-RL / W-MERGE / W-CACHE / W-MB 均已合入 |
@@ -74,7 +75,7 @@
 | RocketMQ（削峰缓冲层） | **9876**（namesrv）/ **10911**（broker，本地单节点；`ADR-RF-014`） | — | 不冲突 ✅（本轮引入；**默认不启用**，`retail.mq.enabled=false` → 走同步路径） |
 | MQ 配置键 / 环境变量 | `retail.mq.*`（`enabled` / `data-key` / `key-version` / `name-server` / `producer-group` / `consumer-group` / `consume-thread-max` / `pull-batch-size` / `relay-consumer-enabled` / `direct-consumers`）；环境变量 `RETAIL_MQ_ENABLED` / `RETAIL_MQ_DATA_KEY` / `RETAIL_MQ_KEY_VERSION` / `RETAIL_MQ_NAME_SERVER` / `RETAIL_MQ_CONSUME_THREADS` / `RETAIL_MQ_PULL_BATCH` / `RETAIL_MQ_RELAY_ENABLED` / `RETAIL_MQ_DIRECT_CONSUMERS` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅ |
 | 数据库实例 | `retail_finance`（独立） | `floorplan`（独立） | 物理隔离 ✅ |
-| Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 起预留**（G-DB-7 审计授权调整顺延至 V21） | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
+| Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 已占用**（G-DB-7 审计写入授权，R06 §3.2）；**V22 起预留** | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 网关限流配置键 | `retail.gateway.rate-limit.mode`（`redis` 缺省 / `memory`）+ `retail.gateway.rate-limit.*`（redis 模式）+ `retail.gateway.rate-limit.memory.*`（进程内模式）；环境变量 `RETAIL_GATEWAY_RATE_LIMIT_MODE` / `RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅（W-RL 引入；**两套互斥装配**，见 `ADR-RF-012` §12） |
 | 出站调用配置键 | `retail.outbound.enabled` / `circuit-enabled`；`retail.outbound.<profile>.*`（7 档 × `connect-timeout` / `read-timeout` / `max-attempts` / `retry-backoff` / `circuit.failure-threshold` / `circuit.open-duration`）；`retail.outbound.tasks.*`；环境变量 `RETAIL_OUTBOUND_*` | — | 前缀一致，不冲突 ✅（P0-7 引入；`financial` / `write` / `forward` 代码级强制不重试） |
@@ -85,6 +86,12 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**G-DB-7 审计写入授权落地（R11 P0-2）**——新增迁移 **V21**：按 G-DB-2 实际连接角色
+>   授权 `retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列
+>   `USAGE` / `SELECT`），`retail_audit_ins` 两表保留；三角色显式禁 `UPDATE` / `DELETE` / `TRUNCATE`。
+>   **只调整授权，不改表结构 / 数据 / 已执行迁移字节，表数仍 62。** 同步 `R06 §3.2 §6`、`R11 P0-2`、
+>   `R00 §7`、`AGENTS §6`（共享禁区，用户指令 P0-2 授权）、`README` / `docs/00` / `R02` / `ADR-RF-013` 修订注。
+>   验证：Flyway V21 applied；三角色权限实测；冒烟 **33/33 EXIT 0**；`check_docs.py` PASS 15/15。
 > - 2026-11-24：**P0-7 出站调用统一超时 / 重试 / 熔断**（用户选定 R11 P0-7）——
 >   ① 新增共享 `common/outbound`：`OutboundProperties` / `OutboundPolicy` / 三态熔断 /
 >   `OutboundHttpClient` + factory / `RfFeignConfig` + `RfFeignRetryer` + `CircuitBreakerCapability` /
@@ -293,8 +300,8 @@
 **S1–S4**：见 `R11 §3` 工作包 W1–W8，本表不重复罗列（避免第二份会过期的清单）。
 
 **投产门禁（外部对接阶段收口前执行，`R06 §3.2`）**
-- [ ] **G-DB-1~G-DB-7 全部满足**：四角色独立登录账号（口令密钥托管，弃用 V1 的 `*_dev`）· 运行连接按角色分配 · 迁移账号与运行账号分离 · 默认权限绑定迁移账号 · 越权拦截实测（`R10 A23` 转正）· 业务流量禁用超管账号 · **审计写入账号归属落地（G-DB-7 已知缺口：当前单连接池 + `retail_app_rw` 无 audit INSERT 权限，切受限账号会写失败）**
-- [ ] G-DB-7 的授权调整走**新迁移**（V20–V21 号段；V18 = 产品档位目录、V19 = W-LOCK 回执唯一索引，均已占用）：授 `retail_app_rw` 对 audit 两表的 `INSERT`/`SELECT`（仍禁 UPDATE/DELETE），不改已执行迁移字节（方案见 `R06 §3.2` 架构侧裁决）
+- [ ] **G-DB-1~G-DB-7 全部满足**：四角色独立登录账号（口令密钥托管，弃用 V1 的 `*_dev`）· 运行连接按角色分配 · 迁移账号与运行账号分离 · 默认权限绑定迁移账号 · 越权拦截实测（`R10 A23` 转正）· 业务流量禁用超管账号 · **审计写入账号归属落地（G-DB-7 ✅ V21 已落地：app_rw → audit_events；pii_rw → pii_access_logs；三角色禁改删）**
+- [x] G-DB-7 授权调整走 **V21**（2026-11-24 已执行）：按实际连接角色授权 `retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列权限；仍禁 UPDATE/DELETE/TRUNCATE），不改已执行迁移字节（方案见 `R06 §3.2`）
 - [ ] 在**具备受限账号的类生产环境**执行一次完整实测并留证；**本地全绿不构成门禁通过证据**（本地统一超级用户，`R06 §3.1`）
 - [ ] 门禁 **fail-closed**：任一项不满足，生产部署不予放行（`AGENTS §5`）
 
@@ -318,6 +325,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **G-DB-7 审计写入授权（V21）** | **PASS**：①Flyway `retail-core` 启动日志 → `Migrating to version 21 - g db 7 audit write authorization` + `Successfully applied 1 migration`；`flyway_schema_history` V21 success；②`retail_app_rw`：INSERT/SELECT `audit.audit_events` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.pii_access_logs` 拒绝；③`retail_pii_rw`：INSERT/SELECT `audit.pii_access_logs` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.audit_events` 拒绝；④`retail_audit_ins`：两表 INSERT/SELECT 成功（序列权限生效），UPDATE/DELETE 拒绝；⑤走网关冒烟 **33/33 EXIT 0**；⑥`check_docs.py` PASS 15/15。**无新表、无代码改动、V1–V20 字节未动** |
 | 2026-11-24 | **P0-7 出站统一治理（超时 / 重试 / 熔断）** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（595 测试 / 93 类 / 0 失败 0 错误 0 跳过）**；②走网关冒烟 **EXIT 0**（前端 46/46 + MQ 11/11；新出站链路真实走通）；③Feign 策略在 retail-core / bureau / underwriting / servicing 启动日志实测生效（connect 0.5s / read 2s / circuit=true）；④真实 PG 实测 `outbound_tasks` 认领（`FOR UPDATE SKIP LOCKED`）、DONE、RETRY、DEAD、DEAD→PENDING 重置 SQL 全部成功；⑤`check_docs.py` **PASS 15/15 EXIT 0**（C15 权威口径 595）。**未新增 Flyway 迁移 / 权限点 / ADR / 依赖**；V21 仍预留 G-DB-7 |
 | 2026-11-22 | `mvn -B clean package`（floorplan，W1 前基线） | **BUILD SUCCESS，EXIT 0**（1m14s），V-9 对拍基线确立 |
 | 2026-11-22 | `mvn -B clean package`（RF 全仓 16 模块，W2） | **BUILD SUCCESS**：父 pom + 四层共享 + 10 业务服务 + 网关 + DMZ；单测 16（common）+ 4（external-api）全绿 |
@@ -382,7 +390,7 @@
    `scripts/smoke_w_lock.py`（锁专项 20 断言）与 `scripts/e2e_w8.py`（104 断言）为准，新增能力必须补断言；MQ **开启态**另由 `MqEnvelopeLiveTest`
    （真实 broker 活体联调）承担，单测与关闭态冒烟**都不等于** MQ 链路已通。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
-   （V1 起共 20 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表）。改表一律走新迁移，不许改已执行迁移的字节。
+   （V1 起共 21 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表，V21 只调整审计授权不建表）。改表一律走新迁移，不许改已执行迁移的字节。
 3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 595，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
@@ -503,7 +511,7 @@
 > **本节保留裁决原文作为合并依据**；实际执行结果与实测数据见 **§6 验证记录（W-MERGE 行）**——
 > 代码合并提交 `cf78529`、收口回灌提交 `be856e6`，验收判据 = `mvn -B -o package`（当前 504 测试 0 失败）·
 > 走网关冒烟 33/33 · 前端页面 46/46 · `scripts/e2e_w8.py` 104/104 · `scripts/check_docs.py` PASS 15/15 EXIT 0 ·
-> Flyway V1–V20 共 20 条全部 success、四 schema 62 表。
+> Flyway 当时 20 条全部 success（后续追加 V21 G-DB-7，见 §6）、四 schema 62 表。
 >
 > **补充（2026-11-24，用户「提交吧」）**：`wt/lock` 已按用户指令**合入 master**——本节原裁决「`wt/lock` 只取回调幂等、Redisson 不合」
 > 被用户指令覆盖：Redisson 分布式锁（`ADR-RF-015`）与 `common/lock` 机制件**一并合入**，`ADR-RF-013` 的「不引入分布式锁」结论
@@ -590,5 +598,5 @@
 
 - master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**该行记录时领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交）。**2026-11-24 收尾后 master HEAD `3674ccd`（Docker 形态验收合入），已按用户明示推送 `origin/master`（见 §2 变更记录）**。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
-- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 20 条迁移、C15 = 504）；Flyway **V1–V20 共 20 条全部 success**、四 schema **62 张表**。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 21 条迁移、C15 = 595）；Flyway **V1–V21 共 21 条全部 success**、四 schema **62 张表**。
 - 4 条分支的合并动作均已由收口轮执行完毕（工作区干净）；**清理状态（2026-11-24，用户指令「清理吧」）**——`wt/lock` / `wt/mq` / `wt/statemachine` 三条的 worktree 与分支**已清理完毕**（`wt/mq` 与 `wt/statemachine` 的尖端非 master 祖先，故先打归档 tag `archived-wt-mq` / `archived-wt-statemachine` 留痕再删；`wt/statemachine` 的 worktree 已由所属会话先行移除），`wt/ratelimit` **保留**（所属会话仍在其 worktree 推进，按 `AGENTS.md` §7 不代他人动）；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**已于 2026-11-24 清理完毕**（worktree 已移除 + 分支已删除；master 侧锁实现 `common/lock/*` · `ADR-RF-015` · `scripts/smoke_w_lock.py` 保留不变）。**2026-11-24 收尾**：`wt/ratelimit` 的 `90f92f2` 已合入 master（`3674ccd`），分支与 worktree 已清理（tag `archived-wt-ratelimit`）；本机 GitHub 目录下 4 个 CR 结尾空残留目录（`retail-finance-{mq,statemachine,ratelimit,system}<CR>`，仅空 `.microservice-pids` / `logs`）已删除。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。
