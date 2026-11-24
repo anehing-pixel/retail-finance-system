@@ -24,6 +24,7 @@
 #   ./run-microservices.sh stop    # 另开窗口停止全部
 #   ./run-microservices.sh smoke   # 启动 → 走网关冒烟 + 前端页面冒烟 → 自动清理，一条命令完成
 #   ./run-microservices.sh db      # 只确保数据库容器运行（幂等）
+#   ./run-microservices.sh migrate # 只跑独立 Flyway 迁移作业（R11 P0-10；服务运行期不再迁移）
 #   ./run-microservices.sh redis   # 只确保 Redis 容器运行（幂等；分布式锁依赖）
 #   # 浏览器点击级 E2E（可选，需 playwright + 系统 Edge）：python frontend/browser_e2e.py
 #   # 模拟对接 E2E（需模拟器在跑）：python external-simulator/demo_e2e.py
@@ -56,6 +57,20 @@ export REDIS_HOST="${REDIS_HOST:-localhost}"
 export REDIS_PORT="${REDIS_PORT:-6382}"
 
 JAR() { echo "$ROOT/$1/target/$2-1.0.0-SNAPSHOT.jar"; }
+MIGRATION_JAR="$ROOT/db-migration/target/retail-db-migration-1.0.0-SNAPSHOT.jar"
+
+# 独立迁移作业（R11 P0-10）：服务运行期不再跑 Flyway；起栈前必须先迁移成功。
+do_migrate() {
+  if [ ! -f "$MIGRATION_JAR" ]; then
+    echo "[错误] 缺独立迁移 jar：$MIGRATION_JAR —— 先执行 mvn -B package"
+    return 1
+  fi
+  echo "=== 运行独立迁移作业（db-migration；Flyway，迁移账号）==="
+  if ! env -u SERVER__PORT java -jar "$MIGRATION_JAR"; then
+    echo "[错误] 迁移失败，拒绝启动服务（fail-closed）"
+    return 1
+  fi
+}
 
 # Feign 门禁本地直连（R09 §7.2 双模 URI：给了 url 就直连，不给回退 lb://）
 export RETAIL_CLIENTS_CONTRACT_URL=http://127.0.0.1:8096
@@ -188,6 +203,7 @@ port_in_use() {
 
 do_start() {
   ensure_db || return 1
+  do_migrate || return 1
   ensure_redis || return 1
   ensure_lock_redis || return 1
   local busy=""
@@ -202,7 +218,7 @@ do_start() {
   echo "=== 启动外部机构模拟器（node 可用时；CIC 出站切至模拟器）==="
   maybe_start_simulator
 
-  echo "=== 启动 10 业务服务 + DMZ（retail-core 最先，唯一跑 Flyway）==="
+  echo "=== 启动 10 业务服务 + DMZ（retail-core 最先；Flyway 已由独立作业完成）==="
   start_one retail-core "$(JAR retail-core retail-core)" || { do_stop; exit 1; }
   wait_one retail-core "Started CoreServiceApplication" 8090 || { do_stop; exit 1; }
 
@@ -309,10 +325,14 @@ case "${1:-}" in
     ensure_db
     ensure_redis
     ;;
+  migrate)
+    ensure_db
+    do_migrate
+    ;;
   redis)
     ensure_redis
     ;;
   *)
-    echo "用法: $0 {start|stop|smoke|db|redis}"; exit 1
+    echo "用法: $0 {start|stop|smoke|db|migrate|redis}"; exit 1
     ;;
 esac

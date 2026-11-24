@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V22（62 表）· 构建 661 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · **W-P0-1 运行期受限角色（app/pii/dmz 三账号 + 独立迁移账号 + V22 补偿授权）已落地** · **W-P0-5 限流生产 fail-closed + Sentinel 高可用模板 + 告警标记已落地** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 18 模块代码（含独立迁移作业）+ Flyway V1–V22（62 表）· 构建 661 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · **W-P0-1 运行期受限角色（app/pii/dmz 三账号 + 独立迁移账号 + V22 补偿授权）已落地** · **W-P0-5 限流生产 fail-closed + Sentinel 高可用模板 + 告警标记已落地** · **W-P0-10 迁移与运行期解耦（独立 db-migration 作业，服务全部 flyway.enabled=false）已落地** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 项 | 值 |
 |---|---|
+| 轮次 | **W-P0-10 迁移与运行期解耦（2026-11-24，用户选定 R11 P0-10）**：新增独立模块 **`db-migration`**（Flyway 迁移作业，迁移账号执行、无端口、非长驻）；`retail-core` 及全部服务 `flyway.enabled=false`；`run-microservices.sh` / `dev-stack.sh` 起栈前先跑迁移，失败即 fail-closed 拒绝启动；发布顺序固定为「先迁移、再滚动发布服务」。**18 模块构建 661 测试 0 失败**；空库从零迁移 **22 条 / 62 个关系对象**；默认库 no-op；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0；retail-core 日志零 Flyway。R11 P0-10 置 ✅。此前：W-P0-5 限流 fail-closed + Redis 高可用 + 告警 |
 | 轮次 | **W-P0-5 限流 fail-closed + Redis 高可用 + 告警（2026-11-24，用户选定 R11 P0-5）**：网关限流 `fail-open` 默认 **false**（生产 Redis 不可用 → 503），本地由 `scripts/dev-secrets.sh` 显式置 true；Redis 不可用输出稳定 ERROR 标记 `ALERT_RATE_LIMIT_REDIS_UNAVAILABLE`（`failMode=CLOSED|OPEN`）；新增 `deploy/redis-ha/` Sentinel 模板（1 主 2 从 3 哨兵，quorum=2）+ 故障转移演练脚本。构建 **661 测试 / 105 类 / 0 失败**；Sentinel 演练 **FAILOVER_OK**（172.25.0.2 → 172.25.0.3，promoted=redis-replica-2）；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。R11 P0-5 置 ✅。此前：W-P0-1 运行期受限角色 |
 | 轮次 | **W-P0-1 运行期受限角色（2026-11-24，用户选定 R11 P0-1）**：11 个连库单元从 `postgres` 超管切换为受限角色——业务 9 服务 → `retail_app_rw`、customer → `retail_pii_rw`、external-api → `retail_dmz_rw`；新增 `DataSourceRolePolicy` + `RfDataSourceGuardConfig`（超管 / 未知角色 / 弱口令 → 启动失败）；`retail-core` Flyway 改用独立迁移账号（G-DB-3）；新增迁移 **V22** 按真实访问路径补齐 `retail_app_rw` integration 5 表、`retail_pii_rw` core outbox 三表 + MQ 收件箱（只授表级、不放开 DMZ-only 表）；本地 `scripts/dev-secrets.sh` 注入 V1 开发口令。构建 **656 测试 / 104 类 / 0 失败**；超管 / 缺口令启动 EXIT 1；`pg_stat_activity` 运行账号 `retail_app_rw`；越权语句被拒；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。R11 P0-1 置 ✅（原记录：构建 656 测试 / 104 类）。此前：W-P0-8 密钥启动门禁 |
 | 轮次 | **W-P0-8 密钥启动门禁（2026-11-24，用户选定 R11 P0-8）**：员工 JWT / 客户 JWT / PII data-key / PII hmac-key / 附件 token-secret **5 类密钥全部移除配置与代码默认值**；新增共享 `SecretPolicy`（缺失 / 短于 32 字节 / 非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`AuthController` 改用 `customerTokenVerifier` Bean（签发与验签密钥单一来源）；本地新增 `scripts/dev-secrets.sh`，由 `run-microservices.sh` / `scripts/dev-stack.sh` 显式 source 并激活 `dev` profile（**共享禁区授权**：用户选定 P0-8 后，本地冒烟必须继续可跑；改动仅限本地 dev 注入，不改变生产语义）。构建 **642 测试 / 102 类 / 0 失败**；缺注入 / 弱值启动 EXIT 1 实测；冒烟 33/33 + 前端 46/46 + MQ 11/11，EXIT 0。R11 P0-8 置 ✅（原记录：构建 642 测试 / 102 类）。此前：W-CI CI 死链修复 |
@@ -80,6 +81,7 @@
 | RocketMQ（削峰缓冲层） | **9876**（namesrv）/ **10911**（broker，本地单节点；`ADR-RF-014`） | — | 不冲突 ✅（本轮引入；**默认不启用**，`retail.mq.enabled=false` → 走同步路径） |
 | MQ 配置键 / 环境变量 | `retail.mq.*`（`enabled` / `data-key` / `key-version` / `name-server` / `producer-group` / `consumer-group` / `consume-thread-max` / `pull-batch-size` / `relay-consumer-enabled` / `direct-consumers`）；环境变量 `RETAIL_MQ_ENABLED` / `RETAIL_MQ_DATA_KEY` / `RETAIL_MQ_KEY_VERSION` / `RETAIL_MQ_NAME_SERVER` / `RETAIL_MQ_CONSUME_THREADS` / `RETAIL_MQ_PULL_BATCH` / `RETAIL_MQ_RELAY_ENABLED` / `RETAIL_MQ_DIRECT_CONSUMERS` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅ |
 | 数据库实例 | `retail_finance`（独立） | `floorplan`（独立） | 物理隔离 ✅ |
+| 数据库迁移作业 | 独立模块 `retail-db-migration`（`db-migration/target/retail-db-migration-1.0.0-SNAPSHOT.jar`）；环境变量 `RETAIL_DB_MIGRATION_{URL,USER,PASSWORD}` | — | 非长驻、无端口；服务全部 `flyway.enabled=false`（P0-10） |
 | Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 已占用**（G-DB-7 审计写入授权，R06 §3.2）；**V22 已占用**（G-DB-2 运行期受限角色补偿授权，R11 P0-1）；**V23 起预留** | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 网关限流配置键 | `retail.gateway.rate-limit.mode`（`redis` 缺省 / `memory`）+ `retail.gateway.rate-limit.*`（redis 模式，**`fail-open` 默认 `false`**）+ `retail.gateway.rate-limit.memory.*`（进程内模式）；环境变量 `RETAIL_GATEWAY_RATE_LIMIT_MODE` / `RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN` / `RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*`；生产 Sentinel 用标准 `SPRING_DATA_REDIS_SENTINEL_{MASTER,NODES,PASSWORD}` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅（W-RL 引入；**两套互斥装配**，见 `ADR-RF-012` §12；P0-5 改默认 fail-closed） |
@@ -91,6 +93,12 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**P0-10 迁移与运行期解耦**（用户选定 R11 P0-10）——新增独立模块 **`db-migration`**
+>   （Flyway 作业，迁移账号执行、无端口、非长驻）；`retail-core` 及全部服务 `flyway.enabled=false`；
+>   `run-microservices.sh` / `dev-stack.sh` 起栈前先迁移，失败 fail-closed；发布顺序文档化。
+>   **共享禁区授权**：用户选定 P0-10，需改父 `pom.xml`（新增模块）、`run-microservices.sh`、
+>   `scripts/dev-stack.sh` 与 `AGENTS.md` §2 §4。
+>   验证：18 模块构建 **661 测试 0 失败**；空库 22 条 / 62 关系对象；冒烟 33/33 + 前端 46/46 + MQ 11/11。
 > - 2026-11-24：**P0-5 限流 fail-closed + Redis 高可用 + 告警**（用户选定 R11 P0-5）——
 >   网关 `fail-open` 默认改 false（生产 503）；本地 `scripts/dev-secrets.sh` 显式置 true；
 >   Redis 不可用输出 `ALERT_RATE_LIMIT_REDIS_UNAVAILABLE` ERROR 标记；
@@ -366,6 +374,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **P0-10 迁移与运行期解耦** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（18 模块 / 661 测试 / 105 类 / 0 失败）**；②独立迁移 jar `db-migration/target/retail-db-migration-1.0.0-SNAPSHOT.jar`（4.9MB，含 Flyway + PG 驱动）；③默认库执行 → `Schema "public" is up to date` **EXIT 0**；④空库 `retail_finance_p010` 从零迁移 → **22 条 success / 62 个关系对象（57 表 + 5 视图）**，验后已删库；⑤`run-microservices.sh smoke` → 迁移作业先执行、retail-core 日志**零 Flyway**、冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑥失败路径：不可达库 **EXIT 1**、缺 `RETAIL_DB_MIGRATION_PASSWORD` **EXIT 2**（fail-closed）；⑦`check_docs.py` PASS 15/15。 |
 | 2026-11-24 | **P0-5 限流 fail-closed + Redis 高可用 + 告警** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（661 测试 / 105 类 / 0 失败）**；②`RateLimitPropertiesTest` 钉死默认 `fail-open=false`；③`RateLimitFilterTest` 钉死 Redis 不可用时 ERROR 标记 `ALERT_RATE_LIMIT_REDIS_UNAVAILABLE`（failMode=OPEN/CLOSED 各一例、实例级 10s 节流、不泄露 Authorization）；④Sentinel 演练 `deploy/redis-ha/failover-drill.sh` → **FAILOVER_OK old=172.25.0.2 new=172.25.0.3 promoted=redis-replica-2**；⑤本地 dev 显式 fail-open 下冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑥限流专项 `smoke_ratelimit.py` **redis 29/29、memory 33/33 EXIT 0**（顺带修正 HTTP 头名大小写断言，RFC 7230 大小写不敏感）；⑦`check_docs.py` PASS 15/15；⑧GitHub Actions **run #7（id `45332533971`，commit `3025293`）双 job success**（构建与单测 / 文档自检）。 |
 | 2026-11-24 | **P0-1 运行期受限角色（G-DB-2 / G-DB-3 / G-DB-6）** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（656 测试 / 104 类 / 0 失败）**；②auth-service 以 `SPRING_DATASOURCE_USERNAME=postgres` 启动 → **EXIT 1**（`RfDataSourceGuardConfig` 拒绝超管）、缺 `RETAIL_DB_APP_PASSWORD` → **EXIT 1**（占位符）；③服务启动后 `pg_stat_activity` 实测运行连接 **`retail_app_rw|10`**，员工登录 API 200；④Flyway **V22 applied**（迁移账号执行，运行账号无 DDL）；⑤越权实测：app_rw 查 `pii.customer_pii` / 建 `core.*` 表 / 查 `integration.partners` 均拒；pii_rw 查 `core.loans` 拒、查 `pii.customer_pii` 可；dmz_rw 查 `core.loans` 拒、查 `integration.partners` 可；⑥冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑦`check_docs.py` PASS 15/15；⑧GitHub Actions **run #5（id `45329342745`，commit `27d0ab5`）双 job success**（构建与单测 / 文档自检）。**新增 V22；表数仍 62** |
 | 2026-11-24 | **P0-8 密钥启动门禁** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（642 测试 / 102 类 / 0 失败 0 错误 0 跳过）**；②`retail-core` 无 `RETAIL_JWT_SECRET` 启动 → **EXIT 1**，报 `Could not resolve placeholder 'RETAIL_JWT_SECRET'`；③仅注入 dev-only 弱值且未激活 `dev` profile → **EXIT 1**，`SecretPolicy` 拒绝；④`run-microservices.sh smoke` → **EXIT 0**（网关 33/33 + 前端 46/46 + MQ 11/11），本地 `scripts/dev-secrets.sh` 注入生效；⑤`check_docs.py` PASS 15/15；⑥GitHub Actions **run #3（id `45326770269`，commit `5f1c706`）双 job success**（构建与单测 / 文档自检）。**无 Flyway 迁移 / 无新表 / 无新权限点** |
@@ -511,7 +520,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 17 模块 12 部署单元、62 表 / 22 迁移、661 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 18 模块（含独立迁移作业）、12 个长驻部署单元、62 表 / 22 迁移、661 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 

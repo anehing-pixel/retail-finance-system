@@ -60,7 +60,8 @@ gateway / external-api / 10 个业务服务
   （`UserRole` 目前无 Java 枚举类——角色清单落在 `core.user_roles` 表 + `auth-service` 的 `RolePermissions`。）
 - **精确装配**：每服务 `@SpringBootApplication(scanBasePackages = 自身包)` + `@Import` 按类注入，
   不做全包扫描；共享 jar 被复用，隔离靠装配实现，不靠复制代码。
-- 只有 `retail-core` 跑 Flyway，其余服务 `flyway.enabled=false`。
+- **迁移由独立 `db-migration` 作业执行**（`R11 P0-10`）：所有服务（含 `retail-core`）`flyway.enabled=false`；
+  发布顺序固定为「先跑迁移作业、再滚动发布服务」，迁移作业非长驻、无端口。
 - 服务间**同步只走 Feign 门禁（fail-closed）、异步只走 outbox**，禁止跨域直写他表。
 - **持久层统一 MyBatis 注解 SQL**（无 XML、无 JPA）：Mapper 接口放各服务 `*.mapper` 包，
   `@MapperScan` 显式列出**单一** mapper 包（精确装配，不做全包扫描）；
@@ -138,7 +139,7 @@ gateway / external-api / 10 个业务服务
 | 后台进程 | 随 shell 会话被回收 | 启动 + 测试 + 清理必须放**同一条命令**内 |
 | 进程数 | 网关 1 + DMZ 1 + 业务服务 10 = **12 个 JVM** | 用 `run-microservices.sh start/stop/smoke` 编排（✅ W2 已交付） |
 | 端口 | 业务 8090–8099 / 网关 18081 / DMZ 18091 / Redis 6381（锁）/ 6382（缓存·限流） / 边缘 Nginx 18076·18077（可选形态，默认不启用） | 与 floorplan 8080–8088 / 18080 / 18090 不冲突 |
-| Flyway | 只有 `retail-core` 跑迁移 | 避免重复迁移 |
+| Flyway | 独立 `db-migration` 作业（非长驻、无端口；`R11 P0-10`） | 所有服务 `flyway.enabled=false`；起栈/发布前先迁移，失败即拒绝启动 |
 | RocketMQ | 本地单节点：namesrv **9876** / broker **10911**，运行台在 `data/mq-broker`（不入版本库） | **本轮口径「先不用 MQ 集群」**；Docker Hub 拉取超时，broker 由 Maven Central 的 `rocketmq-namesrv/broker:5.0.0` 直接起；启动须带 `ROCKETMQ_HOME` 与 JDK17 `--add-opens` |
 | VSCode Java 语言服务器 | 会锁 `target/classes` 导致 `mvn clean` 失败 | 勿误杀，改用增量 `package` |
 | 换行符 | 仓库 blob **一律 LF**；`.gitattributes` 强制 `.sh` / `.py` 为 `eol=lf`；本仓 `core.autocrlf` 不得为 `true` | 见 §4.1 |

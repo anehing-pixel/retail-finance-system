@@ -32,7 +32,7 @@
 |---|---|---|---|
 | `api-gateway` | 18081 | 按路径切流、`X-Request-Id`、限流（**已实现**：Redis 令牌桶，`ADR-RF-012`）、CORS | — |
 | `external-api` | 18091 | **DMZ**：入站验签 / 出站签名 / nonce / partner scope / 调用留痕 | `integration.*` |
-| `retail-core` | 8090 | **核心账务（不拆）**：债权/还款计划/代付/入金核销/结清；**唯一跑 Flyway** | `loans` `repayment_plans` `schedule_items` `disbursements` `payments` `payment_allocations` |
+| `retail-core` | 8090 | **核心账务（不拆）**：债权/还款计划/代付/入金核销/结清；运行期不跑 Flyway（迁移作业独立） | `loans` `repayment_plans` `schedule_items` `disbursements` `payments` `payment_allocations` |
 | `auth-service` | 8091 | 员工侧 + 客户侧**双主体** JWT 签发/验签 | `users` `user_roles` `pii.customer_identities` |
 | `customer-service` | 8092 | 自然人主数据 + **PII 金库** + 身份核验 + 同意 | `pii.*` |
 | `application-service` | 8093 | 申请受理 + DMS 申请代办 + 审查结果回传 + **销售店主数据唯一投影** | `applications` `application_items` `dealer_partners` `dealer_agreements` |

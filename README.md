@@ -2,7 +2,7 @@
 
 > 日本第三方信贩公司 · 面向消费者（C 端）的新车零售金融 · 与 `floorplan-system` 同公司、共享中台能力
 > **架构：Spring Cloud 微服务，直接对齐 floorplan 的微服务形态**（10 个业务服务 + 网关 + DMZ）。
-> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；17 模块代码 + Flyway V1–V22 + 构建 661 测试 0 失败 + 走网关冒烟 33/33 + 全链路 E2E 104/104。文档全文使用中文。**
+> **当前状态：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）；18 模块代码 + Flyway V1–V22 + 构建 661 测试 0 失败 + 走网关冒烟 33/33 + 全链路 E2E 104/104。文档全文使用中文。**
 > 先读 [`AGENTS.md`](AGENTS.md)（怎么干活），进度以 [`PROGRESS.md`](PROGRESS.md)（唯一事实源）为准，
 > 设计理由见 [`docs/00-文档索引.md`](docs/00-文档索引.md)。
 
@@ -128,7 +128,7 @@ flowchart TB
 |---|---|---|
 | `api-gateway` | 18081 | 按路径切流（精确规则在前、`/api/**` 兜底在后）、`X-Request-Id`；**限流已实现**（双模式一个开关：`retail.gateway.rate-limit.mode` = `redis`（缺省，Redis 令牌桶：键取 `Authorization` 头哈希、规则按路径 Ant 最具体优先、Redis 不可用生产 fail-closed）／`memory`（进程内令牌桶，零依赖、单实例口径）；两套互斥装配，配置见 `retail.gateway.rate-limit.*` 与 `retail.gateway.rate-limit.memory.*`） |
 | `external-api` | 18091 | DMZ：DMS / 征信机构 / 支付回调的入站验签、出站签名、nonce、partner scope |
-| `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**唯一跑 Flyway** |
+| `retail-core` | 8090 | **核心账务（不拆）**：债权、还款计划、代付、入金核销、结清；**运行期不跑 Flyway**（迁移由独立作业执行） |
 | `auth-service` | 8091 | 员工侧 + 客户侧双主体 JWT 签发/验签 |
 | `customer-service` | 8092 | 自然人主数据 + 个人信息金库 + 身份核验 + 同意管理 |
 | `application-service` | 8093 | 申请受理 + DMS 申请代办 + 审查结果回传 + 销售店主数据唯一投影 |
@@ -138,6 +138,9 @@ flowchart TB
 | `title-release-service` | 8097 | 所有权保留 + 解除八步 + 外部登记回执 |
 | `servicing-service` | 8098 | 贷后逾期天数 / 催收 / 征信报送触发 |
 | `recon-service` | 8099 | INV-1~5 对拍与差异 |
+
+> **非长驻部署单元**：`db-migration`（独立 Flyway 迁移作业，无端口；发布前先执行，`R11 P0-10`）。
+> 所有服务（含 `retail-core`）`spring.flyway.enabled=false`。
 
 **四条与 floorplan 对齐的工程范式**：
 
@@ -180,7 +183,7 @@ flowchart TB
 
 ## 5. 诚实的边界（防止把文档读成已实现）
 
-1. **已交付文档、工程约定与全部计划内代码**：17 模块（四层共享 + 状态机引擎底座 + 10 业务服务 + 网关 + DMZ）、
+1. **已交付文档、工程约定与全部计划内代码**：18 模块（四层共享 + 状态机引擎底座 + 独立迁移作业 + 10 业务服务 + 网关 + DMZ）、
    Flyway V1–V22（62 张表实测）、构建 661 测试 0 失败、走网关冒烟 33/33、全链路 E2E 104/104（`PROGRESS §6`）。
    实现范围以 `PROGRESS.md`（唯一事实源）为准；外部自动对接未实现（见第 3 条）。
 2. **C-01~C-12 系统口径已定源（2026-11-22）**：`C-01` 用户签（双形态并行）；`C-02`~`C-12` 架构 AI 裁决（用户授权

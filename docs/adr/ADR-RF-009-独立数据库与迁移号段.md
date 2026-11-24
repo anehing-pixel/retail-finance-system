@@ -25,7 +25,8 @@
 3. **Flyway 从 `V1` 起，独立号段**（因独立实例，与 floorplan V1–V26 不会撞号）：
    V1–V9 = S1 地基、V10–V17 = S2、V18 为并行流迁移、V19 预留、V20 = MQ 密文信封通道（`ADR-RF-014`）、
    V21–V29 = S3、V30+ 按波次登记、**V32–V39 有意留空**。
-   脚本唯一目录 `infrastructure/src/main/resources/db/migration/`；只有 `retail-core` 跑 Flyway。
+   脚本唯一目录 `infrastructure/src/main/resources/db/migration/`；**迁移由独立 `db-migration` 作业执行**
+   （`R11 P0-10`，2026-11-24 修订），所有服务 `flyway.enabled=false`，发布顺序为「先迁移、再滚动发布」。
 4. **共享资源仍需跨项目登记**：端口段（8090–8099 / 18081 / 18091 / 5435）、配置前缀 `retail.*`、
    错误码 `RF_*`、JWT 环境变量、中台 jar 版本 —— 全部登记 `PROGRESS §2`，改动前先登记再改 `R00`/`README`。
 5. **已执行迁移字节不改**（Flyway checksum），调整一律走新迁移；开分支前查号段占用表。

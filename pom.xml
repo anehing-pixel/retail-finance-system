@@ -18,6 +18,8 @@
     <module>common</module>
     <!-- 状态机引擎底座（Spring StateMachine；领域为状态图唯一事实源） -->
     <module>statemachine</module>
+    <!-- 独立数据库迁移作业（R11 P0-10：迁移与运行期解耦，非长驻服务） -->
+    <module>db-migration</module>
     <!-- 10 个业务服务（端口 8090–8099） -->
     <module>retail-core</module>
     <module>auth-service</module>

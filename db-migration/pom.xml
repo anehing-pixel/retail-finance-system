@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.company</groupId>
+    <artifactId>retail-finance-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>retail-db-migration</artifactId>
+  <name>Retail Finance :: db-migration</name>
+  <description>独立数据库迁移作业（Flyway；R11 P0-10：迁移与运行期解耦）</description>
+
+  <dependencies>
+    <!-- Flyway 9.x（Boot 3.2.5 纳管 9.22.3）；迁移脚本由下方 resources 从 infrastructure 打入 -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <!-- 迁移脚本唯一事实源仍在 infrastructure；本作业只负责打包与执行 -->
+      <resource>
+        <directory>${project.basedir}/../infrastructure/src/main/resources/db/migration</directory>
+        <targetPath>db/migration</targetPath>
+        <filtering>false</filtering>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>com.company.retail.migration.DbMigrationApplication</mainClass>
+        </configuration>
+        <!-- 自定义 parent（非 spring-boot-starter-parent）需显式绑定 repackage -->
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -37,6 +37,17 @@ start() { # name port
   echo "[启动] $1 pid=$! port=$2"
 }
 
+MIGRATION_JAR="$ROOT/db-migration/target/retail-db-migration-1.0.0-SNAPSHOT.jar"
+if [ ! -f "$MIGRATION_JAR" ]; then
+  echo "[缺迁移 jar] $MIGRATION_JAR —— 先执行 mvn -B package"
+  exit 1
+fi
+echo "[迁移] 运行独立迁移作业（db-migration；R11 P0-10）"
+if ! env -u SERVER__PORT java -jar "$MIGRATION_JAR"; then
+  echo "[错误] 迁移失败，拒绝启动服务（fail-closed）"
+  exit 1
+fi
+
 start retail-core 8090
 sleep 3
 start auth-service 8091

@@ -14,13 +14,9 @@ spring:
     hikari:
       maximum-pool-size: 10
   flyway:
-    enabled: true
-    # 迁移账号与运行账号分离（R11 P0-1 / G-DB-3）：Flyway 用 owner/超管，运行期用 retail_app_rw
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/retail_finance}
-    user: ${RETAIL_DB_MIGRATION_USER:postgres}
-    password: ${RETAIL_DB_MIGRATION_PASSWORD}
-    # 全仓只有 retail-core 跑 Flyway（R00 §7）；迁移脚本在 retail-infrastructure jar 内
-    locations: classpath:db/migration
+    # 迁移已独立为 db-migration 作业（R11 P0-10）：服务运行期不再执行 Flyway；
+    # 发布顺序固定为「先跑迁移作业，再滚动发布服务」。
+    enabled: false
   jackson:
     time-zone: Asia/Tokyo
     default-property-inclusion: non_null
