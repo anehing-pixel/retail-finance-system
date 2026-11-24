@@ -99,6 +99,12 @@ function showTab(name) {
   });
 }
 
+function gotoStep(id) {
+  showTab("staff");
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function requireToken() {
   if (!S.token) { setState("all-state", "请先执行 S1 登录", "step-bad"); return false; }
   return true;
@@ -578,3 +584,6 @@ async function selfNegative() {
     : "❌ 应被拒绝但返回 " + r.code, ok ? "step-ok" : "step-bad");
   return ok;
 }
+
+/* 首屏渲染会话对象占位（后续每步 renderChips 刷新） */
+renderChips();

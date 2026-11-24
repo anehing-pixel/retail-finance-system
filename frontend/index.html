@@ -3,242 +3,612 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
 <title>新车零售金融 · 运营控制台</title>
 <style>
 :root {
-  --bg: #f5f6f8; --card: #ffffff; --ink: #1f2430; --muted: #6b7280;
-  --line: #e5e7eb; --brand: #1d4ed8; --ok: #15803d; --bad: #b91c1c; --warn: #b45309;
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --ink: #101828;
+  --ink-2: #344054;
+  --muted: #667085;
+  --faint: #98a2b3;
+  --line: #e4e7ec;
+  --line-strong: #d0d5dd;
+  --brand: #1d4ed8;
+  --brand-strong: #1e40af;
+  --brand-soft: #eef4ff;
+  --navy: #0b1a30;
+  --navy-2: #0a1628;
+  --ok: #067647; --ok-bg: #ecfdf3; --ok-line: #abefc6;
+  --bad: #b42318; --bad-bg: #fef3f2; --bad-line: #fecdca;
+  --warn: #b54708; --warn-bg: #fffaeb; --warn-line: #fedf89;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, .05);
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-       font: 14px/1.55 "Segoe UI", "Microsoft YaHei", sans-serif; }
-header { background: #111827; color: #f9fafb; padding: 14px 24px;
-         display: flex; align-items: baseline; gap: 16px; }
-header h1 { font-size: 17px; margin: 0; font-weight: 600; }
-header .sub { color: #9ca3af; font-size: 12px; }
-nav.tabs { background: #1f2937; padding: 0 24px; display: flex; gap: 4px; }
-nav.tabs button { background: none; border: none; color: #9ca3af; padding: 10px 18px;
-                  cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; }
-nav.tabs button.active { color: #f9fafb; border-bottom-color: #60a5fa; }
-main { padding: 20px 24px 60px; max-width: 1080px; margin: 0 auto; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-        padding: 16px 18px; margin-bottom: 14px; }
-.card h2 { margin: 0 0 6px; font-size: 15px; }
-.card .desc { color: var(--muted); font-size: 12.5px; margin-bottom: 10px; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.55 "Segoe UI Variable", "Segoe UI", "Hiragino Sans", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(29, 78, 216, .16); }
+
+/* ---------------- 顶栏 ---------------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50; height: 64px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 0 24px;
+  background: linear-gradient(180deg, #0c1d36 0%, var(--navy-2) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand-mark {
+  width: 36px; height: 36px; flex: none; border-radius: 10px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff; font-size: 13px; font-weight: 800; letter-spacing: .02em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 4px 12px rgba(29, 78, 216, .35);
+}
+.brand-copy h1 { margin: 0; font-size: 15px; font-weight: 600; color: #f8fafc; letter-spacing: .01em; white-space: nowrap; }
+.brand-sub { display: block; margin-top: 1px; font-size: 11px; color: rgba(226, 232, 240, .48); letter-spacing: .02em; white-space: nowrap; }
+.topbar-meta { display: flex; align-items: center; gap: 16px; font-size: 11.5px; color: #94a3b8; }
+.env-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(18, 183, 106, .12); border: 1px solid rgba(18, 183, 106, .3);
+  color: #6ee7b7; font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+}
+.env-dot { width: 6px; height: 6px; border-radius: 50%; background: #12b76a; box-shadow: 0 0 0 3px rgba(18, 183, 106, .18); }
+.meta-item { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.meta-k { color: #64748b; font-size: 10.5px; }
+.meta-sep { width: 1px; height: 16px; background: rgba(255, 255, 255, .09); }
+
+/* ---------------- 布局 ---------------- */
+.shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100vh - 64px); }
+.sidebar {
+  position: sticky; top: 64px; align-self: start; height: calc(100vh - 64px);
+  display: flex; flex-direction: column; overflow-y: auto;
+  padding: 18px 14px 16px;
+  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-2) 100%);
+  border-right: 1px solid rgba(255, 255, 255, .06);
+}
+.main { min-width: 0; padding: 26px 32px 110px; }
+#pane-staff, #pane-self, #pane-help { max-width: 1080px; margin: 0 auto; }
+
+/* ---------------- 侧栏导航 ---------------- */
+nav.tabs { display: flex; flex-direction: column; gap: 4px; }
+nav.tabs button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; border: 0; border-radius: 8px;
+  background: transparent; color: #9db0c9;
+  font: inherit; font-size: 13px; font-weight: 500; text-align: left; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+nav.tabs button svg { width: 17px; height: 17px; flex: none; opacity: .85; }
+nav.tabs button:hover { background: rgba(255, 255, 255, .06); color: #e2e8f0; }
+nav.tabs button.active {
+  background: linear-gradient(90deg, rgba(59, 130, 246, .22), rgba(59, 130, 246, .06));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, .22);
+}
+nav.tabs button.active svg { opacity: 1; color: #93c5fd; }
+.side-divider { height: 1px; margin: 16px 6px; background: rgba(255, 255, 255, .07); }
+.side-section { display: flex; flex-direction: column; gap: 1px; }
+.side-label {
+  padding: 0 10px; margin-bottom: 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; color: #5b6d86; text-transform: uppercase;
+}
+.step-link {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 10px; border-radius: 6px;
+  color: #8fa3bf; font-size: 12.5px; text-decoration: none;
+  transition: background .15s, color .15s;
+}
+.step-link:hover { background: rgba(59, 130, 246, .1); color: #dbeafe; }
+.step-code { min-width: 22px; font: 600 10px/1 var(--mono); color: #64748b; letter-spacing: .02em; }
+.side-foot {
+  margin-top: auto; padding: 14px 10px 2px;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+  font-size: 11px; line-height: 1.6; color: #51627a;
+}
+
+/* ---------------- 页头 / 会话对象 ---------------- */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 2px 0 16px; }
+.eyebrow { margin-bottom: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em; color: #94a3b8; text-transform: uppercase; }
+.page-head h2 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
+.page-head p { margin: 6px 0 0; max-width: 720px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.page-badge {
+  flex: none; padding: 6px 10px; border-radius: 7px;
+  background: #e9eefb; border: 1px solid #d6e0f8; color: #1e40af;
+  font: 600 11px/1 var(--mono); letter-spacing: .03em;
+}
+.session-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  min-height: 44px; margin-bottom: 14px; padding: 9px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-sm);
+}
+.session-label { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; color: var(--faint); text-transform: uppercase; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.chip {
+  display: inline-flex; align-items: center; padding: 3px 8px;
+  background: #f8fafc; border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink-2); font: 500 11.5px/1.4 var(--mono); white-space: nowrap;
+}
+.chip.gray { color: var(--faint); background: #fcfcfd; border-style: dashed; }
+
+/* ---------------- 卡片 ---------------- */
+.card {
+  margin-bottom: 14px; padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); scroll-margin-top: 84px;
+  transition: border-color .18s, box-shadow .18s;
+}
+.card:hover { border-color: #d7dde9; box-shadow: 0 2px 8px rgba(16, 24, 40, .06); }
+.card-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.step-badge {
+  width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--brand-soft); border: 1px solid #dbe7ff; color: var(--brand);
+  font: 700 11.5px/1 var(--mono); letter-spacing: .02em;
+}
+.step-badge.wide { font-size: 10px; }
+.card-title { min-width: 0; }
+.card-title h2 { margin: 0 0 3px; font-size: 15px; font-weight: 620; line-height: 1.35; color: var(--ink); }
+.card .desc { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.card > .row { margin-top: 14px; padding-left: 46px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-button.act { background: var(--brand); color: #fff; border: none; border-radius: 6px;
-             padding: 7px 14px; cursor: pointer; font-size: 13px; }
-button.act:hover { filter: brightness(1.08); }
-button.act:disabled { background: #cbd5e1; cursor: not-allowed; }
-button.act.ghost { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
-button.act.danger { background: #fff; color: var(--bad); border: 1px solid var(--bad); }
-input, select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
-                font-size: 13px; width: 150px; }
+
+/* ---------------- 状态徽章 ---------------- */
+[id$="-state"] {
+  justify-self: end; align-self: center;
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 100%; padding: 4px 10px;
+  border: 1px solid transparent; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.4; color: var(--muted);
+}
+[id$="-state"]:empty { display: none; }
+[id$="-state"].step-ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line); }
+[id$="-state"].step-bad { color: var(--bad); background: var(--bad-bg); border-color: var(--bad-line); }
+[id$="-state"].step-note { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+
+/* ---------------- 控件 ---------------- */
+button.act {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: 8px;
+  background: var(--brand); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 550; letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(29, 78, 216, .25), inset 0 1px 0 rgba(255, 255, 255, .12);
+  transition: background .15s, box-shadow .15s, transform .05s;
+}
+button.act:hover { background: var(--brand-strong); box-shadow: 0 2px 6px rgba(29, 78, 216, .3); }
+button.act:active { transform: translateY(1px); }
+button.act:focus-visible { outline: 3px solid rgba(59, 130, 246, .35); outline-offset: 1px; }
+button.act:disabled { background: #e4e7ec; color: var(--faint); box-shadow: none; cursor: not-allowed; transform: none; }
+button.act.ghost { background: #fff; color: var(--ink-2); border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
+button.act.ghost:hover { background: #f8faff; color: var(--brand); border-color: #b2c5f0; }
+button.act.danger { background: #fff; color: var(--bad); border-color: #f0b4ae; box-shadow: var(--shadow-sm); }
+button.act.danger:hover { background: var(--bad-bg); border-color: #e98d84; }
+
+input, select {
+  width: 150px; height: 34px; padding: 0 11px;
+  border: 1px solid var(--line-strong); border-radius: 8px;
+  background: #fff; color: var(--ink); font: inherit; font-size: 13px;
+  transition: border-color .15s, box-shadow .15s;
+}
 input.wide { width: 240px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.chip { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
-        border-radius: 999px; padding: 3px 10px; font-size: 12px; }
-.chip.gray { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
-.step-ok { color: var(--ok); font-weight: 600; }
-.step-bad { color: var(--bad); font-weight: 600; }
-.step-note { color: var(--warn); }
-pre.result { background: #0f172a; color: #d1fae5; border-radius: 8px; padding: 10px 12px;
-             font-size: 12px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
-#log { position: fixed; right: 16px; bottom: 16px; width: 430px; max-height: 300px;
-       background: #111827; color: #9ae6b4; font: 11.5px/1.5 Consolas, monospace;
-       border-radius: 10px; padding: 10px 12px; overflow: auto; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-#log .head { color: #93c5fd; font-weight: 700; margin-bottom: 4px; }
+input:hover { border-color: #b8c0cf; }
+input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29, 78, 216, .14); }
+::placeholder { color: var(--faint); }
+
+/* ---------------- 表格 / 徽标 ---------------- */
+table {
+  width: 100%; margin-top: 14px;
+  border: 1px solid var(--line); border-radius: 10px; border-collapse: separate; border-spacing: 0;
+  overflow: hidden; font-size: 12.5px;
+}
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+th { background: #f8fafc; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .05em; }
+td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafbff; }
+.badge {
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  background: #eef4ff; border: 1px solid #dbe7ff; border-radius: 999px;
+  color: #1e40af; font-size: 11px; font-weight: 600; letter-spacing: .01em;
+}
+.summary { margin-top: 8px; font-size: 13px; }
+
+/* ---------------- 说明页 ---------------- */
+#pane-help .card h2 { margin: 0 0 8px; font-size: 15px; font-weight: 620; color: var(--ink); }
+#pane-help .card h2:not(:first-child) { margin-top: 20px; }
+#pane-help .card p { margin: 8px 0; font-size: 13px; line-height: 1.75; color: var(--ink-2); }
+#pane-help .card p:last-child { margin-bottom: 0; }
+#pane-help code {
+  padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px;
+  background: #f2f4f7; color: var(--ink-2); font: 500 12px/1.4 var(--mono);
+}
+
+/* ---------------- 请求日志 ---------------- */
+#log {
+  position: fixed; right: 18px; bottom: 18px; z-index: 60;
+  width: 460px; max-height: 300px; overflow: auto;
+  padding: 0 14px 12px;
+  background: linear-gradient(180deg, #0c1a2e, #0a1526);
+  border: 1px solid rgba(148, 163, 184, .18); border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(2, 6, 23, .35);
+  color: #a7b7d4;
+  font: 11.5px/1.65 var(--mono);
+}
+#log::-webkit-scrollbar { width: 8px; }
+#log::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .25); border-radius: 8px; }
+#log .head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 0 8px;
+  background: #0c1a2e;
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  color: #93c5fd; font-size: 11.5px; font-weight: 700; letter-spacing: .04em;
+}
+.log-dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .15); }
+.log-hint { margin-left: auto; font-size: 10px; font-weight: 500; letter-spacing: .1em; color: #64748b; }
+#log-body div { padding: 3px 0; border-bottom: 1px solid rgba(148, 163, 184, .06); white-space: pre-wrap; overflow-wrap: anywhere; }
+#log-body div:last-child { border-bottom: none; }
 #log .err { color: #fca5a5; }
-table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 8px; }
-th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
-th { background: #f9fafb; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 5px; font-size: 11px;
-         background: #dbeafe; color: #1e40af; }
-.summary { font-size: 13px; margin-top: 8px; }
-fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 8px 10px; }
-legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
+
+/* ---------------- 响应式 ---------------- */
+@media (max-width: 980px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static; height: auto; flex-direction: row; align-items: center;
+    gap: 16px; padding: 10px 16px; overflow-x: auto;
+  }
+  nav.tabs { flex-direction: row; flex: none; }
+  nav.tabs button { width: auto; white-space: nowrap; }
+  .side-divider, .side-section, .side-foot { display: none; }
+  .main { padding: 20px 18px 120px; }
+  .topbar-meta .meta-item, .topbar-meta .meta-sep { display: none; }
+}
+@media (max-width: 720px) {
+  .brand-sub { display: none; }
+  .page-badge { display: none; }
+  .card-head { grid-template-columns: 34px minmax(0, 1fr); }
+  .card-head [id$="-state"] { grid-column: 2; justify-self: start; }
+  .card > .row { padding-left: 0; }
+  #log { width: calc(100% - 36px); max-height: 240px; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>新车零售金融 · 运营控制台</h1>
-  <span class="sub">前端验证页 · /gw→网关18081 · /svc→8098 · /cust→8092 · 本页端口 18082</span>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">RF</div>
+    <div class="brand-copy">
+      <h1>新车零售金融 · 运营控制台</h1>
+      <span class="brand-sub">Retail Finance Operations Console · 本地验证环境</span>
+    </div>
+  </div>
+  <div class="topbar-meta">
+    <span class="env-pill"><span class="env-dot"></span>LOCAL</span>
+    <span class="meta-sep"></span>
+    <span class="meta-item"><span class="meta-k">网关</span>18081</span>
+    <span class="meta-item"><span class="meta-k">DMZ</span>18091</span>
+    <span class="meta-item"><span class="meta-k">代理</span>18082</span>
+  </div>
 </header>
-<nav class="tabs">
-  <button id="tab-staff" class="active" onclick="showTab('staff')">员工运营台</button>
-  <button id="tab-self" onclick="showTab('self')">客户自助</button>
-  <button id="tab-help" onclick="showTab('help')">说明</button>
-</nav>
-<main>
-  <!-- ============ 员工运营台 ============ -->
-  <section id="pane-staff">
-    <div class="card">
-      <h2>S1 · 员工登录</h2>
-      <div class="desc">POST /gw/api/auth/staff/login —— token 是后续所有步骤的前置。</div>
-      <div class="row">
-        <input id="staff-user" value="admin" placeholder="用户名">
-        <input id="staff-pass" value="admin123" type="password" placeholder="密码">
-        <button class="act" onclick="s1Login()">登录</button>
-        <span id="s1-state"></span>
-      </div>
-    </div>
 
-    <div class="card">
-      <h2>S2 · 客户注册（PII 加密落库）</h2>
-      <div class="desc">POST /gw/api/customers —— 电话号按时间戳自动生成，可改姓名。</div>
-      <div class="row">
-        <input id="cust-name" class="wide" value="山田太郎">
-        <input id="cust-kana" class="wide" value="ヤマダタロウ">
-        <button class="act" onclick="s2Register()">注册客户</button>
-        <span id="s2-state"></span>
-      </div>
+<div class="shell">
+  <aside class="sidebar">
+    <nav class="tabs" aria-label="主导航">
+      <button id="tab-staff" class="active" onclick="showTab('staff')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>员工运营台</span>
+      </button>
+      <button id="tab-self" onclick="showTab('self')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>客户自助</span>
+      </button>
+      <button id="tab-help" onclick="showTab('help')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span>说明</span>
+      </button>
+    </nav>
+    <div class="side-divider"></div>
+    <div class="side-section">
+      <div class="side-label">流程导航</div>
+      <a class="step-link" href="#" onclick="gotoStep('step-s1');return false;"><span class="step-code">S1</span>员工登录</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s2');return false;"><span class="step-code">S2</span>客户注册</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s3');return false;"><span class="step-code">S3</span>身份核验</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s4');return false;"><span class="step-code">S4</span>征信同意</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s5');return false;"><span class="step-code">S5</span>申请提交</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s6');return false;"><span class="step-code">S6</span>审查域</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s7');return false;"><span class="step-code">S7</span>合同域</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s8');return false;"><span class="step-code">S8</span>账务</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s9');return false;"><span class="step-code">S9</span>还款</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s10');return false;"><span class="step-code">S10</span>结清</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s11');return false;"><span class="step-code">S11</span>解押</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-s12');return false;"><span class="step-code">S12</span>贷后</a>
+      <a class="step-link" href="#" onclick="gotoStep('step-all');return false;"><span class="step-code">ALL</span>一键全链路</a>
     </div>
+    <div class="side-foot">本地联调环境<br>数据仅用于流程验证</div>
+  </aside>
 
-    <div class="card">
-      <h2>S3 · 身份核验（MANUAL 人工通道）</h2>
-      <div class="desc">发起 → 提交驾照材料 → 开始核验 → 人工审核通过 → VERIFIED。</div>
-      <div class="row">
-        <button class="act" onclick="s3All()">一键核验至 VERIFIED</button>
-        <span id="s3-state"></span>
+  <main class="main">
+    <!-- ============ 员工运营台 ============ -->
+    <section id="pane-staff">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Staff Console</div>
+          <h2>员工运营台</h2>
+          <p>端到端验证 S1–S12：员工登录 → 客户注册 → 身份核验 → 申请 → 审查 → 合同 → 账务 → 还款 → 结清 → 解押 → 贷后。</p>
+        </div>
+        <span class="page-badge">S1–S12</span>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>S4 · 征信同意取得</h2>
-      <div class="desc">POST /gw/api/consents（purpose=CREDIT_INQUIRY）→ 有效性查询。</div>
-      <div class="row">
-        <button class="act" onclick="s4Consent()">取得同意</button>
-        <span id="s4-state"></span>
+      <div class="session-bar">
+        <span class="session-label">会话对象</span>
+        <div class="chips"></div>
       </div>
-    </div>
 
-    <div class="card">
-      <h2>S5 · 申请提交（含幂等重放验证）</h2>
-      <div class="desc">POST /gw/api/applications，Idempotency-Key 重放应返回 replayed=true 与同一申请号。</div>
-      <div class="row">
-        <input id="app-price" value="1200000" title="车价（円）">
-        <input id="app-access" value="30000" title="用品（円）">
-        <button class="act" onclick="s5Apply()">提交申请</button>
-        <span id="s5-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s1">
+        <div class="card-head">
+          <span class="step-badge">S1</span>
+          <div class="card-title">
+            <h2>员工登录</h2>
+            <p class="desc">POST /gw/api/auth/staff/login —— token 是后续所有步骤的前置。</p>
+          </div>
+          <span id="s1-state"></span>
+        </div>
+        <div class="row">
+          <input id="staff-user" value="admin" placeholder="用户名">
+          <input id="staff-pass" value="admin123" type="password" placeholder="密码">
+          <button class="act" onclick="s1Login()">登录</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S6 · 审查域（建案→征信→支付能力→APPROVED）</h2>
-      <div class="desc">G3 同意门禁真实生效；征信走 CIC 挡板；INQUIRY_DONE 由事件驱动（页面轮询案件状态）。</div>
-      <div class="row">
-        <button class="act" onclick="s6All()">一键审查至 APPROVED</button>
-        <span id="s6-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s2">
+        <div class="card-head">
+          <span class="step-badge">S2</span>
+          <div class="card-title">
+            <h2>客户注册（PII 加密落库）</h2>
+            <p class="desc">POST /gw/api/customers —— 电话号按时间戳自动生成，可改姓名。</p>
+          </div>
+          <span id="s2-state"></span>
+        </div>
+        <div class="row">
+          <input id="cust-name" class="wide" value="山田太郎">
+          <input id="cust-kana" class="wide" value="ヤマダタロウ">
+          <button class="act" onclick="s2Register()">注册客户</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S7 · 合同域（书面交付→签订→冷静期→EFFECTIVE）</h2>
-      <div class="desc">两份法定书面留痕 → DOCUMENTS_DELIVERED → 签订 → 冷静期确认 → 查询代付门禁。</div>
-      <div class="row">
-        <button class="act" onclick="s7All()">合同四步至 EFFECTIVE</button>
-        <span id="s7-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s3">
+        <div class="card-head">
+          <span class="step-badge">S3</span>
+          <div class="card-title">
+            <h2>身份核验（MANUAL 人工通道）</h2>
+            <p class="desc">发起 → 提交驾照材料 → 开始核验 → 人工审核通过 → VERIFIED。</p>
+          </div>
+          <span id="s3-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s3All()">一键核验至 VERIFIED</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S8 · 账务（建债权→还款计划→三门禁代付）</h2>
-      <div class="desc">G8 门禁 fail-closed：合同/审查任一不符即拒（页面含两个负例按钮）。</div>
-      <div class="row">
-        <button class="act" onclick="s8Loan()">建债权+还款计划</button>
-        <button class="act" onclick="s8Disburse()">执行代付（三门禁）</button>
-        <button class="act ghost" onclick="s8NegContract()">负例：假合同</button>
-        <span id="s8-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s4">
+        <div class="card-head">
+          <span class="step-badge">S4</span>
+          <div class="card-title">
+            <h2>征信同意取得</h2>
+            <p class="desc">POST /gw/api/consents（purpose=CREDIT_INQUIRY）→ 有效性查询。</p>
+          </div>
+          <span id="s4-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s4Consent()">取得同意</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S9 · 还款（到期滚转 job → 逐期核销 → 余额对拍）</h2>
-      <div class="desc">schedule-due-rollup 滚至末期后逐期 POST /gw/api/payments，每期后刷新计划与余额。</div>
-      <div class="row">
-        <button class="act" onclick="s9All()">一键：滚转+逐期核销+对拍</button>
-        <span id="s9-state"></span>
-      </div>
-      <div id="s9-plan"></div>
-    </div>
+      <article class="card" id="step-s5">
+        <div class="card-head">
+          <span class="step-badge">S5</span>
+          <div class="card-title">
+            <h2>申请提交（含幂等重放验证）</h2>
+            <p class="desc">POST /gw/api/applications，Idempotency-Key 重放应返回 replayed=true 与同一申请号。</p>
+          </div>
+          <span id="s5-state"></span>
+        </div>
+        <div class="row">
+          <input id="app-price" value="1200000" title="车价（円）">
+          <input id="app-access" value="30000" title="用品（円）">
+          <button class="act" onclick="s5Apply()">提交申请</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S10 · 结清（试算 → NORMAL settle）</h2>
-      <div class="desc">GET settlement-quote → POST settle → LOAN_SETTLED 事件驱动解押建单。</div>
-      <div class="row">
-        <button class="act" onclick="s10Settle()">结清</button>
-        <span id="s10-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s6">
+        <div class="card-head">
+          <span class="step-badge">S6</span>
+          <div class="card-title">
+            <h2>审查域（建案→征信→支付能力→APPROVED）</h2>
+            <p class="desc">G3 同意门禁真实生效；征信走 CIC 挡板；INQUIRY_DONE 由事件驱动（页面轮询案件状态）。</p>
+          </div>
+          <span id="s6-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s6All()">一键审查至 APPROVED</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S11 · 解押（保留登记 → 事件建单 → 文件四件套 → 外部回执闭环）</h2>
-      <div class="desc">代录（INTERNAL_WITNESS）≠ 完成；经销商自证被拒（X-10）；仅 EXTERNAL_REGISTRY 回执可闭环。</div>
-      <div class="row">
-        <button class="act" onclick="s11Register()">保留登记</button>
-        <button class="act" onclick="s11WaitOrder()">等事件建单</button>
-        <button class="act" onclick="s11All()">一键解押闭环</button>
-        <span id="s11-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s7">
+        <div class="card-head">
+          <span class="step-badge">S7</span>
+          <div class="card-title">
+            <h2>合同域（书面交付→签订→冷静期→EFFECTIVE）</h2>
+            <p class="desc">两份法定书面留痕 → DOCUMENTS_DELIVERED → 签订 → 冷静期确认 → 查询代付门禁。</p>
+          </div>
+          <span id="s7-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s7All()">合同四步至 EFFECTIVE</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>S12 · 贷后（DPD 快照 + 对拍）</h2>
-      <div class="desc">/svc/api/jobs/dpd-snapshot（直连段，与 e2e 同口径）+ /gw/api/recon/run。</div>
-      <div class="row">
-        <button class="act" onclick="s12All()">跑快照+对拍</button>
-        <span id="s12-state"></span>
-      </div>
-    </div>
+      <article class="card" id="step-s8">
+        <div class="card-head">
+          <span class="step-badge">S8</span>
+          <div class="card-title">
+            <h2>账务（建债权→还款计划→三门禁代付）</h2>
+            <p class="desc">G8 门禁 fail-closed：合同/审查任一不符即拒（页面含两个负例按钮）。</p>
+          </div>
+          <span id="s8-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s8Loan()">建债权+还款计划</button>
+          <button class="act" onclick="s8Disburse()">执行代付（三门禁）</button>
+          <button class="act ghost" onclick="s8NegContract()">负例：假合同</button>
+        </div>
+      </article>
 
-    <div class="card">
-      <h2>全链路 · 一镜到底</h2>
-      <div class="desc">从登录到解押闭环顺序执行 S1–S12（幂等键用本次会话时间戳，可重复跑）。</div>
-      <div class="row">
-        <button class="act" id="btn-e2e" onclick="runAll()">▶ 一键全链路</button>
-        <button class="act ghost" onclick="resetRun()">重置会话</button>
-        <span id="all-state"></span>
-      </div>
-    </div>
-  </section>
+      <article class="card" id="step-s9">
+        <div class="card-head">
+          <span class="step-badge">S9</span>
+          <div class="card-title">
+            <h2>还款（到期滚转 job → 逐期核销 → 余额对拍）</h2>
+            <p class="desc">schedule-due-rollup 滚至末期后逐期 POST /gw/api/payments，每期后刷新计划与余额。</p>
+          </div>
+          <span id="s9-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s9All()">一键：滚转+逐期核销+对拍</button>
+        </div>
+        <div id="s9-plan"></div>
+      </article>
 
-  <!-- ============ 客户自助 ============ -->
-  <section id="pane-self" style="display:none">
-    <div class="card">
-      <h2>客户登录（开发桥）</h2>
-      <div class="desc">POST /gw/api/auth/customer/login，用户名 = customerId（RETAIL_CUSTOMER_DEV_LOGIN=true）。</div>
-      <div class="row">
-        <input id="self-cust" placeholder="customerId（运营台注册后自动带入）">
-        <button class="act" onclick="selfLogin()">登录</button>
+      <article class="card" id="step-s10">
+        <div class="card-head">
+          <span class="step-badge">S10</span>
+          <div class="card-title">
+            <h2>结清（试算 → NORMAL settle）</h2>
+            <p class="desc">GET settlement-quote → POST settle → LOAN_SETTLED 事件驱动解押建单。</p>
+          </div>
+          <span id="s10-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s10Settle()">结清</button>
+        </div>
+      </article>
+
+      <article class="card" id="step-s11">
+        <div class="card-head">
+          <span class="step-badge">S11</span>
+          <div class="card-title">
+            <h2>解押（保留登记 → 事件建单 → 文件四件套 → 外部回执闭环）</h2>
+            <p class="desc">代录（INTERNAL_WITNESS）≠ 完成；经销商自证被拒（X-10）；仅 EXTERNAL_REGISTRY 回执可闭环。</p>
+          </div>
+          <span id="s11-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s11Register()">保留登记</button>
+          <button class="act" onclick="s11WaitOrder()">等事件建单</button>
+          <button class="act" onclick="s11All()">一键解押闭环</button>
+        </div>
+      </article>
+
+      <article class="card" id="step-s12">
+        <div class="card-head">
+          <span class="step-badge">S12</span>
+          <div class="card-title">
+            <h2>贷后（DPD 快照 + 对拍）</h2>
+            <p class="desc">/svc/api/jobs/dpd-snapshot（直连段，与 e2e 同口径）+ /gw/api/recon/run。</p>
+          </div>
+          <span id="s12-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" onclick="s12All()">跑快照+对拍</button>
+        </div>
+      </article>
+
+      <article class="card" id="step-all">
+        <div class="card-head">
+          <span class="step-badge wide">ALL</span>
+          <div class="card-title">
+            <h2>全链路 · 一镜到底</h2>
+            <p class="desc">从登录到解押闭环顺序执行 S1–S12（幂等键用本次会话时间戳，可重复跑）。</p>
+          </div>
+          <span id="all-state"></span>
+        </div>
+        <div class="row">
+          <button class="act" id="btn-e2e" onclick="runAll()">▶ 一键全链路</button>
+          <button class="act ghost" onclick="resetRun()">重置会话</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============ 客户自助 ============ -->
+    <section id="pane-self" style="display:none">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Customer Self-Service</div>
+          <h2>客户自助</h2>
+          <p>客户主体开发桥登录与本人脱敏视图；员工 token 访问将被拒绝，用于验证双主体隔离。</p>
+        </div>
         <span id="self-state"></span>
       </div>
-    </div>
-    <div class="card">
-      <h2>我的脱敏视图</h2>
-      <div class="desc">GET /cust/api/customer-self/me —— 姓名/电话脱敏返回，员工 token 访问会被拒（主体隔离）。</div>
-      <div class="row">
-        <button class="act" onclick="selfMe()">查询本人视图</button>
-        <button class="act danger" onclick="selfNegative()">负例：员工 token 访问</button>
-      </div>
-      <div id="self-view"></div>
-    </div>
-  </section>
+      <article class="card">
+        <div class="card-head">
+          <span class="step-badge">ID</span>
+          <div class="card-title">
+            <h2>客户登录（开发桥）</h2>
+            <p class="desc">POST /gw/api/auth/customer/login，用户名 = customerId（RETAIL_CUSTOMER_DEV_LOGIN=true）。</p>
+          </div>
+        </div>
+        <div class="row">
+          <input id="self-cust" placeholder="customerId（运营台注册后自动带入）">
+          <button class="act" onclick="selfLogin()">登录</button>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <span class="step-badge">ME</span>
+          <div class="card-title">
+            <h2>我的脱敏视图</h2>
+            <p class="desc">GET /cust/api/customer-self/me —— 姓名/电话脱敏返回，员工 token 访问会被拒（主体隔离）。</p>
+          </div>
+        </div>
+        <div class="row">
+          <button class="act" onclick="selfMe()">查询本人视图</button>
+          <button class="act danger" onclick="selfNegative()">负例：员工 token 访问</button>
+        </div>
+        <div id="self-view"></div>
+      </article>
+    </section>
 
-  <!-- ============ 说明 ============ -->
-  <section id="pane-help" style="display:none">
-    <div class="card">
-      <h2>这是什么</h2>
-      <p>本地验证用前端控制台：把 <code>e2e_w8.py</code> 的 98 断言链路做成可点击页面。
-      所有请求经本页（18082）同源代理转发：<code>/gw/**</code>→网关 18081，
-      <code>/svc/**</code>→servicing 8098，<code>/cust/**</code>→customer 8092（与 e2e 直连段口径一致）。</p>
-      <p>右下角日志面板记录每次请求的方法 / 路径 / 状态 / 耗时。</p>
-      <h2>口径提示</h2>
-      <p>① 幂等键每次会话唯一，可重复跑；② 事件驱动步骤（INQUIRY_DONE、解除建单）页面用轮询等待；
-      ③ 代录回执只到 MANUAL_RECORDED，保留态不变，必须外部登记回执才闭环（B-6 / C-11）。</p>
-    </div>
-  </section>
-</main>
-<div id="log"><div class="head">请求日志</div><div id="log-body"></div></div>
+    <!-- ============ 说明 ============ -->
+    <section id="pane-help" style="display:none">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Documentation</div>
+          <h2>说明</h2>
+          <p>本地验证页的链路口径与使用提示。</p>
+        </div>
+      </div>
+      <article class="card">
+        <h2>这是什么</h2>
+        <p>本地验证用前端控制台：把 <code>e2e_w8.py</code> 的 98 断言链路做成可点击页面。
+        所有请求经本页（18082）同源代理转发：<code>/gw/**</code>→网关 18081，
+        <code>/svc/**</code>→servicing 8098，<code>/cust/**</code>→customer 8092（与 e2e 直连段口径一致）。</p>
+        <p>右下角日志面板记录每次请求的方法 / 路径 / 状态 / 耗时。</p>
+        <h2>口径提示</h2>
+        <p>① 幂等键每次会话唯一，可重复跑；② 事件驱动步骤（INQUIRY_DONE、解除建单）页面用轮询等待；
+        ③ 代录回执只到 MANUAL_RECORDED，保留态不变，必须外部登记回执才闭环（B-6 / C-11）。</p>
+      </article>
+    </section>
+  </main>
+</div>
+
+<div id="log"><div class="head"><span class="log-dot"></span>请求日志<span class="log-hint">实时</span></div><div id="log-body"></div></div>
 <script src="app.js"></script>
 </body>
 </html>
