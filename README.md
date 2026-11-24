@@ -160,6 +160,9 @@ flowchart LR
   ROLL --> SMOKE["③ 健康检查 + 冒烟"]
 ```
 
+> 可视化图集：[`docs/architecture-diagrams.html`](docs/architecture-diagrams.html)
+> （15 张 Mermaid 图，Mermaid 已本地化、离线可打开；宽图可点「原始尺寸」横向查看）。
+
 **四条与 floorplan 对齐的工程范式**：
 
 1. **精确装配**：每服务只扫自身包 + `@Import` 按类注入所需用例与仓储；四层共享 jar 被复用，隔离靠装配而非复制代码。

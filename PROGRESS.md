@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 18 模块代码（含独立迁移作业）+ Flyway V1–V22（62 表）· 构建 661 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · **W-P0-1 运行期受限角色（app/pii/dmz 三账号 + 独立迁移账号 + V22 补偿授权）已落地** · **W-P0-5 限流生产 fail-closed + Sentinel 高可用模板 + 告警标记已落地** · **W-P0-10 迁移与运行期解耦（独立 db-migration 作业，服务全部 flyway.enabled=false）已落地** · **W-DOC-VISUAL 架构图/流程图已按最新口径刷新** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 18 模块代码（含独立迁移作业）+ Flyway V1–V22（62 表）· 构建 661 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · **W-P0-1 运行期受限角色（app/pii/dmz 三账号 + 独立迁移账号 + V22 补偿授权）已落地** · **W-P0-5 限流生产 fail-closed + Sentinel 高可用模板 + 告警标记已落地** · **W-P0-10 迁移与运行期解耦（独立 db-migration 作业，服务全部 flyway.enabled=false）已落地** · **W-DOC-VISUAL 架构图/流程图已按最新口径刷新** · **W-DOC-HTML 可视化图集（15 张，离线可渲染）已生成** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
 
 ---
 
@@ -10,6 +10,7 @@
 
 | 项 | 值 |
 |---|---|
+| 轮次 | **W-DOC-HTML 架构/流程图 HTML 图集（2026-11-24，用户指示「架构图，流程图这些，生成一版html的」）**：新增 `docs/architecture-diagrams.html`（**15 张 Mermaid 图**：README/R01/R02/R04/R05/R06；含目录、来源、源码折叠、宽图「原始尺寸」切换）；新增生成脚本 `docs/tools/gen_diagrams_html.py`，并把 **Mermaid 10.9.1（MIT，3.2MB）本地化** 到 `docs/assets/`，离线可渲染；README 与 `docs/00` 加入口。Playwright + Edge 实测 **15/15 SVG 渲染、0 告警**；`check_docs.py` PASS 15/15。**无代码/测试变更**（661 测试口径不变）。此前：W-DOC-VISUAL 架构/流程图刷新 |
 | 轮次 | **W-DOC-VISUAL 架构/流程图刷新（2026-11-24，用户指示「更新最新文档，尤其架构图/流程图，补充内容」）**：README 总览图补 **Redis Sentinel、db-migration、DB 受限角色**，并新增「先迁移、再滚动发布」流程图；R02 L2 补 13 个部署单元（含迁移作业）与运行期账号映射，§3.3 补**限流故障决策图**，§7.2 补**outbox 多实例消费图**，§7.4 补**出站韧性策略图**；R06 补**角色访问矩阵图**与 **expand/contract 迁移发布图**；R05 补**解除八步状态图**；修正 README「不使用 MQ」旧口径。**无代码/测试变更**（661 测试口径不变）；`check_docs.py` PASS 15/15。此前：W-P0-10 迁移与运行期解耦 |
 | 轮次 | **W-P0-10 迁移与运行期解耦（2026-11-24，用户选定 R11 P0-10）**：新增独立模块 **`db-migration`**（Flyway 迁移作业，迁移账号执行、无端口、非长驻）；`retail-core` 及全部服务 `flyway.enabled=false`；`run-microservices.sh` / `dev-stack.sh` 起栈前先跑迁移，失败即 fail-closed 拒绝启动；发布顺序固定为「先迁移、再滚动发布服务」。**18 模块构建 661 测试 0 失败**；空库从零迁移 **22 条 / 62 个关系对象**；默认库 no-op；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0；retail-core 日志零 Flyway。R11 P0-10 置 ✅。此前：W-P0-5 限流 fail-closed + Redis 高可用 + 告警 |
 | 轮次 | **W-P0-5 限流 fail-closed + Redis 高可用 + 告警（2026-11-24，用户选定 R11 P0-5）**：网关限流 `fail-open` 默认 **false**（生产 Redis 不可用 → 503），本地由 `scripts/dev-secrets.sh` 显式置 true；Redis 不可用输出稳定 ERROR 标记 `ALERT_RATE_LIMIT_REDIS_UNAVAILABLE`（`failMode=CLOSED|OPEN`）；新增 `deploy/redis-ha/` Sentinel 模板（1 主 2 从 3 哨兵，quorum=2）+ 故障转移演练脚本。构建 **661 测试 / 105 类 / 0 失败**；Sentinel 演练 **FAILOVER_OK**（172.25.0.2 → 172.25.0.3，promoted=redis-replica-2）；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。R11 P0-5 置 ✅。此前：W-P0-1 运行期受限角色 |
@@ -94,6 +95,10 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**架构/流程图 HTML 图集（W-DOC-HTML）**——新增 `docs/architecture-diagrams.html`
+>   （15 张 Mermaid 图，目录/来源/源码折叠/宽图原始尺寸）、生成脚本 `docs/tools/gen_diagrams_html.py`、
+>   本地化 Mermaid 10.9.1（MIT）；README / `docs/00` 加入口。Playwright + Edge 实测 15/15 渲染；
+>   `check_docs.py` PASS 15/15。**无代码/测试变更**。
 > - 2026-11-24：**架构图/流程图刷新（W-DOC-VISUAL）**——README 补 Redis Sentinel / db-migration /
 >   DB 受限角色与发布顺序；R02 补限流故障决策图、outbox 多实例消费图、出站韧性图；
 >   R06 补角色访问矩阵图与 expand/contract 迁移发布图；R05 补解除八步状态图；
@@ -380,6 +385,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **架构/流程图 HTML 图集（W-DOC-HTML）** | **PASS**：`docs/architecture-diagrams.html` 生成 **15 张 Mermaid 图**（README 2 / R01 1 / R02 6 / R04 1 / R05 3 / R06 2）；Playwright + Edge 打开本地 HTML，`pre.mermaid svg` **15/15**、`#mermaid-warning` 不可见、console 0 error；宽图「原始尺寸」切换可用；Mermaid 10.9.1 本地化到 `docs/assets/`（离线可渲染）。`check_docs.py` **PASS 15/15**；**无代码/测试变更**。 |
 | 2026-11-24 | **架构图/流程图刷新（W-DOC-VISUAL）** | **PASS**：README 补 Redis Sentinel / db-migration / DB 受限角色总览图 + 「先迁移、再滚动发布」流程图；R02 L2 补 13 个部署单元与账号映射、§3.3 限流故障决策图、§7.2 outbox 多实例消费图、§7.4 出站韧性图；R06 补角色访问矩阵图 + expand/contract 迁移发布图；R05 补解除八步状态图；修正 README「不使用 MQ」旧口径。`check_docs.py` **PASS 15/15**（C14 = 22 条迁移、C15 = 661）；**无代码/测试变更**。 |
 | 2026-11-24 | **P0-10 迁移与运行期解耦** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（18 模块 / 661 测试 / 105 类 / 0 失败）**；②独立迁移 jar `db-migration/target/retail-db-migration-1.0.0-SNAPSHOT.jar`（4.9MB，含 Flyway + PG 驱动）；③默认库执行 → `Schema "public" is up to date` **EXIT 0**；④空库 `retail_finance_p010` 从零迁移 → **22 条 success / 62 个关系对象（57 表 + 5 视图）**，验后已删库；⑤`run-microservices.sh smoke` → 迁移作业先执行、retail-core 日志**零 Flyway**、冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑥失败路径：不可达库 **EXIT 1**、缺 `RETAIL_DB_MIGRATION_PASSWORD` **EXIT 2**（fail-closed）；⑦`check_docs.py` PASS 15/15；⑧GitHub Actions **run #9（id `45335266487`，commit `46e7f42`）双 job success**（18 模块构建与单测 / 文档自检）。 |
 | 2026-11-24 | **P0-5 限流 fail-closed + Redis 高可用 + 告警** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（661 测试 / 105 类 / 0 失败）**；②`RateLimitPropertiesTest` 钉死默认 `fail-open=false`；③`RateLimitFilterTest` 钉死 Redis 不可用时 ERROR 标记 `ALERT_RATE_LIMIT_REDIS_UNAVAILABLE`（failMode=OPEN/CLOSED 各一例、实例级 10s 节流、不泄露 Authorization）；④Sentinel 演练 `deploy/redis-ha/failover-drill.sh` → **FAILOVER_OK old=172.25.0.2 new=172.25.0.3 promoted=redis-replica-2**；⑤本地 dev 显式 fail-open 下冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑥限流专项 `smoke_ratelimit.py` **redis 29/29、memory 33/33 EXIT 0**（顺带修正 HTTP 头名大小写断言，RFC 7230 大小写不敏感）；⑦`check_docs.py` PASS 15/15；⑧GitHub Actions **run #7（id `45332533971`，commit `3025293`）双 job success**（构建与单测 / 文档自检）。 |
