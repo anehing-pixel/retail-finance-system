@@ -8,8 +8,9 @@ spring:
     # 第一版共库（ADR-RF-009）：W9-B 起 nonce 防重放 / call_logs 留痕 / partner 档案
     # 走 integration.* 表（R06 §integration）
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/retail_finance}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    # 运行期受限角色（R11 P0-1 / G-DB-2）：DMZ 用 retail_dmz_rw；禁止 postgres 超管
+    username: ${SPRING_DATASOURCE_USERNAME:retail_dmz_rw}
+    password: ${RETAIL_DB_DMZ_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5

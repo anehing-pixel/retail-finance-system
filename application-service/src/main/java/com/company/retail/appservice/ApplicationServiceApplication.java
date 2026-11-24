@@ -1,5 +1,6 @@
 package com.company.retail.appservice;
 
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.common.lock.RfLockConfig;
 import com.company.retail.infrastructure.config.RfOutboxConfig;
@@ -18,7 +19,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.appservice")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class, RfOutboxConfig.class, RfLockConfig.class})
+@Import({RfDataSourceGuardConfig.class, RfSecurityConfig.class, RfOutboxConfig.class, RfLockConfig.class})
 public class ApplicationServiceApplication {
 
     public static void main(String[] args) {

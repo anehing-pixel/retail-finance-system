@@ -1,5 +1,6 @@
 package com.company.retail.underwriting;
 
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.underwriting.config.UnderwritingMqConfig;
 import com.company.retail.infrastructure.config.MqEnvelopeConfig;
@@ -19,7 +20,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.underwriting")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class, RfOutboxConfig.class, MqEnvelopeConfig.class, UnderwritingMqConfig.class,
+@Import({RfDataSourceGuardConfig.class, RfSecurityConfig.class, RfOutboxConfig.class, MqEnvelopeConfig.class, UnderwritingMqConfig.class,
         com.company.retail.common.outbound.RfFeignConfig.class,
         com.company.retail.common.contract.W4GateFacadeConfig.class})
 public class UnderwritingServiceApplication {

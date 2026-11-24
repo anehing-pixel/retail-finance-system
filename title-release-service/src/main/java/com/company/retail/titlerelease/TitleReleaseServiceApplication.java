@@ -1,5 +1,6 @@
 package com.company.retail.titlerelease;
 
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.common.lock.RfLockConfig;
 import com.company.retail.titlerelease.config.TitleReleaseMqConfig;
@@ -20,7 +21,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.titlerelease")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class, RfOutboxConfig.class, RfLockConfig.class, MqEnvelopeConfig.class, TitleReleaseMqConfig.class})
+@Import({RfDataSourceGuardConfig.class, RfSecurityConfig.class, RfOutboxConfig.class, RfLockConfig.class, MqEnvelopeConfig.class, TitleReleaseMqConfig.class})
 public class TitleReleaseServiceApplication {
 
     public static void main(String[] args) {

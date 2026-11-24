@@ -1,6 +1,7 @@
 package com.company.retail.externalapi;
 
 import com.company.platform.exception.GlobalExceptionHandler;
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.lock.RfLockConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -16,7 +17,7 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootApplication(scanBasePackages = "com.company.retail.externalapi")
 @EnableDiscoveryClient
-@Import({GlobalExceptionHandler.class, RfLockConfig.class,
+@Import({RfDataSourceGuardConfig.class, GlobalExceptionHandler.class, RfLockConfig.class,
         com.company.retail.common.outbound.RfOutboundConfig.class})
 public class ExternalApiApplication {
 

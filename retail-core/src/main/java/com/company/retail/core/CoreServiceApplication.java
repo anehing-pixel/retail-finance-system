@@ -1,6 +1,7 @@
 package com.company.retail.core;
 
 import com.company.retail.common.cache.RfCacheConfig;
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.infrastructure.config.MqEnvelopeConfig;
 import com.company.retail.infrastructure.config.RfOutboxConfig;
@@ -19,7 +20,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.core")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class, RfOutboxConfig.class, RfCacheConfig.class, MqEnvelopeConfig.class,
+@Import({RfDataSourceGuardConfig.class, RfSecurityConfig.class, RfOutboxConfig.class, RfCacheConfig.class, MqEnvelopeConfig.class,
         com.company.retail.common.outbound.RfFeignConfig.class})
 public class CoreServiceApplication {
 

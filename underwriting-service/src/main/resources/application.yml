@@ -7,8 +7,9 @@ spring:
   datasource:
     # 第一版共库（ADR-RF-009 / R02 §3.1 范式 4）：core | pii | integration | audit 按 schema 分区
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/retail_finance}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    # 运行期受限角色（R11 P0-1 / G-DB-2）：禁止 postgres 超管；口令由环境变量注入，无默认值
+    username: ${SPRING_DATASOURCE_USERNAME:retail_app_rw}
+    password: ${RETAIL_DB_APP_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10

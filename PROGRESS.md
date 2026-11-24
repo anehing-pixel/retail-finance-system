@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 642 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V22（62 表）· 构建 656 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · **W-P0-1 运行期受限角色（app/pii/dmz 三账号 + 独立迁移账号 + V22 补偿授权）已落地** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
 
 ---
 
@@ -10,7 +10,8 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **W-P0-8 密钥启动门禁（2026-11-24，用户选定 R11 P0-8）**：员工 JWT / 客户 JWT / PII data-key / PII hmac-key / 附件 token-secret **5 类密钥全部移除配置与代码默认值**；新增共享 `SecretPolicy`（缺失 / 短于 32 字节 / 非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`AuthController` 改用 `customerTokenVerifier` Bean（签发与验签密钥单一来源）；本地新增 `scripts/dev-secrets.sh`，由 `run-microservices.sh` / `scripts/dev-stack.sh` 显式 source 并激活 `dev` profile（**共享禁区授权**：用户选定 P0-8 后，本地冒烟必须继续可跑；改动仅限本地 dev 注入，不改变生产语义）。构建 **642 测试 / 102 类 / 0 失败**；缺注入 / 弱值启动 EXIT 1 实测；冒烟 33/33 + 前端 46/46 + MQ 11/11，EXIT 0。R11 P0-8 置 ✅。此前：W-CI CI 死链修复 |
+| 轮次 | **W-P0-1 运行期受限角色（2026-11-24，用户选定 R11 P0-1）**：11 个连库单元从 `postgres` 超管切换为受限角色——业务 9 服务 → `retail_app_rw`、customer → `retail_pii_rw`、external-api → `retail_dmz_rw`；新增 `DataSourceRolePolicy` + `RfDataSourceGuardConfig`（超管 / 未知角色 / 弱口令 → 启动失败）；`retail-core` Flyway 改用独立迁移账号（G-DB-3）；新增迁移 **V22** 按真实访问路径补齐 `retail_app_rw` integration 5 表、`retail_pii_rw` core outbox 三表 + MQ 收件箱（只授表级、不放开 DMZ-only 表）；本地 `scripts/dev-secrets.sh` 注入 V1 开发口令。构建 **656 测试 / 104 类 / 0 失败**；超管 / 缺口令启动 EXIT 1；`pg_stat_activity` 运行账号 `retail_app_rw`；越权语句被拒；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。R11 P0-1 置 ✅。此前：W-P0-8 密钥启动门禁 |
+| 轮次 | **W-P0-8 密钥启动门禁（2026-11-24，用户选定 R11 P0-8）**：员工 JWT / 客户 JWT / PII data-key / PII hmac-key / 附件 token-secret **5 类密钥全部移除配置与代码默认值**；新增共享 `SecretPolicy`（缺失 / 短于 32 字节 / 非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`AuthController` 改用 `customerTokenVerifier` Bean（签发与验签密钥单一来源）；本地新增 `scripts/dev-secrets.sh`，由 `run-microservices.sh` / `scripts/dev-stack.sh` 显式 source 并激活 `dev` profile（**共享禁区授权**：用户选定 P0-8 后，本地冒烟必须继续可跑；改动仅限本地 dev 注入，不改变生产语义）。构建 **642 测试 / 102 类 / 0 失败**；缺注入 / 弱值启动 EXIT 1 实测；冒烟 33/33 + 前端 46/46 + MQ 11/11，EXIT 0。R11 P0-8 置 ✅（原记录：构建 642 测试 / 102 类）。此前：W-CI CI 死链修复 |
 | 轮次 | **W-CI CI 死链修复（2026-11-24，用户选定 R11 P0-6）**：`.github/workflows/docs-check.yml` → **`ci.yml`**；触发分支 `main → master`（`push` / `pull_request` / `workflow_dispatch`）；保留 docs job，新增 **build job**（Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests` → `mvn -B clean package` 跑全量单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。本地按同命令实测构建绿；**contracts 仓已发布，GitHub Actions 首跑 run #1 双 job 全绿**（构建与单测 / 文档自检），R11 P0-6 置 ✅。此前：W-P0-4 事件消费多实例 |
 | 轮次 | **W-P0-4 事件消费多实例（2026-11-24，用户选定 R11 P0-4）**：`core.event_consumptions` 增加原子认领（PENDING/FAILED → PROCESSING + 5 分钟租约，`UPDATE ... RETURNING`），同一 `(event_id, consumer)` 只有一个实例执行；`markConsumption*` 仅认领者可写；`consumer_offsets.last_event_id` 改 `GREATEST` 只前进；MQ 中继未完成时抛错触发重投。**无 DDL / 无新配置 / 无新迁移**。新增 3 个测试类 14 例；真实 PG 认领/租约/条件写/游标 SQL 实测；冒烟 **33/33 EXIT 0**。R11 P0-4 置 ✅。此前：W-GDB7 审计授权 |
 | 轮次 | **W-GDB7 审计写入授权落地（2026-11-24，用户选定 R11 P0-2）**：新增迁移 **V21**（`V21__g_db_7_audit_write_authorization.sql`）——按 `G-DB-2` 实际连接角色授权：`retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列 `USAGE` / `SELECT`），`retail_audit_ins` 两表保留；三角色显式禁 `UPDATE` / `DELETE` / `TRUNCATE`（append-only 不变）。**不新增表 / 不改代码 / 不改已执行迁移字节**。Flyway V21 实测 applied；三角色写 / 禁改删 / 禁跨表实测通过；冒烟 **33/33 EXIT 0**。R11 P0-2 置 ✅。此前：W-P0-7 出站统一治理 |
@@ -78,7 +79,7 @@
 | RocketMQ（削峰缓冲层） | **9876**（namesrv）/ **10911**（broker，本地单节点；`ADR-RF-014`） | — | 不冲突 ✅（本轮引入；**默认不启用**，`retail.mq.enabled=false` → 走同步路径） |
 | MQ 配置键 / 环境变量 | `retail.mq.*`（`enabled` / `data-key` / `key-version` / `name-server` / `producer-group` / `consumer-group` / `consume-thread-max` / `pull-batch-size` / `relay-consumer-enabled` / `direct-consumers`）；环境变量 `RETAIL_MQ_ENABLED` / `RETAIL_MQ_DATA_KEY` / `RETAIL_MQ_KEY_VERSION` / `RETAIL_MQ_NAME_SERVER` / `RETAIL_MQ_CONSUME_THREADS` / `RETAIL_MQ_PULL_BATCH` / `RETAIL_MQ_RELAY_ENABLED` / `RETAIL_MQ_DIRECT_CONSUMERS` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅ |
 | 数据库实例 | `retail_finance`（独立） | `floorplan`（独立） | 物理隔离 ✅ |
-| Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 已占用**（G-DB-7 审计写入授权，R06 §3.2）；**V22 起预留** | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
+| Flyway | V1 起（独立库）；**V16–V17 已占用**（PII 授权收紧）；**V18 已占用**（产品档位目录 + 还款计划快照列，W-CACHE）；**V19 已占用**（外部登记回执幂等唯一索引，ADR-RF-013）；**V20 已占用**（MQ 密文信封通道，ADR-RF-014）；**V21 已占用**（G-DB-7 审计写入授权，R06 §3.2）；**V22 已占用**（G-DB-2 运行期受限角色补偿授权，R11 P0-1）；**V23 起预留** | V1–V26 已执行、V27–V31 预分配、V40–V79 已占用 | 不撞号 ✅ |
 | 配置前缀 | `retail.*` | `floorplan.*` | 不冲突 ✅ |
 | 网关限流配置键 | `retail.gateway.rate-limit.mode`（`redis` 缺省 / `memory`）+ `retail.gateway.rate-limit.*`（redis 模式）+ `retail.gateway.rate-limit.memory.*`（进程内模式）；环境变量 `RETAIL_GATEWAY_RATE_LIMIT_MODE` / `RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*` | — | 前缀 `retail.*` 与 `RETAIL_*` 一致，不冲突 ✅（W-RL 引入；**两套互斥装配**，见 `ADR-RF-012` §12） |
 | 出站调用配置键 | `retail.outbound.enabled` / `circuit-enabled`；`retail.outbound.<profile>.*`（7 档 × `connect-timeout` / `read-timeout` / `max-attempts` / `retry-backoff` / `circuit.failure-threshold` / `circuit.open-duration`）；`retail.outbound.tasks.*`；环境变量 `RETAIL_OUTBOUND_*` | — | 前缀一致，不冲突 ✅（P0-7 引入；`financial` / `write` / `forward` 代码级强制不重试） |
@@ -89,12 +90,19 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**P0-1 运行期受限角色**（用户选定 R11 P0-1）——11 连库单元改为受限角色
+>   （业务 9 → `retail_app_rw`、customer → `retail_pii_rw`、external-api → `retail_dmz_rw`）；
+>   新增 `DataSourceRolePolicy` + `RfDataSourceGuardConfig`（超管 / 未知角色 / 弱口令启动失败）；
+>   `retail-core` Flyway 改用独立迁移账号（G-DB-3）；新增迁移 **V22**（G-DB-2 补偿授权）。
+>   **共享禁区授权**：用户选定 P0-1，需改 `scripts/dev-secrets.sh` 并在 `AGENTS.md §6` 登记 V22 号段。
+>   验证：构建 **656 测试 0 失败**；超管 / 缺口令 EXIT 1；`pg_stat_activity` 运行账号 `retail_app_rw`；
+>   越权语句被拒；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。
 > - 2026-11-24：**P0-8 密钥启动门禁**（用户选定 R11 P0-8）——5 类密钥移除各服务 `application.yml`
 >   与代码 `@Value` 的全部默认值；新增共享 `common/.../security/SecretPolicy.java`（缺失 / <32 字节 /
 >   非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`RfSecurityConfig`、customer PII、
 >   title-release 附件签名、MQ 信封密钥统一接入；`AuthController` 改用 `customerTokenVerifier` Bean；
 >   本地新增 `scripts/dev-secrets.sh`（仅本地，显式激活 `dev` profile）。**无 Flyway 迁移 / 无新表**。
->   验证：构建 **642 测试 0 失败**；缺注入 / 弱值启动 EXIT 1；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。
+>   验证（原记录）：构建 **642 测试 0 失败**；缺注入 / 弱值启动 EXIT 1；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。
 > - 2026-11-24：**P0-6 CI 死链修复**（用户选定 R11 P0-6）——`docs-check.yml` 重命名为 `ci.yml`；
 >   触发分支 `main → master`（push / pull_request / workflow_dispatch）；新增 build job：
 >   Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests`
@@ -324,9 +332,10 @@
 **S1–S4**：见 `R11 §3` 工作包 W1–W8，本表不重复罗列（避免第二份会过期的清单）。
 
 **投产门禁（外部对接阶段收口前执行，`R06 §3.2`）**
-- [ ] **G-DB-1~G-DB-7 全部满足**：四角色独立登录账号（口令密钥托管，弃用 V1 的 `*_dev`）· 运行连接按角色分配 · 迁移账号与运行账号分离 · 默认权限绑定迁移账号 · 越权拦截实测（`R10 A23` 转正）· 业务流量禁用超管账号 · **审计写入账号归属落地（G-DB-7 ✅ V21 已落地：app_rw → audit_events；pii_rw → pii_access_logs；三角色禁改删）**
+- [x] **G-DB-1~G-DB-7 本地口径全部兑现**（2026-11-24）：四角色独立登录（生产口令由 `RETAIL_DB_*` 注入）· 运行连接按角色分配 · 迁移账号与运行账号分离 · 默认权限绑定迁移账号 · 越权拦截实测（`R10 A23` 转正）· 业务流量禁用超管账号（`RfDataSourceGuardConfig`）· **审计写入账号归属（G-DB-7 ✅ V21）**
 - [x] G-DB-7 授权调整走 **V21**（2026-11-24 已执行）：按实际连接角色授权 `retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列权限；仍禁 UPDATE/DELETE/TRUNCATE），不改已执行迁移字节（方案见 `R06 §3.2`）
-- [ ] 在**具备受限账号的类生产环境**执行一次完整实测并留证；**本地全绿不构成门禁通过证据**（本地统一超级用户，`R06 §3.1`）
+- [x] G-DB-2 补偿授权走 **V22**（2026-11-24 已执行）：`retail_app_rw` 读 integration 5 张业务表、`retail_pii_rw` 读写 core outbox 三表 + MQ 收件箱；只授表级权限，未放开 DMZ-only 表（`R06 §3.2`）
+- [ ] 在**生产级密钥托管环境**执行一次完整实测并留证：托管口令注入、轮换演练、迁移账号 owner 口径核对；本地已按受限角色跑绿（`R06 §3.1`），但托管与轮换仍属上线运维项
 - [ ] 门禁 **fail-closed**：任一项不满足，生产部署不予放行（`AGENTS §5`）
 
 ---
@@ -349,6 +358,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **P0-1 运行期受限角色（G-DB-2 / G-DB-3 / G-DB-6）** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（656 测试 / 104 类 / 0 失败）**；②auth-service 以 `SPRING_DATASOURCE_USERNAME=postgres` 启动 → **EXIT 1**（`RfDataSourceGuardConfig` 拒绝超管）、缺 `RETAIL_DB_APP_PASSWORD` → **EXIT 1**（占位符）；③服务启动后 `pg_stat_activity` 实测运行连接 **`retail_app_rw|10`**，员工登录 API 200；④Flyway **V22 applied**（迁移账号执行，运行账号无 DDL）；⑤越权实测：app_rw 查 `pii.customer_pii` / 建 `core.*` 表 / 查 `integration.partners` 均拒；pii_rw 查 `core.loans` 拒、查 `pii.customer_pii` 可；dmz_rw 查 `core.loans` 拒、查 `integration.partners` 可；⑥冒烟 **33/33 + 前端 46/46 + MQ 11/11 EXIT 0**；⑦`check_docs.py` PASS 15/15。**新增 V22；表数仍 62** |
 | 2026-11-24 | **P0-8 密钥启动门禁** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（642 测试 / 102 类 / 0 失败 0 错误 0 跳过）**；②`retail-core` 无 `RETAIL_JWT_SECRET` 启动 → **EXIT 1**，报 `Could not resolve placeholder 'RETAIL_JWT_SECRET'`；③仅注入 dev-only 弱值且未激活 `dev` profile → **EXIT 1**，`SecretPolicy` 拒绝；④`run-microservices.sh smoke` → **EXIT 0**（网关 33/33 + 前端 46/46 + MQ 11/11），本地 `scripts/dev-secrets.sh` 注入生效；⑤`check_docs.py` PASS 15/15；⑥GitHub Actions **run #3（id `45326770269`，commit `5f1c706`）双 job success**（构建与单测 / 文档自检）。**无 Flyway 迁移 / 无新表 / 无新权限点** |
 | 2026-11-24 | **P0-6 CI 死链修复（本地 + GitHub Actions 首跑）** | **PASS**：①本地 `ci.yml` YAML 解析 OK；触发分支 `master`（push / pull_request / workflow_dispatch）；`mvn -B -f ../company-platform-contracts/pom.xml install -DskipTests` → **BUILD SUCCESS**；`mvn -B clean package` → **BUILD SUCCESS**（609 测试 / 96 类 / 0 失败）。②**GitHub Actions run #1（id `45324660737`，commit `b9afd30`）**：`构建与单测` **success**（contracts 克隆 / install / 全量 package 逐步 success）、`文档自检` **success**（check_docs + normalize_terms --check）。R11 P0-6 置 ✅ |
 | 2026-11-24 | **P0-4 事件消费多实例** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（609 测试 / 96 类 / 0 失败 0 错误 0 跳过）**；②真实 PG 实测：首次认领 1 行、租约内二次认领 0 行、租约过期重认领 1 行、`markDone` 重复 0 行、`DEAD` 补置 1 行、`GREATEST` 游标只前进；③冒烟 **33/33 EXIT 0**，`core.event_consumptions` 52 条全 DONE、**0 条 PROCESSING 卡死**；④`check_docs.py` PASS 15/15（C15 = 609）。**无 DDL / 新配置 / 新迁移** |
@@ -417,8 +427,8 @@
    `scripts/smoke_w_lock.py`（锁专项 20 断言）与 `scripts/e2e_w8.py`（104 断言）为准，新增能力必须补断言；MQ **开启态**另由 `MqEnvelopeLiveTest`
    （真实 broker 活体联调）承担，单测与关闭态冒烟**都不等于** MQ 链路已通。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
-   （V1 起共 21 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表，V21 只调整审计授权不建表）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 642，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
+   （V1 起共 22 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表，V21 / V22 只调整授权不建表）。改表一律走新迁移，不许改已执行迁移的字节。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 656，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。
@@ -492,7 +502,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 17 模块 12 部署单元、62 表 / 21 迁移、642 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 17 模块 12 部署单元、62 表 / 22 迁移、656 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 

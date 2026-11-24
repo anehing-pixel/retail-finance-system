@@ -1,5 +1,6 @@
 package com.company.retail.auth;
 
+import com.company.retail.common.config.RfDataSourceGuardConfig;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.infrastructure.config.RfOutboxConfig;
 import org.springframework.boot.SpringApplication;
@@ -17,7 +18,7 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication(scanBasePackages = "com.company.retail.auth")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.company.retail.common.contract")
-@Import({RfSecurityConfig.class})
+@Import({RfDataSourceGuardConfig.class, RfSecurityConfig.class})
 public class AuthServiceApplication {
 
     public static void main(String[] args) {
