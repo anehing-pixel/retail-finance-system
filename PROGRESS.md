@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 609 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 609 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **W-CI CI 死链修复（2026-11-24，用户选定 R11 P0-6）**：`.github/workflows/docs-check.yml` → **`ci.yml`**；触发分支 `main → master`（`push` / `pull_request` / `workflow_dispatch`）；保留 docs job，新增 **build job**（Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests` → `mvn -B clean package` 跑 609 单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。本地按同命令实测构建绿；**CI 首跑待 contracts 仓发布**。此前：W-P0-4 事件消费多实例 |
+| 轮次 | **W-CI CI 死链修复（2026-11-24，用户选定 R11 P0-6）**：`.github/workflows/docs-check.yml` → **`ci.yml`**；触发分支 `main → master`（`push` / `pull_request` / `workflow_dispatch`）；保留 docs job，新增 **build job**（Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests` → `mvn -B clean package` 跑 609 单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。本地按同命令实测构建绿；**contracts 仓已发布，GitHub Actions 首跑 run #1 双 job 全绿**（构建与单测 / 文档自检），R11 P0-6 置 ✅。此前：W-P0-4 事件消费多实例 |
 | 轮次 | **W-P0-4 事件消费多实例（2026-11-24，用户选定 R11 P0-4）**：`core.event_consumptions` 增加原子认领（PENDING/FAILED → PROCESSING + 5 分钟租约，`UPDATE ... RETURNING`），同一 `(event_id, consumer)` 只有一个实例执行；`markConsumption*` 仅认领者可写；`consumer_offsets.last_event_id` 改 `GREATEST` 只前进；MQ 中继未完成时抛错触发重投。**无 DDL / 无新配置 / 无新迁移**。新增 3 个测试类 14 例；真实 PG 认领/租约/条件写/游标 SQL 实测；冒烟 **33/33 EXIT 0**。R11 P0-4 置 ✅。此前：W-GDB7 审计授权 |
 | 轮次 | **W-GDB7 审计写入授权落地（2026-11-24，用户选定 R11 P0-2）**：新增迁移 **V21**（`V21__g_db_7_audit_write_authorization.sql`）——按 `G-DB-2` 实际连接角色授权：`retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列 `USAGE` / `SELECT`），`retail_audit_ins` 两表保留；三角色显式禁 `UPDATE` / `DELETE` / `TRUNCATE`（append-only 不变）。**不新增表 / 不改代码 / 不改已执行迁移字节**。Flyway V21 实测 applied；三角色写 / 禁改删 / 禁跨表实测通过；冒烟 **33/33 EXIT 0**。R11 P0-2 置 ✅。此前：W-P0-7 出站统一治理 |
 | 轮次 | **W-P0-7 出站调用统一超时 / 重试 / 熔断（2026-11-24，用户选定 R11 P0-7「改动可控、立刻提升工程可信度」）**：新增共享 `common/outbound`（7 策略档 + 三态熔断 + JDK `HttpClient` 封装 + Feign `FeignBuilderCustomizer` + 稳定幂等键）；9 处 JDK 客户端与 3 个 Feign 门禁全部迁移；`integration.outbound_tasks` 补齐消费（1m/5m/30m/2h/6h、5 次、DEAD、租约回收、`SKIP LOCKED`）与人工重触发端点（`JOB_TRIGGER`）；**不新增依赖 / Flyway 迁移 / 权限点**。构建 **595 测试 0 失败**（P0-7 轮原记录）、走网关冒烟 EXIT 0、真实 PG 状态机 SQL 验证；R11 P0-7 / E-3 置 ✅。此前：W-EXT-DECIDE 外部接口内部裁决 |
@@ -93,6 +93,8 @@
 >   Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests`
 >   → `mvn -B clean package`（609 单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。
 >   本地按同命令实测：YAML 解析 OK、contracts install BUILD SUCCESS、全量构建 BUILD SUCCESS。
+>   **首跑证据（2026-11-24）**：contracts 仓 `anehing-pixel/company-platform-contracts` 已发布（master `ddf6a11`）；
+>   本仓 master `b9afd30` 触发 Actions **run #1（run id `45324660737`）**：`构建与单测` success（含 contracts 克隆 / install / 全量 package）、`文档自检` success。R11 P0-6 置 ✅。
 >   **CI 首跑待 contracts 仓发布**（用户选择「发布独立仓」方案）；发布后本行改 ✅。
 > - 2026-11-24：**P0-4 事件消费多实例**（用户选定 R11 P0-4）——`EventConsumptionService`
 >   执行前原子认领 `core.event_consumptions`（PENDING/FAILED → PROCESSING，5 分钟租约，
@@ -341,7 +343,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
-| 2026-11-24 | **P0-6 CI 死链修复（本地同命令验证）** | **PASS（本地）**：①`ci.yml` YAML 解析 OK；②触发分支 `master`（push / pull_request / workflow_dispatch）；③`mvn -B -f ../company-platform-contracts/pom.xml install -DskipTests` → **BUILD SUCCESS**；④`mvn -B clean package` → **BUILD SUCCESS**（609 测试 / 96 类 / 0 失败）。**CI 首跑待 `company-platform-contracts` 仓发布**；发布后按 GitHub Actions 结果补记 |
+| 2026-11-24 | **P0-6 CI 死链修复（本地 + GitHub Actions 首跑）** | **PASS**：①本地 `ci.yml` YAML 解析 OK；触发分支 `master`（push / pull_request / workflow_dispatch）；`mvn -B -f ../company-platform-contracts/pom.xml install -DskipTests` → **BUILD SUCCESS**；`mvn -B clean package` → **BUILD SUCCESS**（609 测试 / 96 类 / 0 失败）。②**GitHub Actions run #1（id `45324660737`，commit `b9afd30`）**：`构建与单测` **success**（contracts 克隆 / install / 全量 package 逐步 success）、`文档自检` **success**（check_docs + normalize_terms --check）。R11 P0-6 置 ✅ |
 | 2026-11-24 | **P0-4 事件消费多实例** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（609 测试 / 96 类 / 0 失败 0 错误 0 跳过）**；②真实 PG 实测：首次认领 1 行、租约内二次认领 0 行、租约过期重认领 1 行、`markDone` 重复 0 行、`DEAD` 补置 1 行、`GREATEST` 游标只前进；③冒烟 **33/33 EXIT 0**，`core.event_consumptions` 52 条全 DONE、**0 条 PROCESSING 卡死**；④`check_docs.py` PASS 15/15（C15 = 609）。**无 DDL / 新配置 / 新迁移** |
 | 2026-11-24 | **G-DB-7 审计写入授权（V21）** | **PASS**：①Flyway `retail-core` 启动日志 → `Migrating to version 21 - g db 7 audit write authorization` + `Successfully applied 1 migration`；`flyway_schema_history` V21 success；②`retail_app_rw`：INSERT/SELECT `audit.audit_events` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.pii_access_logs` 拒绝；③`retail_pii_rw`：INSERT/SELECT `audit.pii_access_logs` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.audit_events` 拒绝；④`retail_audit_ins`：两表 INSERT/SELECT 成功（序列权限生效），UPDATE/DELETE 拒绝；⑤走网关冒烟 **33/33 EXIT 0**；⑥`check_docs.py` PASS 15/15。**无新表、无代码改动、V1–V20 字节未动** |
 | 2026-11-24 | **P0-7 出站统一治理（超时 / 重试 / 熔断）** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（595 测试 / 93 类 / 0 失败 0 错误 0 跳过）**；②走网关冒烟 **EXIT 0**（前端 46/46 + MQ 11/11；新出站链路真实走通）；③Feign 策略在 retail-core / bureau / underwriting / servicing 启动日志实测生效（connect 0.5s / read 2s / circuit=true）；④真实 PG 实测 `outbound_tasks` 认领（`FOR UPDATE SKIP LOCKED`）、DONE、RETRY、DEAD、DEAD→PENDING 重置 SQL 全部成功；⑤`check_docs.py` **PASS 15/15 EXIT 0**（C15 权威口径 595）。**未新增 Flyway 迁移 / 权限点 / ADR / 依赖**；V21 仍预留 G-DB-7 |
