@@ -8,9 +8,9 @@ import java.util.List;
 /**
  * 网关限流参数（{@code retail.gateway.rate-limit.*}）。
  *
- * <p><b>默认 fail-open</b>：Redis 不可用时放行。限流是<b>保护层</b>而不是安全边界——
- * 真正的正确性防线在各服务内（幂等唯一索引、乐观锁、fail-closed 门禁）。
- * 为了保护层可用性而把主链路打挂，是本末倒置；生产上若要改为 fail-closed 可配置切换。</p>
+ * <p><b>默认 fail-closed</b>（R11 P0-5）：Redis 不可用时拒绝请求（503），不允许静默绕过限流。
+ * 本地开发由 {@code scripts/dev-secrets.sh} 显式置 {@code RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN=true}
+ * 换取开发便利；生产环境不得开启 fail-open。</p>
  */
 @ConfigurationProperties(prefix = "retail.gateway.rate-limit")
 public class RateLimitProperties {
@@ -28,8 +28,8 @@ public class RateLimitProperties {
      */
     private String mode = "redis";
 
-    /** Redis 不可用时是否放行（true = fail-open，默认）。 */
-    private boolean failOpen = true;
+    /** Redis 不可用时是否放行（true = fail-open；**默认 false = fail-closed**）。 */
+    private boolean failOpen = false;
 
     /** 限流键维度：{@code auth_or_ip}（优先用 Authorization 头哈希，退化到 IP）/ {@code ip}。 */
     private String keyBy = "auth_or_ip";

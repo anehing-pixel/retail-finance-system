@@ -10,7 +10,7 @@
   环境变量 RETAIL_GATEWAY_RATE_LIMIT_*。
   计数键 = key-prefix + 规则 path + ":" + 调用方指纹，指纹是 Authorization 头的
   SHA-256 哈希（无该头时退化到来源 IP）。桶在 Redis（Lua 原子扣减），
-  Redis 不可用默认 fail-open 放行。
+  本冒烟模板显式 fail-open（生产默认 fail-closed，R11 P0-5）。
   429 响应：状态 429 + Retry-After 头；响应体 details 只有 path；
   **不下发 X-RateLimit-* 头**（故本脚本在 redis 模式下不断言其存在）。
 
@@ -33,7 +33,7 @@ scripts/smoke_ratelimit_edge.py 单独验收（details.layer=edge 与网关层�
 前置：先构建网关 jar
     mvn -B -o -pl gateway -am package
     redis 模式还需要 Redis 可达（默认 localhost:6382，可用 REDIS_HOST / REDIS_PORT 覆盖；
-    不可达时网关会 fail-open 放行，限流无从验证，故直接判环境不具备）。
+    不可达时冒烟模板会 fail-open 放行，限流无从验证，故直接判环境不具备）。
 
 用法：
     python scripts/smoke_ratelimit.py                 # 默认 redis 模式
@@ -115,6 +115,14 @@ DISABLE_ENV = {
 }
 
 
+def hget(headers, name):
+    """HTTP 头名大小写不敏感（RFC 7230）——urllib 会把 X-RateLimit-* 归一化成 X-Ratelimit-*。"""
+    for k, v in headers.items():
+        if k.lower() == name.lower():
+            return v
+    return None
+
+
 def check(name, cond, detail=""):
     global PASS
     if cond:
@@ -160,7 +168,7 @@ def free_port():
 
 
 def redis_reachable(host, port, timeout=2.0):
-    """redis 模式的前置检查：Redis 不可达时网关会 fail-open 放行，限流无从验证。"""
+    """redis 模式的前置检查：Redis 不可达时冒烟模板会 fail-open 放行，限流无从验证。"""
     try:
         with socket.create_connection((host, int(port)), timeout=timeout):
             return True
@@ -269,7 +277,7 @@ def check_reject(name, code, body, headers, mode, expect_path, expect_trace=None
     """429 语义断言：按模式分支（redis 无 X-RateLimit-* 头、details 只有 path；
     memory 有 X-RateLimit-* 头、details 含 policy）。"""
     check("{}：返回 429".format(name), code == 429, "实际 HTTP {}".format(code))
-    check("{}：带 Retry-After 退避头".format(name), bool(headers.get("Retry-After")),
+    check("{}：带 Retry-After 退避头".format(name), bool(hget(headers, "Retry-After")),
           "headers={}".format(headers))
     payload = parse_json(body)
     check("{}：响应体为统一响应结构且错误码为 RF_GATEWAY_001".format(name),
@@ -288,9 +296,9 @@ def check_reject(name, code, body, headers, mode, expect_path, expect_trace=None
         info("{}：redis 模式不下发 X-RateLimit-* 头（按口径不适用，不计失败）".format(name))
     else:
         check("{}：下发 X-RateLimit-Limit 头（memory 口径）".format(name),
-              bool(headers.get("X-RateLimit-Limit")), "headers={}".format(headers))
+              bool(hget(headers, "X-RateLimit-Limit")), "headers={}".format(headers))
         check("{}：下发 X-RateLimit-Remaining 头且为 0（memory 口径）".format(name),
-              headers.get("X-RateLimit-Remaining") == "0",
+              hget(headers, "X-RateLimit-Remaining") == "0",
               "headers={}".format(headers))
         check("{}：details 含 limit/remaining/retryAfterSeconds/policy（memory 口径）".format(name),
               all(key in details for key in ("limit", "remaining", "retryAfterSeconds", "policy")),
@@ -346,7 +354,7 @@ def main(argv=None):
         return 2
     if mode == MODE_REDIS and not redis_reachable(REDIS_HOST, REDIS_PORT):
         print("环境不具备：redis 模式需要 Redis 可达（{}:{}）".format(REDIS_HOST, REDIS_PORT))
-        print("Redis 不可达时网关按 fail-open 放行，限流是否生效无从验证。")
+        print("Redis 不可达时冒烟模板按 fail-open 放行，限流是否生效无从验证。")
         print("可先启动 Redis 实例，或用 REDIS_HOST / REDIS_PORT 指定其他实例；")
         print("也可改跑进程内实现：--mode memory。")
         return 2

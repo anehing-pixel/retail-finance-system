@@ -1,10 +1,15 @@
 package com.company.retail.gateway.ratelimit;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.company.retail.gateway.RequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -146,6 +151,78 @@ class RateLimitFilterTest {
 
         assertFalse(invoke(filter, exchange));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    @DisplayName("Redis 不可用且 fail-open：输出 ALERT 告警标记，且不泄露凭据")
+    void failOpenEmitsAlertMarker() {
+        Logger logger = (Logger) LoggerFactory.getLogger(RateLimitFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            RateLimitFilter filter = filter(props(true, ""),
+                    new FakeRedis(null, new RuntimeException("redis down")));
+            MockServerWebExchange exchange = exchange("/api/loans/1", "10.0.0.5",
+                    "Bearer super-secret-token", null);
+
+            assertTrue(invoke(filter, exchange));
+
+            ILoggingEvent event = appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("ALERT_RATE_LIMIT_REDIS_UNAVAILABLE"))
+                    .findFirst().orElseThrow();
+            assertEquals(Level.ERROR, event.getLevel());
+            assertTrue(event.getFormattedMessage().contains("failMode=OPEN"));
+            assertFalse(event.getFormattedMessage().contains("super-secret-token"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    @DisplayName("Redis 不可用且 fail-closed：输出 ALERT 告警标记")
+    void failClosedEmitsAlertMarker() {
+        Logger logger = (Logger) LoggerFactory.getLogger(RateLimitFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            RateLimitFilter filter = filter(props(false, ""),
+                    new FakeRedis(null, new RuntimeException("redis down")));
+            MockServerWebExchange exchange = exchange("/api/loans/1", "10.0.0.5", null, null);
+
+            assertFalse(invoke(filter, exchange));
+
+            ILoggingEvent event = appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("ALERT_RATE_LIMIT_REDIS_UNAVAILABLE"))
+                    .findFirst().orElseThrow();
+            assertEquals(Level.ERROR, event.getLevel());
+            assertTrue(event.getFormattedMessage().contains("failMode=CLOSED"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
+    @DisplayName("同一实例 10s 内重复失败只输出一次 ALERT（防日志洪泛）")
+    void alertIsThrottled() {
+        Logger logger = (Logger) LoggerFactory.getLogger(RateLimitFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            RateLimitFilter filter = filter(props(false, ""),
+                    new FakeRedis(null, new RuntimeException("redis down")));
+            invoke(filter, exchange("/api/loans/1", "10.0.0.5", null, null));
+            invoke(filter, exchange("/api/loans/2", "10.0.0.6", null, null));
+
+            long alerts = appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("ALERT_RATE_LIMIT_REDIS_UNAVAILABLE"))
+                    .count();
+            assertEquals(1, alerts, "同一实例 10s 内只应输出一条 ALERT");
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     @Test

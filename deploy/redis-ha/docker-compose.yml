@@ -1,0 +1,118 @@
+# 网关限流 Redis 高可用拓扑模板（R11 P0-5 / ADR-RF-012）
+# 拓扑：1 master + 2 replicas + 3 sentinels（quorum=2）
+# 用法：export REDIS_PASSWORD=... && docker compose -f deploy/redis-ha/docker-compose.yml up -d
+# 安全：数据节点强制口令；Sentinel 仅暴露在受控网络（生产必须加防火墙/ACL）。
+name: rf-redis-ha
+
+services:
+  redis-master:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$${REDIS_PASSWORD}" --save "" --appendonly no
+    restart: unless-stopped
+    networks: [redis-ha]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+
+  redis-replica-1:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --replicaof redis-master 6379 --masterauth "$${REDIS_PASSWORD}" --requirepass "$${REDIS_PASSWORD}" --save "" --appendonly no
+    restart: unless-stopped
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks: [redis-ha]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+
+  redis-replica-2:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --replicaof redis-master 6379 --masterauth "$${REDIS_PASSWORD}" --requirepass "$${REDIS_PASSWORD}" --save "" --appendonly no
+    restart: unless-stopped
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    networks: [redis-ha]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+
+  sentinel-1:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - cp /etc/redis/sentinel.conf /tmp/sentinel.conf && printf 'sentinel auth-pass rfmaster %s\n' "$${REDIS_PASSWORD}" >> /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf
+    restart: unless-stopped
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26379:26379"
+    networks: [redis-ha]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - ./sentinel-1.conf:/etc/redis/sentinel.conf:ro
+
+  sentinel-2:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - cp /etc/redis/sentinel.conf /tmp/sentinel.conf && printf 'sentinel auth-pass rfmaster %s\n' "$${REDIS_PASSWORD}" >> /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf
+    restart: unless-stopped
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26380:26380"
+    networks: [redis-ha]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - ./sentinel-2.conf:/etc/redis/sentinel.conf:ro
+
+  sentinel-3:
+    image: redis:7-alpine
+    command:
+      - sh
+      - -c
+      - cp /etc/redis/sentinel.conf /tmp/sentinel.conf && printf 'sentinel auth-pass rfmaster %s\n' "$${REDIS_PASSWORD}" >> /tmp/sentinel.conf && exec redis-sentinel /tmp/sentinel.conf
+    restart: unless-stopped
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    ports:
+      - "26381:26381"
+    networks: [redis-ha]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - ./sentinel-3.conf:/etc/redis/sentinel.conf:ro
+
+networks:
+  redis-ha:
+    driver: bridge

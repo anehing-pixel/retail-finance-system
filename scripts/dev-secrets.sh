@@ -23,3 +23,5 @@ export RETAIL_DB_DMZ_PASSWORD="${RETAIL_DB_DMZ_PASSWORD:-retail_dmz_rw_dev}"
 # 迁移账号（G-DB-3）：本地沿用 postgres；生产必须单独注入 owner/迁移账号口令
 export RETAIL_DB_MIGRATION_USER="${RETAIL_DB_MIGRATION_USER:-postgres}"
 export RETAIL_DB_MIGRATION_PASSWORD="${RETAIL_DB_MIGRATION_PASSWORD:-postgres}"
+# 网关限流故障语义（R11 P0-5）：生产默认 fail-closed；本地显式 fail-open，避免 Redis 抖动阻断开发
+export RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN="${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:-true}"

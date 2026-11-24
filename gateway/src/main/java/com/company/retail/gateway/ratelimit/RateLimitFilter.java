@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 网关限流过滤器（Redis 令牌桶）。
@@ -29,8 +30,9 @@ import java.util.Map;
  * 它是<b>保护层</b>，不是安全边界——真正的正确性防线在各服务内
  * （幂等唯一索引、乐观锁、fail-closed 门禁）。</p>
  *
- * <p><b>Redis 不可用时默认 fail-open 放行</b>：限流层挂掉就把主链路打挂，
- * 是本末倒置；且真正的重复提交已被服务内幂等挡住。生产可配置切换 fail-closed。</p>
+ * <p><b>Redis 不可用时默认 fail-closed</b>（R11 P0-5）：返回 503，不允许静默绕过限流；
+ * 本地开发由 {@code scripts/dev-secrets.sh} 显式置 fail-open。两种模式都输出
+ * {@code ALERT_RATE_LIMIT_REDIS_UNAVAILABLE} 告警标记，供日志告警规则接入。</p>
  *
  * <p>顺序排在 {@code RequestIdFilter}(-100) 之后，保证被限流的响应也带请求号。</p>
  */
@@ -38,12 +40,18 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
+    /** 告警日志节流窗口：Redis 故障时每请求一条 ERROR 会洪泛日志，按实例 10s 一条。 */
+    private static final long ALERT_THROTTLE_MS = 10_000L;
+
     private final RateLimitProperties props;
     private final RateLimitRuleMatcher matcher;
     private final TokenBucketLimiter limiter;
     private final ObjectMapper mapper;
     /** 客户端 IP 解析（可信代理网段为空时不采信转发头，行为与上线前一致）。 */
     private final ClientIpResolver clientIpResolver;
+
+    /** 上次输出 ALERT 的时间（实例级节流，10s 窗口）。 */
+    private final AtomicLong lastAlertAtMs = new AtomicLong(0L);
 
     public RateLimitFilter(RateLimitProperties props, RateLimitRuleMatcher matcher,
                             TokenBucketLimiter limiter, ObjectMapper mapper) {
@@ -72,14 +80,29 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         return limiter.tryAcquire(key, rule.getBurstCapacity(), rule.getReplenishRate())
                 .flatMap(allowed -> allowed ? chain.filter(exchange) : reject(exchange, path))
                 .onErrorResume(e -> {
+                    logAlert(path, e);
                     if (props.isFailOpen()) {
-                        log.warn("[网关限流] Redis 不可用，fail-open 放行 path={} err={}", path, e.toString());
                         return chain.filter(exchange);
                     }
-                    log.warn("[网关限流] Redis 不可用，fail-closed 拒绝 path={} err={}", path, e.toString());
                     exchange.getResponse().setStatusCode(HttpStatus.SERVICE_UNAVAILABLE);
                     return exchange.getResponse().setComplete();
                 });
+    }
+
+    /**
+     * 稳定告警标记（实例级 10s 节流）：日志平台按 {@code ALERT_RATE_LIMIT_REDIS_UNAVAILABLE} 建规则；
+     * 只记路径与异常类型，不记 Authorization / 客户端 IP（B-1 / R08 §5）。
+     */
+    private void logAlert(String path, Throwable e) {
+        long now = System.currentTimeMillis();
+        long last = lastAlertAtMs.get();
+        if (now - last < ALERT_THROTTLE_MS) {
+            return;
+        }
+        if (lastAlertAtMs.compareAndSet(last, now)) {
+            log.error("[ALERT_RATE_LIMIT_REDIS_UNAVAILABLE] mode=redis failMode={} path={} err={}",
+                    props.isFailOpen() ? "OPEN" : "CLOSED", path, e.toString());
+        }
     }
 
     /** 被限流：429 + 与平台统一结构一致的响应体（code / message / data / traceId / details）。 */

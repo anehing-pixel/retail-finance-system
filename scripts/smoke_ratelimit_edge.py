@@ -10,7 +10,7 @@
 双层联动里的网关层限流由**模式开关**决定（网关有两套限流实现，一个开关二选一）：
   · mode=redis（默认）：分布式令牌桶，配置前缀 retail.gateway.rate-limit.*，
     环境变量 RETAIL_GATEWAY_RATE_LIMIT_*；桶在 Redis（Lua 原子扣减），
-    Redis 不可达时网关 fail-open 放行 → 本脚本会跳过双层联动并说明原因；
+    Redis 不可达时冒烟模板 fail-open 放行（生产默认 fail-closed，R11 P0-5）→ 本脚本会跳过双层联动并说明原因；
     429 响应体的 details 只有 path（无 layer、无 policy）。
   · mode=memory：进程内令牌桶，配置前缀 retail.gateway.rate-limit.memory.*，
     环境变量 RETAIL_GATEWAY_RATE_LIMIT_MEMORY_*；桶在网关进程内存；
@@ -125,7 +125,7 @@ def req(url, headers=None):
 
 
 def redis_reachable(host, port, timeout=2.0):
-    """redis 模式的前置检查：Redis 不可达时网关会 fail-open 放行，限流无从验证。"""
+    """redis 模式的前置检查：Redis 不可达时冒烟模板会 fail-open 放行，限流无从验证。"""
     try:
         with socket.create_connection((host, int(port)), timeout=timeout):
             return True
@@ -379,7 +379,7 @@ def dual_layer(tmp, gw_mode, run_mode):
         return
     if gw_mode == MODE_REDIS and not redis_reachable(REDIS_HOST, REDIS_PORT):
         print("SKIP  双层联动（redis 模式需要 Redis 可达（{}:{}）；Redis 不可达时网关 "
-              "fail-open 放行，「网关层拒绝」无从验证）".format(REDIS_HOST, REDIS_PORT))
+              "冒烟模板 fail-open 放行，「网关层拒绝」无从验证）".format(REDIS_HOST, REDIS_PORT))
         return
     gw_port = free_port()
     gw_stub_port = free_port()

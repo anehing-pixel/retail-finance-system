@@ -22,7 +22,7 @@ spring:
       # redis 模式的限流态所在 Redis（与网关生产配置同口径：REDIS_HOST / REDIS_PORT）
       host: __REDIS_HOST__
       port: __REDIS_PORT__
-      # 与生产同口径的短超时：Redis 抖动时快速 fail-open，而不是把请求挂住
+      # 冒烟模板显式 fail-open（生产默认 fail-closed，R11 P0-5）；短超时避免 Redis 抖动挂住请求
       connect-timeout: 2s
       timeout: 2s
   cloud:

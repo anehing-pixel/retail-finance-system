@@ -6,7 +6,10 @@ spring:
     name: api-gateway
   data:
     redis:
-      # 令牌桶限流共用实例（端口登记见 PROGRESS §2）；连接失败按 fail-open 放行
+      # 令牌桶限流共用实例（端口登记见 PROGRESS §2）；生产默认 fail-closed，Redis 不可用即 503。
+      # 高可用：改用 Sentinel（deploy/redis-ha/），通过标准 Spring 环境变量注入：
+      #   SPRING_DATA_REDIS_SENTINEL_MASTER=rfmaster
+      #   SPRING_DATA_REDIS_SENTINEL_NODES=host1:26379,host2:26380,host3:26381
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6382}
       connect-timeout: 2s
@@ -81,8 +84,9 @@ retail:
       # 限流实现模式：redis（Redis 令牌桶，分布式准确，缺省）/ memory（进程内令牌桶，单实例口径）
       # 两个实现互斥装配，同一时刻只注册一个限流过滤器，不会双重限流（R02 §3.3）
       mode: ${RETAIL_GATEWAY_RATE_LIMIT_MODE:redis}
-      # Redis 不可用时放行（保护层不拖垮主链路）；生产可切 false 变 fail-closed
-      fail-open: ${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:true}
+      # Redis 不可用时是否放行：生产默认 false = fail-closed（503，不允许静默绕过限流）；
+      # 本地开发由 scripts/dev-secrets.sh 显式置 true（R11 P0-5）
+      fail-open: ${RETAIL_GATEWAY_RATE_LIMIT_FAIL_OPEN:false}
       # 限流键维度：auth_or_ip（Authorization 头哈希，退化到 IP）/ ip
       key-by: ${RETAIL_GATEWAY_RATE_LIMIT_KEY_BY:auth_or_ip}
       # 可信代理网段（逗号分隔 CIDR）：为空 = 不采信 X-Forwarded-For（默认）；
