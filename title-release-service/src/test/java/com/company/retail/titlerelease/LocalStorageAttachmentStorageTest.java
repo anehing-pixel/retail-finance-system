@@ -4,6 +4,7 @@ import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.env.StandardEnvironment;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,7 +35,7 @@ class LocalStorageAttachmentStorageTest {
     @BeforeEach
     void setUp() {
         storage = new LocalStorageAttachmentStorage(tempDir.toString(),
-                "test-token-secret", 1024);
+                "test-token-secret-0123456789abcdef012345", 1024, new StandardEnvironment());
     }
 
     @Test

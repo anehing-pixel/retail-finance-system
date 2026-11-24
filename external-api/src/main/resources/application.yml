@@ -32,8 +32,11 @@ mybatis:
 retail:
   auth:
     # 员工侧 JWT 密钥（W-SIM）：DMZ 转发内部 API 时签系统服务 token（svc-external-dmz），
-    # 与其他服务同一真相源；生产必须环境变量注入
-    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+    # 与其他服务同一真相源；无默认值，缺失即启动失败（R11 P0-8）
+    secret: ${RETAIL_JWT_SECRET}
+  customer-auth:
+    # 客户侧独立密钥（RfSecurityConfig 无条件装配双主体验签器）
+    secret: ${RETAIL_CUSTOMER_JWT_SECRET}
   lock:
     # 分布式锁（ADR-RF-015）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
     redis:

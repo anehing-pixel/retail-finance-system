@@ -5,6 +5,7 @@ import com.company.retail.common.messaging.EnvelopeConsumer;
 import com.company.retail.common.messaging.EnvelopeCipher;
 import com.company.retail.common.messaging.EnvelopePublisher;
 import com.company.retail.common.messaging.NoopEnvelopePublisher;
+import com.company.retail.common.security.SecretPolicy;
 import com.company.retail.infrastructure.mapper.MqEnvelopeInboxMapper;
 import com.company.retail.infrastructure.mapper.OutboxMapper;
 import com.company.retail.infrastructure.messaging.MqEnvelopeDispatcher;
@@ -54,6 +55,9 @@ public class MqEnvelopeConfig {
             throw new IllegalStateException(
                     "MQ 通道已启用但信封数据密钥为空（retail.mq.data-key / retail.pii.data-key）——fail-closed 拒绝启动");
         }
+        // R11 P0-8：密钥过短 / 生产环境 dev 弱默认值同样拒绝启动
+        SecretPolicy.requireStrong("retail.mq.data-key / retail.pii.data-key", key,
+                SecretPolicy.devMode(environment.getActiveProfiles()));
         return new AesGcmEnvelopeCipher(key, props.getKeyVersion());
     }
 

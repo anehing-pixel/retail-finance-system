@@ -2,7 +2,7 @@
 
 > **规则**：本文件是「做到哪一步」的唯一权威源。`README.md` 的模块/断言数、`docs/` 的目标态描述都可能滞后，
 > 一律以本文件为准。每轮收口必须更新本文件，再提交。
-> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 609 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
+> **当前状态**：计划内 S0–S5 全部完成（W9 放行，tag `w9-accepted`）· 17 模块代码 + Flyway V1–V21（62 表）· 构建 642 单测 0 失败（2026-11-23 W-SIM2 校正：此前记录 706/748 系统计口径虚高，权威口径=类级/模块级 surefire 汇总）· 走网关冒烟 33/33 · E2E 104/104 · MQ 削峰与密文信封已落地（默认关闭；关闭态冒烟 11/11 + 开启态活体联调 1/1）· 外部提议协议 v1 已定稿 · W-SIM2 外部模拟器六向对接全通 · W-CACHE 产品档位配置化 + 两级缓存 + 网关限流已落地 · **W-LOCK 分布式锁（防重复进件 / 回调幂等，fail-closed）已按用户指令合入 master** · **W-P0-8 密钥启动门禁（5 类密钥无默认值，缺失 / 弱值即启动失败）已落地** · 文档自检 PASS · **CI 首跑双 job 全绿（2026-11-24，run #1；构建与单测 + 文档自检）**。详见 §0。
 
 ---
 
@@ -10,7 +10,8 @@
 
 | 项 | 值 |
 |---|---|
-| 轮次 | **W-CI CI 死链修复（2026-11-24，用户选定 R11 P0-6）**：`.github/workflows/docs-check.yml` → **`ci.yml`**；触发分支 `main → master`（`push` / `pull_request` / `workflow_dispatch`）；保留 docs job，新增 **build job**（Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests` → `mvn -B clean package` 跑 609 单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。本地按同命令实测构建绿；**contracts 仓已发布，GitHub Actions 首跑 run #1 双 job 全绿**（构建与单测 / 文档自检），R11 P0-6 置 ✅。此前：W-P0-4 事件消费多实例 |
+| 轮次 | **W-P0-8 密钥启动门禁（2026-11-24，用户选定 R11 P0-8）**：员工 JWT / 客户 JWT / PII data-key / PII hmac-key / 附件 token-secret **5 类密钥全部移除配置与代码默认值**；新增共享 `SecretPolicy`（缺失 / 短于 32 字节 / 非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`AuthController` 改用 `customerTokenVerifier` Bean（签发与验签密钥单一来源）；本地新增 `scripts/dev-secrets.sh`，由 `run-microservices.sh` / `scripts/dev-stack.sh` 显式 source 并激活 `dev` profile（**共享禁区授权**：用户选定 P0-8 后，本地冒烟必须继续可跑；改动仅限本地 dev 注入，不改变生产语义）。构建 **642 测试 / 102 类 / 0 失败**；缺注入 / 弱值启动 EXIT 1 实测；冒烟 33/33 + 前端 46/46 + MQ 11/11，EXIT 0。R11 P0-8 置 ✅。此前：W-CI CI 死链修复 |
+| 轮次 | **W-CI CI 死链修复（2026-11-24，用户选定 R11 P0-6）**：`.github/workflows/docs-check.yml` → **`ci.yml`**；触发分支 `main → master`（`push` / `pull_request` / `workflow_dispatch`）；保留 docs job，新增 **build job**（Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests` → `mvn -B clean package` 跑全量单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。本地按同命令实测构建绿；**contracts 仓已发布，GitHub Actions 首跑 run #1 双 job 全绿**（构建与单测 / 文档自检），R11 P0-6 置 ✅。此前：W-P0-4 事件消费多实例 |
 | 轮次 | **W-P0-4 事件消费多实例（2026-11-24，用户选定 R11 P0-4）**：`core.event_consumptions` 增加原子认领（PENDING/FAILED → PROCESSING + 5 分钟租约，`UPDATE ... RETURNING`），同一 `(event_id, consumer)` 只有一个实例执行；`markConsumption*` 仅认领者可写；`consumer_offsets.last_event_id` 改 `GREATEST` 只前进；MQ 中继未完成时抛错触发重投。**无 DDL / 无新配置 / 无新迁移**。新增 3 个测试类 14 例；真实 PG 认领/租约/条件写/游标 SQL 实测；冒烟 **33/33 EXIT 0**。R11 P0-4 置 ✅。此前：W-GDB7 审计授权 |
 | 轮次 | **W-GDB7 审计写入授权落地（2026-11-24，用户选定 R11 P0-2）**：新增迁移 **V21**（`V21__g_db_7_audit_write_authorization.sql`）——按 `G-DB-2` 实际连接角色授权：`retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列 `USAGE` / `SELECT`），`retail_audit_ins` 两表保留；三角色显式禁 `UPDATE` / `DELETE` / `TRUNCATE`（append-only 不变）。**不新增表 / 不改代码 / 不改已执行迁移字节**。Flyway V21 实测 applied；三角色写 / 禁改删 / 禁跨表实测通过；冒烟 **33/33 EXIT 0**。R11 P0-2 置 ✅。此前：W-P0-7 出站统一治理 |
 | 轮次 | **W-P0-7 出站调用统一超时 / 重试 / 熔断（2026-11-24，用户选定 R11 P0-7「改动可控、立刻提升工程可信度」）**：新增共享 `common/outbound`（7 策略档 + 三态熔断 + JDK `HttpClient` 封装 + Feign `FeignBuilderCustomizer` + 稳定幂等键）；9 处 JDK 客户端与 3 个 Feign 门禁全部迁移；`integration.outbound_tasks` 补齐消费（1m/5m/30m/2h/6h、5 次、DEAD、租约回收、`SKIP LOCKED`）与人工重触发端点（`JOB_TRIGGER`）；**不新增依赖 / Flyway 迁移 / 权限点**。构建 **595 测试 0 失败**（P0-7 轮原记录）、走网关冒烟 EXIT 0、真实 PG 状态机 SQL 验证；R11 P0-7 / E-3 置 ✅。此前：W-EXT-DECIDE 外部接口内部裁决 |
@@ -88,21 +89,26 @@
 | 持久层框架 | `org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3`（**W-MB 本轮引入**：父 pom `dependencyManagement` 统一版本；业务服务 + `infrastructure` + `external-api` 各自显式声明） | floorplan 仍用 JdbcTemplate，未引入 MyBatis | 不冲突 ✅（本项目独立选型，互不影响） |
 
 > 变更记录：
+> - 2026-11-24：**P0-8 密钥启动门禁**（用户选定 R11 P0-8）——5 类密钥移除各服务 `application.yml`
+>   与代码 `@Value` 的全部默认值；新增共享 `common/.../security/SecretPolicy.java`（缺失 / <32 字节 /
+>   非 `dev` profile 的 dev-only 弱值 / 两把密钥复用 → 启动失败）；`RfSecurityConfig`、customer PII、
+>   title-release 附件签名、MQ 信封密钥统一接入；`AuthController` 改用 `customerTokenVerifier` Bean；
+>   本地新增 `scripts/dev-secrets.sh`（仅本地，显式激活 `dev` profile）。**无 Flyway 迁移 / 无新表**。
+>   验证：构建 **642 测试 0 失败**；缺注入 / 弱值启动 EXIT 1；冒烟 33/33 + 前端 46/46 + MQ 11/11 EXIT 0。
 > - 2026-11-24：**P0-6 CI 死链修复**（用户选定 R11 P0-6）——`docs-check.yml` 重命名为 `ci.yml`；
 >   触发分支 `main → master`（push / pull_request / workflow_dispatch）；新增 build job：
 >   Temurin 17 + Maven 缓存 → 克隆独立仓 `company-platform-contracts` → `mvn install -DskipTests`
->   → `mvn -B clean package`（609 单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。
+>   → `mvn -B clean package`（全量单测）。公开 contracts 仓直接可跑，私有仓需 `CONTRACTS_REPO_TOKEN`。
 >   本地按同命令实测：YAML 解析 OK、contracts install BUILD SUCCESS、全量构建 BUILD SUCCESS。
 >   **首跑证据（2026-11-24）**：contracts 仓 `anehing-pixel/company-platform-contracts` 已发布（master `ddf6a11`）；
 >   本仓 master `b9afd30` 触发 Actions **run #1（run id `45324660737`）**：`构建与单测` success（含 contracts 克隆 / install / 全量 package）、`文档自检` success。R11 P0-6 置 ✅。
->   **CI 首跑待 contracts 仓发布**（用户选择「发布独立仓」方案）；发布后本行改 ✅。
 > - 2026-11-24：**P0-4 事件消费多实例**（用户选定 R11 P0-4）——`EventConsumptionService`
 >   执行前原子认领 `core.event_consumptions`（PENDING/FAILED → PROCESSING，5 分钟租约，
 >   `attempts < 3` 才可认领），同一 `(event_id, consumer)` 只有一个实例执行；状态写仅认领者
 >   （`status='PROCESSING'`）可写；`consumer_offsets.last_event_id` 改 `GREATEST` 只前进；
 >   MQ 中继在 `handle` 返回 false 时抛错触发重投。**无 DDL（复用 VARCHAR(12) status）/
 >   无新配置 / 无新迁移**。R11 P0-4 / infrastructure 模块差距同步。
->   验证：构建 **609 测试 / 96 类 / 0 失败**；真实 PG 认领/租约/条件写/游标 SQL；
+>   验证（原记录）：构建 **609 测试 / 96 类 / 0 失败**；真实 PG 认领/租约/条件写/游标 SQL；
 >   冒烟 **33/33 EXIT 0**；`check_docs.py` PASS 15/15。
 > - 2026-11-24：**G-DB-7 审计写入授权落地（R11 P0-2）**——新增迁移 **V21**：按 G-DB-2 实际连接角色
 >   授权 `retail_app_rw` → `audit.audit_events`、`retail_pii_rw` → `audit.pii_access_logs`（各含序列
@@ -343,6 +349,7 @@
 
 | 日期 | 命令 | 结果 |
 |---|---|---|
+| 2026-11-24 | **P0-8 密钥启动门禁** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（642 测试 / 102 类 / 0 失败 0 错误 0 跳过）**；②`retail-core` 无 `RETAIL_JWT_SECRET` 启动 → **EXIT 1**，报 `Could not resolve placeholder 'RETAIL_JWT_SECRET'`；③仅注入 dev-only 弱值且未激活 `dev` profile → **EXIT 1**，`SecretPolicy` 拒绝；④`run-microservices.sh smoke` → **EXIT 0**（网关 33/33 + 前端 46/46 + MQ 11/11），本地 `scripts/dev-secrets.sh` 注入生效；⑤`check_docs.py` PASS 15/15。**无 Flyway 迁移 / 无新表 / 无新权限点** |
 | 2026-11-24 | **P0-6 CI 死链修复（本地 + GitHub Actions 首跑）** | **PASS**：①本地 `ci.yml` YAML 解析 OK；触发分支 `master`（push / pull_request / workflow_dispatch）；`mvn -B -f ../company-platform-contracts/pom.xml install -DskipTests` → **BUILD SUCCESS**；`mvn -B clean package` → **BUILD SUCCESS**（609 测试 / 96 类 / 0 失败）。②**GitHub Actions run #1（id `45324660737`，commit `b9afd30`）**：`构建与单测` **success**（contracts 克隆 / install / 全量 package 逐步 success）、`文档自检` **success**（check_docs + normalize_terms --check）。R11 P0-6 置 ✅ |
 | 2026-11-24 | **P0-4 事件消费多实例** | **PASS**：①`mvn -B clean package` → **BUILD SUCCESS（609 测试 / 96 类 / 0 失败 0 错误 0 跳过）**；②真实 PG 实测：首次认领 1 行、租约内二次认领 0 行、租约过期重认领 1 行、`markDone` 重复 0 行、`DEAD` 补置 1 行、`GREATEST` 游标只前进；③冒烟 **33/33 EXIT 0**，`core.event_consumptions` 52 条全 DONE、**0 条 PROCESSING 卡死**；④`check_docs.py` PASS 15/15（C15 = 609）。**无 DDL / 新配置 / 新迁移** |
 | 2026-11-24 | **G-DB-7 审计写入授权（V21）** | **PASS**：①Flyway `retail-core` 启动日志 → `Migrating to version 21 - g db 7 audit write authorization` + `Successfully applied 1 migration`；`flyway_schema_history` V21 success；②`retail_app_rw`：INSERT/SELECT `audit.audit_events` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.pii_access_logs` 拒绝；③`retail_pii_rw`：INSERT/SELECT `audit.pii_access_logs` 成功，UPDATE/DELETE 拒绝，跨表 INSERT `audit.audit_events` 拒绝；④`retail_audit_ins`：两表 INSERT/SELECT 成功（序列权限生效），UPDATE/DELETE 拒绝；⑤走网关冒烟 **33/33 EXIT 0**；⑥`check_docs.py` PASS 15/15。**无新表、无代码改动、V1–V20 字节未动** |
@@ -411,7 +418,7 @@
    （真实 broker 活体联调）承担，单测与关闭态冒烟**都不等于** MQ 链路已通。
 2. `R06` 的表清单是**字段级规格**；实际 DDL 以 `infrastructure/` 下已执行的 Flyway 迁移为准
    （V1 起共 21 条迁移、62 张表；V19 只建唯一索引不建表，V20 新增 1 张信封表，V21 只调整审计授权不建表）。改表一律走新迁移，不许改已执行迁移的字节。
-3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 609，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
+3. `R10` 的断言清单是**验收设计**；实际通过情况以构建测试数（当前 642，见顶部校正注）+ 冒烟 + E2E 实测记录（§6）为准。
 4. `README §4` 的文档编号齐全 ≠ 内容已实现；各文档「交付性质」见各自 §0 文档控制。
 5. 与 floorplan 的对应关系是设计对齐（同构微服务），代码层面通过中台 jar 复用
    （`../company-platform-contracts`，W1 已抽取并 `mvn install`，34 单测全绿），其余不直接复用。
@@ -485,7 +492,7 @@
 
 > `R11 §1` 声明不写工期估算（属路线图纪律）；本节是 PROGRESS 对**投入量级**的评估记录，
 > 供排期参考，不构成承诺。依据为 2026-11-23 终态实测：330 个 Java 文件 / 约 2.6 万行、
-> 17 模块 12 部署单元、62 表 / 21 迁移、609 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
+> 17 模块 12 部署单元、62 表 / 21 迁移、642 单测、约 3.1k 行验证脚本、约 5k 行设计文档。
 
 ### 8.1 口径假设
 
@@ -618,5 +625,5 @@
 
 - master HEAD `b0bd5c3`（**W-RL 网关限流双模式合入 master**，`git merge --no-ff wt/ratelimit` 的合并提交；双父：`fe118b3` = W-LOCK 合入与 §9.4 订正、`8d1a6de` = `wt/ratelimit` 分支头）；**该行记录时领先 `origin/master` 6 个提交**（合并提交 + `wt/ratelimit` 4 个提交 + 本行订正提交）。**2026-11-24 收尾后 master HEAD `3674ccd`（Docker 形态验收合入），已按用户明示推送 `origin/master`（见 §2 变更记录）**。
 - 本次合入为**快进合并**（`git merge --ff-only wt/lock`）：master 已是 `wt/lock` 的祖先，无额外合并提交、无历史改写。
-- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（C2 = 15 份 ADR、C13 = 36 项、C14 = 21 条迁移、C15 = 609）；Flyway **V1–V21 共 21 条全部 success**、四 schema **62 张表**。
+- 工作树干净；`check_docs.py` **PASS 15/15 EXIT 0**（原记录：C2 = 15 份 ADR、C13 = 36 项、C14 = 21 条迁移、C15 = 609）；Flyway **V1–V21 共 21 条全部 success**、四 schema **62 张表**。
 - 4 条分支的合并动作均已由收口轮执行完毕（工作区干净）；**清理状态（2026-11-24，用户指令「清理吧」）**——`wt/lock` / `wt/mq` / `wt/statemachine` 三条的 worktree 与分支**已清理完毕**（`wt/mq` 与 `wt/statemachine` 的尖端非 master 祖先，故先打归档 tag `archived-wt-mq` / `archived-wt-statemachine` 留痕再删；`wt/statemachine` 的 worktree 已由所属会话先行移除），`wt/ratelimit` **保留**（所属会话仍在其 worktree 推进，按 `AGENTS.md` §7 不代他人动）；**`wt/lock` 已于 2026-11-24 按用户指令「提交吧」合入 master**（Redisson 分布式锁一并带入，`ADR-RF-015`；`ADR-RF-013` 加修订注）——`wt/lock` worktree 与分支**已于 2026-11-24 清理完毕**（worktree 已移除 + 分支已删除；master 侧锁实现 `common/lock/*` · `ADR-RF-015` · `scripts/smoke_w_lock.py` 保留不变）。**2026-11-24 收尾**：`wt/ratelimit` 的 `90f92f2` 已合入 master（`3674ccd`），分支与 worktree 已清理（tag `archived-wt-ratelimit`）；本机 GitHub 目录下 4 个 CR 结尾空残留目录（`retail-finance-{mq,statemachine,ratelimit,system}<CR>`，仅空 `.microservice-pids` / `logs`）已删除。合并期暴露的两类工程问题记入 **§7 第 12 条**（共享库被不合路线迁移污染 → 重建库）与 **§7 第 13 条**（多会话并发起栈互撞端口、`run-microservices.sh` 的 `netstat -ano` 占用检查在 WSL 恒为空）。

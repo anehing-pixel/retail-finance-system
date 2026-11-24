@@ -2,9 +2,11 @@ package com.company.retail.titlerelease.storage;
 
 import com.company.platform.storage.AttachmentStorage;
 import com.company.platform.storage.DirectUploadEndpoint;
+import com.company.retail.common.security.SecretPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -51,10 +53,14 @@ public class LocalStorageAttachmentStorage implements AttachmentStorage, DirectU
 
     public LocalStorageAttachmentStorage(
             @Value("${retail.attachments.base-dir:data/attachments}") String baseDir,
-            @Value("${retail.attachments.token-secret:dev-only-local-attachment-token}") String tokenSecret,
-            @Value("${retail.attachments.max-size-bytes:" + DEFAULT_MAX_SIZE_BYTES + "}") long maxSizeBytes) {
+            @Value("${retail.attachments.token-secret}") String tokenSecret,
+            @Value("${retail.attachments.max-size-bytes:" + DEFAULT_MAX_SIZE_BYTES + "}") long maxSizeBytes,
+            Environment environment) {
+        // R11 P0-8：无默认值；缺失 / 弱值 fail-fast（dev profile 例外仅限本地）
+        this.tokenSecret = SecretPolicy.requireStrong(
+                "retail.attachments.token-secret（RETAIL_ATTACHMENTS_TOKEN_SECRET）",
+                tokenSecret, SecretPolicy.devMode(environment.getActiveProfiles()));
         this.root = Paths.get(baseDir).toAbsolutePath().normalize();
-        this.tokenSecret = tokenSecret;
         this.maxSizeBytes = maxSizeBytes;
         try {
             Files.createDirectories(this.root);

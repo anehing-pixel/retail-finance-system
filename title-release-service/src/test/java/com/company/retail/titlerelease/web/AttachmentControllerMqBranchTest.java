@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -57,7 +58,8 @@ class AttachmentControllerMqBranchTest {
 
     @BeforeEach
     void setUp() {
-        storage = new LocalStorageAttachmentStorage(tempDir.toString(), "test-token-secret", 1024);
+        storage = new LocalStorageAttachmentStorage(tempDir.toString(),
+                "test-token-secret-0123456789abcdef012345", 1024, new StandardEnvironment());
         repository = new StubAttachmentRepository();
         publisher = new StubEnvelopePublisher(true);
         cipher = new StubEnvelopeCipher();

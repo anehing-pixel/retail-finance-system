@@ -16,6 +16,7 @@ import com.company.retail.titlerelease.storage.LocalStorageAttachmentStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.env.StandardEnvironment;
 
 import java.nio.file.Path;
 import java.sql.Timestamp;
@@ -255,7 +256,8 @@ class RegistryReceiptIdempotencyTest {
         return new TitleReleaseApplicationService(titles,
                 new ReleaseOrderRepository(mapper),
                 new AttachmentRepository(null),
-                new LocalStorageAttachmentStorage(tempDir.toString(), "test-token", 1024L),
+                new LocalStorageAttachmentStorage(tempDir.toString(),
+                        "test-token-0123456789abcdef0123456789", 1024L, new StandardEnvironment()),
                 outbox,
                 new TitleReleaseApplicationService.ObjectMapperHolder(new ObjectMapper()),
                 releaseTransitions(),

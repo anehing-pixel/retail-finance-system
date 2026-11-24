@@ -30,12 +30,12 @@ mybatis:
     local-cache-scope: STATEMENT
 retail:
   auth:
-    # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
-    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+    # 员工侧 JWT 密钥：无默认值，缺失即启动失败（R11 P0-8；本地由 scripts/dev-secrets.sh 注入）
+    secret: ${RETAIL_JWT_SECRET}
     token-hours: ${RETAIL_TOKEN_HOURS:8}
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
-    secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+    secret: ${RETAIL_CUSTOMER_JWT_SECRET}
   contract:
     # C-08：法定书面文件模板可配（签订前必须交付留痕的类型清单）+ 冷静期 8 日占位；
     # 口径变更走配置不改代码（P-12）。只做交付留痕与状态记录，不实现效力判断

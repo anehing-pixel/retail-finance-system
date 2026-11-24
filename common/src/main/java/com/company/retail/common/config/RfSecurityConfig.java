@@ -5,6 +5,7 @@ import com.company.platform.security.PlatformJwtAuthInterceptor;
 import com.company.platform.security.SubjectType;
 import com.company.retail.common.security.JwtPassthroughInterceptor;
 import com.company.retail.common.security.JwtTokenVerifier;
+import com.company.retail.common.security.SecretPolicy;
 import com.company.retail.domain.exception.RFErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -39,20 +41,35 @@ public class RfSecurityConfig {
     private static final String[] PERMIT_ALL = {
             "/api/health", "/api/*/health", "/api/auth/staff/login", "/api/auth/customer/login"};
 
-    @Value("${retail.auth.secret:dev-only-retail-staff-secret-change-me-in-prod-0123456789}")
-    private String staffSecret;
-
-    /** 客户侧密钥：与 auth-service 签发侧同一属性键（RETAIL_CUSTOMER_JWT_SECRET），保证签发/验签一致。 */
-    @Value("${retail.customer-auth.secret:dev-only-retail-customer-secret-change-me-in-prod-01234}")
-    private String customerSecret;
+    private final String staffSecret;
+    private final String customerSecret;
 
     /**
      * 客户自助端点路径段：这些路径挂客户侧拦截器（验 CUSTOMER token），
      * 其余 /api/** 挂员工侧拦截器（S2 遗留收口：客户 token 过员工拦截器 401 的机制性解法）。
      * 可用 retail.security.customer-path-prefixes 覆盖（逗号分隔）。
      */
-    @Value("${retail.security.customer-path-prefixes:/api/customer-self/**}")
-    private String[] customerPathPrefixes;
+    private final String[] customerPathPrefixes;
+
+    /**
+     * 密钥无默认值（R11 P0-8）：缺失即占位符解析失败，弱值 / 两把相同由
+     * {@link SecretPolicy} fail-fast；仅显式激活 dev profile 的本地进程允许 dev 值。
+     */
+    public RfSecurityConfig(
+            @Value("${retail.auth.secret}") String staffSecret,
+            @Value("${retail.customer-auth.secret}") String customerSecret,
+            @Value("${retail.security.customer-path-prefixes:/api/customer-self/**}") String[] customerPathPrefixes,
+            Environment environment) {
+        boolean devMode = SecretPolicy.devMode(environment.getActiveProfiles());
+        this.staffSecret = SecretPolicy.requireStrong(
+                "retail.auth.secret（RETAIL_JWT_SECRET）", staffSecret, devMode);
+        this.customerSecret = SecretPolicy.requireStrong(
+                "retail.customer-auth.secret（RETAIL_CUSTOMER_JWT_SECRET）", customerSecret, devMode);
+        SecretPolicy.requireDistinct(
+                "retail.auth.secret（员工 JWT）", this.staffSecret,
+                "retail.customer-auth.secret（客户 JWT）", this.customerSecret);
+        this.customerPathPrefixes = customerPathPrefixes;
+    }
 
     /**
      * 员工侧验签器。

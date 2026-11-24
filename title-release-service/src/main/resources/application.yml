@@ -30,12 +30,12 @@ mybatis:
     local-cache-scope: STATEMENT
 retail:
   auth:
-    # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
-    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+    # 员工侧 JWT 密钥：无默认值，缺失即启动失败（R11 P0-8；本地由 scripts/dev-secrets.sh 注入）
+    secret: ${RETAIL_JWT_SECRET}
     token-hours: ${RETAIL_TOKEN_HOURS:8}
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
-    secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+    secret: ${RETAIL_CUSTOMER_JWT_SECRET}
   lock:
     # 分布式锁（ADR-RF-015）：Redis 是受保护写路径的硬依赖——Redis 不可达即 fail-closed 拒绝写
     redis:
@@ -79,4 +79,4 @@ retail:
     # 附件本地文件系统存储（ADR-RF-008：只用本地实现，不引入 S3/MinIO）
     base-dir: ${RETAIL_ATTACHMENTS_BASE_DIR:data/attachments}
     max-size-bytes: ${RETAIL_ATTACHMENTS_MAX_SIZE_BYTES:10485760}
-    token-secret: ${RETAIL_ATTACHMENTS_TOKEN_SECRET:dev-only-local-attachment-token}
+    token-secret: ${RETAIL_ATTACHMENTS_TOKEN_SECRET}

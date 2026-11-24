@@ -9,6 +9,7 @@ import com.company.retail.auth.repository.StaffUserRepository;
 import com.company.retail.common.config.RfSecurityConfig;
 import com.company.retail.common.security.JwtTokenVerifier;
 import com.company.retail.domain.exception.RFErrorCode;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,14 +46,14 @@ public class AuthController {
     public AuthController(StaffUserRepository userRepository,
                           BCryptPasswordEncoder encoder,
                           JwtTokenVerifier staffTokenVerifier,
-                          @Value("${retail.customer-auth.secret:dev-only-retail-customer-secret-change-me-in-prod-01234}")
-                          String customerSecret,
+                          @Qualifier("customerTokenVerifier") JwtTokenVerifier customerTokenVerifier,
                           @Value("${retail.auth.token-hours:8}") long tokenHours,
                           @Value("${retail.auth.customer-dev-login-enabled:false}") boolean customerDevLoginEnabled) {
         this.userRepository = userRepository;
         this.encoder = encoder;
         this.staffSigner = staffTokenVerifier;
-        this.customerSigner = new JwtTokenVerifier(customerSecret, SubjectType.CUSTOMER);
+        // 签发与验签共用 RfSecurityConfig 的同一把客户密钥（R11 P0-8：密钥单一来源，无本地兜底）
+        this.customerSigner = customerTokenVerifier;
         this.tokenHours = tokenHours;
         this.customerDevLoginEnabled = customerDevLoginEnabled;
     }

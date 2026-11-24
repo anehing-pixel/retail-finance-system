@@ -31,6 +31,9 @@
 set -u
 cd "$(dirname "$0")"
 ROOT="$PWD"
+# 本地开发密钥（R11 P0-8）：仅本地显式注入并激活 dev profile；
+# 生产不 source 本文件，服务侧无默认值，缺失即启动失败。
+. "$ROOT/scripts/dev-secrets.sh"
 PIDDIR="$ROOT/.microservice-pids"
 LOGDIR="$ROOT/logs/microservices"
 mkdir -p "$PIDDIR" "$LOGDIR"

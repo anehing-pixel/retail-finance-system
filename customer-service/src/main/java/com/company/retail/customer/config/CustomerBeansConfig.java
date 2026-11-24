@@ -2,6 +2,7 @@ package com.company.retail.customer.config;
 
 import com.company.retail.common.outbound.OutboundHttpClientFactory;
 import com.company.retail.common.outbound.OutboundProfile;
+import com.company.retail.common.security.SecretPolicy;
 import com.company.retail.customer.infra.PiiCryptoService;
 import com.company.retail.customer.integration.HttpKycProvider;
 import com.company.retail.customer.integration.KycProvider;
@@ -9,6 +10,7 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * customer-service 专属装配：PII 字段加密（密钥独立，R06 §5 三把密钥互不相同）
@@ -20,9 +22,16 @@ public class CustomerBeansConfig {
 
     @Bean
     public PiiCryptoService piiCryptoService(
-            @Value("${retail.pii.data-key:dev-only-retail-pii-data-key-change-me-in-prod-012345}") String dataKey,
-            @Value("${retail.pii.hmac-key:dev-only-retail-pii-hmac-key-change-me-in-prod-01234}") String hmacKey,
-            @Value("${retail.pii.key-version:v1}") String keyVersion) {
+            @Value("${retail.pii.data-key}") String dataKey,
+            @Value("${retail.pii.hmac-key}") String hmacKey,
+            @Value("${retail.pii.key-version:v1}") String keyVersion,
+            Environment environment) {
+        // R11 P0-8：无默认值；缺失即启动失败，弱值 / 复用同样 fail-fast（dev profile 例外仅限本地）
+        boolean devMode = SecretPolicy.devMode(environment.getActiveProfiles());
+        SecretPolicy.requireStrong("retail.pii.data-key（RETAIL_PII_DATA_KEY）", dataKey, devMode);
+        SecretPolicy.requireStrong("retail.pii.hmac-key（RETAIL_PII_HMAC_KEY）", hmacKey, devMode);
+        SecretPolicy.requireDistinct("retail.pii.data-key", dataKey,
+                "retail.pii.hmac-key", hmacKey);
         return new PiiCryptoService(dataKey, hmacKey, keyVersion);
     }
 

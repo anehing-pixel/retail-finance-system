@@ -30,14 +30,14 @@ mybatis:
     local-cache-scope: STATEMENT
 retail:
   auth:
-    # 员工侧 JWT 密钥：生产必须环境变量注入，dev 兜底值绝不进生产
-    secret: ${RETAIL_JWT_SECRET:dev-only-retail-staff-secret-change-me-in-prod-0123456789}
+    # 员工侧 JWT 密钥：无默认值，缺失即启动失败（R11 P0-8；本地由 scripts/dev-secrets.sh 注入）
+    secret: ${RETAIL_JWT_SECRET}
     token-hours: ${RETAIL_TOKEN_HOURS:8}
     # 客户登录开发桥（W2）：显式开关，生产默认 false；客户真实认证 W3 交付
     customer-dev-login-enabled: ${RETAIL_CUSTOMER_DEV_LOGIN:false}
   customer-auth:
     # 客户侧独立密钥（三把密钥互不相同，R00 §6）；验签器 W3 接入 customer-service
-    secret: ${RETAIL_CUSTOMER_JWT_SECRET:dev-only-retail-customer-secret-change-me-in-prod-01234}
+    secret: ${RETAIL_CUSTOMER_JWT_SECRET}
   clients:
     # Feign 门禁双模 URI（R09 §7.2）：空串回退 lb://，本地无注册中心用环境变量直连
     contract:
