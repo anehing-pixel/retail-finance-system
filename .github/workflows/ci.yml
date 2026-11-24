@@ -1,0 +1,59 @@
+# P0-6：统一 CI（文档自检 + 构建与单测）
+# - 触发分支与本仓一致：master（原工作流误写 main，推送不触发）
+# - 构建 job 先克隆独立仓 company-platform-contracts 并安装共享 jar：
+#   公开仓无需配置；私有仓需在仓库 Secrets 配置 CONTRACTS_REPO_TOKEN（只读权限即可）
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: 文档自检
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 文档一致性自检（check_docs.py）
+        run: python scripts/check_docs.py
+      - name: 术语规范化幂等校验（normalize_terms.py --check）
+        run: python scripts/normalize_terms.py --check
+
+  build:
+    name: 构建与单测
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: 克隆中台共享 jar 仓（company-platform-contracts）
+        env:
+          CONTRACTS_REPO_TOKEN: ${{ secrets.CONTRACTS_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          OWNER="${{ github.repository_owner }}"
+          if [ -n "${CONTRACTS_REPO_TOKEN}" ]; then
+            git clone --depth 1 "https://x-access-token:${CONTRACTS_REPO_TOKEN}@github.com/${OWNER}/company-platform-contracts.git" contracts
+          else
+            git clone --depth 1 "https://github.com/${OWNER}/company-platform-contracts.git" contracts
+          fi
+      - name: 安装共享 jar 到本地仓库
+        run: mvn -B -f contracts/pom.xml install -DskipTests
+      - name: 全量构建 + 单测（surefire）
+        run: mvn -B clean package
