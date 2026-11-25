@@ -9,7 +9,8 @@ updated: "2026-11-24"
 owner: 架构侧
 deciders: ["用户"]
 amends: ["ADR-RF-013"]
-amendment_scope: "结论 4：分布式锁"
+amendment_scope:
+  - "ADR-RF-015 → ADR-RF-013 结论 4：分布式锁"
 lang: zh-CN
 ---
 

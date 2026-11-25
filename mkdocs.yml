@@ -1,0 +1,31 @@
+# Docs-as-Code 本地预览配置（不参与 GitHub Actions 的文档校验）
+#
+# 安装：python -m pip install mkdocs-material
+# 预览：mkdocs serve
+# 构建：mkdocs build --strict
+#
+# 说明：导航由 MkDocs 自动生成（未写死 nav），新增文档不需要改本文件；
+# ADR 目录会作为独立 section 出现在左侧导航。
+
+site_name: 新车零售金融核心系统（RF）
+site_description: 新车零售金融核心系统设计文档集
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - tables
+  - fenced_code
+  - toc:
+      permalink: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences

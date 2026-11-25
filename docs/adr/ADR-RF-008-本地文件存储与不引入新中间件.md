@@ -9,6 +9,9 @@ updated: "2026-11-24"
 owner: 架构侧
 deciders: ["架构侧"]
 amended_by: ["ADR-RF-012", "ADR-RF-014"]
+amendment_scope:
+  - "ADR-RF-012 → ADR-RF-008 §4：Redis 缓存与限流"
+  - "ADR-RF-014 → ADR-RF-008 §3：MQ"
 lang: zh-CN
 ---
 

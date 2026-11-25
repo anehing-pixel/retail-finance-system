@@ -31,6 +31,9 @@ logs/
 app-run.log
 app.log
 
+# ---- Docs-as-Code 本地构建产物 ----
+site/
+
 # ---- 本地数据 / 附件（继续用本地文件系统，但绝不入库） ----
 data/
 !data/.gitkeep

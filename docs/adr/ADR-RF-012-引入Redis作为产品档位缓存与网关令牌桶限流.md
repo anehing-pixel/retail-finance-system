@@ -9,7 +9,8 @@ updated: "2026-11-24"
 owner: 架构侧
 deciders: ["用户"]
 amends: ["ADR-RF-008"]
-amendment_scope: "第 4 条：Redis 缓存与限流"
+amendment_scope:
+  - "ADR-RF-012 → ADR-RF-008 §4：Redis 缓存与限流"
 lang: zh-CN
 ---
 

@@ -9,7 +9,8 @@ updated: "2026-11-24"
 owner: 架构侧
 deciders: ["用户"]
 amends: ["ADR-RF-008"]
-amendment_scope: "第 3 条：MQ"
+amendment_scope:
+  - "ADR-RF-014 → ADR-RF-008 §3：MQ"
 lang: zh-CN
 ---
 

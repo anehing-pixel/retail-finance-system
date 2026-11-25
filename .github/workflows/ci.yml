@@ -27,10 +27,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: 安装 Docs-as-Code 校验依赖（PyYAML）
+        run: python -m pip install --quiet pyyaml
       - name: 文档一致性自检（check_docs.py）
         run: python scripts/check_docs.py
       - name: 术语规范化幂等校验（normalize_terms.py --check）
         run: python scripts/normalize_terms.py --check
+      - name: Docs-as-Code 元数据校验（front matter）
+        run: python docs/tools/check_doc_meta.py
 
   build:
     name: 构建与单测
