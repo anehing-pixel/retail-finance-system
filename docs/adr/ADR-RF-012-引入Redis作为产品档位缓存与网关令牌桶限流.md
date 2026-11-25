@@ -1,4 +1,30 @@
+---
+schema: 1
+id: ADR-RF-012
+title: "引入 Redis 作为产品档位缓存与网关令牌桶限流"
+type: adr
+status: accepted
+date: "2026-11-23"
+updated: "2026-11-24"
+owner: 架构侧
+deciders: ["用户"]
+amends: ["ADR-RF-008"]
+amendment_scope: "第 4 条：Redis 缓存与限流"
+lang: zh-CN
+---
+
 # ADR-RF-012：引入 Redis 作为产品档位缓存与网关令牌桶限流
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-012` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-23 |
+| 最近更新 | 2026-11-24 |
+| 决策人 | 用户 |
+| 关系 | amends `ADR-RF-008`（第 4 条：Redis 缓存与限流） |
 
 ## 状态
 

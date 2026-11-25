@@ -1,4 +1,28 @@
+---
+schema: 1
+id: ADR-RF-001
+title: "采用微服务架构，与 floorplan 对齐"
+type: adr
+status: accepted
+date: "2026-11-22"
+updated: "2026-11-24"
+owner: 架构侧
+deciders: ["用户"]
+lang: zh-CN
+---
+
 # ADR-RF-001：采用微服务架构，与 floorplan 对齐
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-001` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-22 |
+| 最近更新 | 2026-11-24 |
+| 决策人 | 用户 |
+| 关系 | — |
 
 ## 状态
 

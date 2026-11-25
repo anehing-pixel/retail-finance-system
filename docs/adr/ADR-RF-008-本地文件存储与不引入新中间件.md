@@ -1,4 +1,29 @@
+---
+schema: 1
+id: ADR-RF-008
+title: "本地文件存储与不引入新中间件"
+type: adr
+status: accepted
+date: "2026-11-22"
+updated: "2026-11-24"
+owner: 架构侧
+deciders: ["架构侧"]
+amended_by: ["ADR-RF-012", "ADR-RF-014"]
+lang: zh-CN
+---
+
 # ADR-RF-008：本地文件存储与不引入新中间件
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-008` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-22 |
+| 最近更新 | 2026-11-24 |
+| 决策人 | 架构侧 |
+| 关系 | amended_by `ADR-RF-012`（§4）、`ADR-RF-014`（§3） |
 
 ## 状态
 

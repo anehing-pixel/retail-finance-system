@@ -1,4 +1,30 @@
+---
+schema: 1
+id: ADR-RF-014
+title: "RocketMQ 削峰与密文信封投递"
+type: adr
+status: accepted
+date: "2026-11-23"
+updated: "2026-11-24"
+owner: 架构侧
+deciders: ["用户"]
+amends: ["ADR-RF-008"]
+amendment_scope: "第 3 条：MQ"
+lang: zh-CN
+---
+
 # ADR-RF-014：RocketMQ 削峰与密文信封投递
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-014` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-23 |
+| 最近更新 | 2026-11-24 |
+| 决策人 | 用户 |
+| 关系 | amends `ADR-RF-008`（第 3 条：MQ） |
 
 ## 状态
 

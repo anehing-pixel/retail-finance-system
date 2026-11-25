@@ -1,4 +1,28 @@
+---
+schema: 1
+id: ADR-RF-006
+title: "所有权保留解除不复用 floorplan 担保链路"
+type: adr
+status: accepted
+date: "2026-11-22"
+updated: "2026-11-22"
+owner: 架构侧
+deciders: ["架构侧"]
+lang: zh-CN
+---
+
 # ADR-RF-006：所有权保留解除不复用 floorplan 担保链路
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-006` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-22 |
+| 最近更新 | 2026-11-22 |
+| 决策人 | 架构侧 |
+| 关系 | — |
 
 ## 状态
 

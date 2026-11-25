@@ -1,4 +1,30 @@
+---
+schema: 1
+id: ADR-RF-015
+title: "引入 Redisson 分布式锁（防重复进件 / 回调幂等）"
+type: adr
+status: accepted
+date: "2026-11-23"
+updated: "2026-11-24"
+owner: 架构侧
+deciders: ["用户"]
+amends: ["ADR-RF-013"]
+amendment_scope: "结论 4：分布式锁"
+lang: zh-CN
+---
+
 # ADR-RF-015 · 引入 Redisson 分布式锁（防重复进件 / 回调幂等）
+
+## 文档控制
+
+| 项 | 值 |
+|---|---|
+| 文档编号 | `ADR-RF-015` |
+| 状态 | accepted |
+| 决策日期 | 2026-11-23 |
+| 最近更新 | 2026-11-24 |
+| 决策人 | 用户 |
+| 关系 | amends `ADR-RF-013`（结论 4：分布式锁） |
 
 ## 状态
 
