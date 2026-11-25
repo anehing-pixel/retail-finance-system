@@ -161,7 +161,7 @@ if (!window.mermaid) {
       <span class="chip">12 个长驻部署单元 + db-migration</span>
       <span class="chip">661 测试 / 105 测试类</span>
       <span class="chip">Flyway V1–V22 / 62 表</span>
-      <span class="chip">15 张 Mermaid 图</span>
+      <span class="chip">16 张 Mermaid 图</span>
     </div>
   </div>
 </header>
@@ -180,11 +180,12 @@ if (!window.mermaid) {
 <div class="nav-doc">
 <span>R02 · 总体架构设计</span>
 <a href="#diagram-2-0">2. C4 · L1 系统上下文</a>
-<a href="#diagram-2-1">3. C4 · L2 容器（12 个长驻部署单元 + db-migration 作业）</a>
-<a href="#diagram-2-2">3.3 限流设计（两层 + 双模式 + 一个开关）</a>
-<a href="#diagram-2-3">4. C4 · L3 组件（服务内部与服务间）</a>
-<a href="#diagram-2-4">7.2 异步：事后状态同步（Transactional Outbox）</a>
-<a href="#diagram-2-5">7.4 出站调用韧性治理（P0-7）</a>
+<a href="#diagram-2-1">图 A · 入口与业务服务（原图上半部分）</a>
+<a href="#diagram-2-2">图 B · 数据访问与共享设施（原图下半部分）</a>
+<a href="#diagram-2-3">3.3 限流设计（两层 + 双模式 + 一个开关）</a>
+<a href="#diagram-2-4">4. C4 · L3 组件（服务内部与服务间）</a>
+<a href="#diagram-2-5">7.2 异步：事后状态同步（Transactional Outbox）</a>
+<a href="#diagram-2-6">7.4 出站调用韧性治理（P0-7）</a>
 </div>
 <div class="nav-doc">
 <span>R04 · 领域模型与状态机</span>
@@ -361,7 +362,7 @@ if (!window.mermaid) {
   STAFF --&gt;|运营 · 审查| RF
   FP -.-&gt;|共享机制层 jar / 主数据| RF
   RF -.-&gt;|不共享：个人信息 · 征信 · 担保语义| FP</code></pre></details></article>
-<article class="diagram-card" id="diagram-2-1"><div class="card-head"><h3>3. C4 · L2 容器（12 个长驻部署单元 + db-migration 作业）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：3. C4 · L2 容器（12 个长驻部署单元 + db-migration 作业）</p><pre class="mermaid">flowchart TB
+<article class="diagram-card" id="diagram-2-1"><div class="card-head"><h3>图 A · 入口与业务服务（原图上半部分）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：图 A · 入口与业务服务（原图上半部分）</p><pre class="mermaid">flowchart TB
   subgraph EXT["外部"]
     CUST[消费者 / 门户]
     DMS[销售店 DMS]
@@ -369,7 +370,8 @@ if (!window.mermaid) {
     BANK[银行 / 代收]
     GOV[车辆登记机关]
   end
-  EDGE["边缘 Nginx（可选形态）:18076 / :18077&lt;br/&gt;来源 IP 漏桶泄洪"]
+  EDGE_IN["边缘 Nginx :18076&lt;br/&gt;内部网关前置 · 来源 IP 漏桶泄洪"]
+  EDGE_DMZ["边缘 Nginx :18077&lt;br/&gt;外部 DMZ 前置 · 来源 IP 漏桶泄洪"]
   GW["api-gateway :18081&lt;br/&gt;路径切流 · X-Request-Id · 限流（redis / memory 双模式）"]
   DMZ["external-api :18091&lt;br/&gt;DMZ 独立进程：验签/签名/nonce/scope"]
   CORE["retail-core :8090&lt;br/&gt;核心账务（不拆）· 运行期不跑 Flyway"]
@@ -382,27 +384,16 @@ if (!window.mermaid) {
   TITLE["title-release-service :8097"]
   SERV["servicing-service :8098"]
   RECON["recon-service :8099"]
-  DB[("PostgreSQL 16 :5435&lt;br/&gt;retail_finance&lt;br/&gt;core | pii | integration | audit")]
-  REDIS["Redis Sentinel（生产 HA）:26379-26381&lt;br/&gt;限流状态 · 生产 fail-closed；本地单实例 :6382"]
-  MIG["db-migration（非长驻）&lt;br/&gt;Flyway 迁移作业 · 迁移账号"]
-  PLAT["company-platform-contracts（共享 jar）&lt;br/&gt;响应/异常/Outbox/幂等/日历/加密/审计约定"]
 
-  CUST --&gt; GW
-  DMS --&gt; DMZ
-  BUR &lt;--&gt; DMZ
-  BANK &lt;--&gt; DMZ
-  GOV &lt;--&gt; DMZ
-  CUST -.-&gt; EDGE
-  EDGE -.-&gt; GW
-  EDGE -.-&gt; DMZ
+  CUST &lt;--&gt; EDGE_IN
+  EDGE_IN &lt;--&gt; GW
+  DMS &lt;--&gt; EDGE_DMZ
+  BUR &lt;--&gt; EDGE_DMZ
+  BANK &lt;--&gt; EDGE_DMZ
+  GOV &lt;--&gt; EDGE_DMZ
+  EDGE_DMZ &lt;--&gt; DMZ
   GW --&gt; CORE &amp; AUTH &amp; CUSTOMER &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON
-  DMZ --&gt;|内部命令| CORE &amp; APP &amp; BUREAU &amp; TITLE
-  CORE &amp; AUTH &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON --&gt;|retail_app_rw| DB
-  CUSTOMER --&gt;|retail_pii_rw| DB
-  DMZ --&gt;|retail_dmz_rw| DB
-  MIG --&gt;|迁移账号 DDL| DB
-  GW -.-&gt;|令牌桶| REDIS
-  CORE &amp; AUTH &amp; CUSTOMER &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON &amp; DMZ -.-&gt; PLAT</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TB
+  DMZ --&gt;|内部命令| CORE &amp; APP &amp; BUREAU &amp; TITLE</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TB
   subgraph EXT["外部"]
     CUST[消费者 / 门户]
     DMS[销售店 DMS]
@@ -410,7 +401,8 @@ if (!window.mermaid) {
     BANK[银行 / 代收]
     GOV[车辆登记机关]
   end
-  EDGE["边缘 Nginx（可选形态）:18076 / :18077&lt;br/&gt;来源 IP 漏桶泄洪"]
+  EDGE_IN["边缘 Nginx :18076&lt;br/&gt;内部网关前置 · 来源 IP 漏桶泄洪"]
+  EDGE_DMZ["边缘 Nginx :18077&lt;br/&gt;外部 DMZ 前置 · 来源 IP 漏桶泄洪"]
   GW["api-gateway :18081&lt;br/&gt;路径切流 · X-Request-Id · 限流（redis / memory 双模式）"]
   DMZ["external-api :18091&lt;br/&gt;DMZ 独立进程：验签/签名/nonce/scope"]
   CORE["retail-core :8090&lt;br/&gt;核心账务（不拆）· 运行期不跑 Flyway"]
@@ -423,28 +415,52 @@ if (!window.mermaid) {
   TITLE["title-release-service :8097"]
   SERV["servicing-service :8098"]
   RECON["recon-service :8099"]
+
+  CUST &lt;--&gt; EDGE_IN
+  EDGE_IN &lt;--&gt; GW
+  DMS &lt;--&gt; EDGE_DMZ
+  BUR &lt;--&gt; EDGE_DMZ
+  BANK &lt;--&gt; EDGE_DMZ
+  GOV &lt;--&gt; EDGE_DMZ
+  EDGE_DMZ &lt;--&gt; DMZ
+  GW --&gt; CORE &amp; AUTH &amp; CUSTOMER &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON
+  DMZ --&gt;|内部命令| CORE &amp; APP &amp; BUREAU &amp; TITLE</code></pre></details></article>
+<article class="diagram-card" id="diagram-2-2"><div class="card-head"><h3>图 B · 数据访问与共享设施（原图下半部分）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：图 B · 数据访问与共享设施（原图下半部分）</p><pre class="mermaid">flowchart TB
+  GW["api-gateway :18081"]
+  HUB["业务服务组（app_rw，9 个服务）"]
+  CUSTOMER["customer-service :8092&lt;br/&gt;pii_rw"]
+  DMZ["external-api :18091&lt;br/&gt;dmz_rw"]
   DB[("PostgreSQL 16 :5435&lt;br/&gt;retail_finance&lt;br/&gt;core | pii | integration | audit")]
   REDIS["Redis Sentinel（生产 HA）:26379-26381&lt;br/&gt;限流状态 · 生产 fail-closed；本地单实例 :6382"]
+  MQ["RocketMQ（namesrv :9876 / broker :10911）&lt;br/&gt;outbox 之上的削峰缓冲 · 只走密文信封 · 默认关闭"]
   MIG["db-migration（非长驻）&lt;br/&gt;Flyway 迁移作业 · 迁移账号"]
   PLAT["company-platform-contracts（共享 jar）&lt;br/&gt;响应/异常/Outbox/幂等/日历/加密/审计约定"]
 
-  CUST --&gt; GW
-  DMS --&gt; DMZ
-  BUR &lt;--&gt; DMZ
-  BANK &lt;--&gt; DMZ
-  GOV &lt;--&gt; DMZ
-  CUST -.-&gt; EDGE
-  EDGE -.-&gt; GW
-  EDGE -.-&gt; DMZ
-  GW --&gt; CORE &amp; AUTH &amp; CUSTOMER &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON
-  DMZ --&gt;|内部命令| CORE &amp; APP &amp; BUREAU &amp; TITLE
-  CORE &amp; AUTH &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON --&gt;|retail_app_rw| DB
+  HUB --&gt;|retail_app_rw| DB
   CUSTOMER --&gt;|retail_pii_rw| DB
   DMZ --&gt;|retail_dmz_rw| DB
   MIG --&gt;|迁移账号 DDL| DB
   GW -.-&gt;|令牌桶| REDIS
-  CORE &amp; AUTH &amp; CUSTOMER &amp; APP &amp; UW &amp; BUREAU &amp; CONTRACT &amp; TITLE &amp; SERV &amp; RECON &amp; DMZ -.-&gt; PLAT</code></pre></details></article>
-<article class="diagram-card" id="diagram-2-2"><div class="card-head"><h3>3.3 限流设计（两层 + 双模式 + 一个开关）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：3.3 限流设计（两层 + 双模式 + 一个开关）</p><pre class="mermaid">flowchart TD
+  HUB &lt;--&gt;|密文信封 · 削峰（默认关闭）| MQ
+  HUB &amp; CUSTOMER &amp; DMZ -.-&gt; PLAT</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TB
+  GW["api-gateway :18081"]
+  HUB["业务服务组（app_rw，9 个服务）"]
+  CUSTOMER["customer-service :8092&lt;br/&gt;pii_rw"]
+  DMZ["external-api :18091&lt;br/&gt;dmz_rw"]
+  DB[("PostgreSQL 16 :5435&lt;br/&gt;retail_finance&lt;br/&gt;core | pii | integration | audit")]
+  REDIS["Redis Sentinel（生产 HA）:26379-26381&lt;br/&gt;限流状态 · 生产 fail-closed；本地单实例 :6382"]
+  MQ["RocketMQ（namesrv :9876 / broker :10911）&lt;br/&gt;outbox 之上的削峰缓冲 · 只走密文信封 · 默认关闭"]
+  MIG["db-migration（非长驻）&lt;br/&gt;Flyway 迁移作业 · 迁移账号"]
+  PLAT["company-platform-contracts（共享 jar）&lt;br/&gt;响应/异常/Outbox/幂等/日历/加密/审计约定"]
+
+  HUB --&gt;|retail_app_rw| DB
+  CUSTOMER --&gt;|retail_pii_rw| DB
+  DMZ --&gt;|retail_dmz_rw| DB
+  MIG --&gt;|迁移账号 DDL| DB
+  GW -.-&gt;|令牌桶| REDIS
+  HUB &lt;--&gt;|密文信封 · 削峰（默认关闭）| MQ
+  HUB &amp; CUSTOMER &amp; DMZ -.-&gt; PLAT</code></pre></details></article>
+<article class="diagram-card" id="diagram-2-3"><div class="card-head"><h3>3.3 限流设计（两层 + 双模式 + 一个开关）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：3.3 限流设计（两层 + 双模式 + 一个开关）</p><pre class="mermaid">flowchart TD
   REQ["请求进入网关"] --&gt; MATCH{"命中限流规则？"}
   MATCH -- "否" --&gt; PASS["直接转发下游"]
   MATCH -- "是" --&gt; REDIS{"Redis 可用？"}
@@ -463,7 +479,7 @@ if (!window.mermaid) {
   REDIS -- "否" --&gt; OPEN{"fail-open？"}
   OPEN -- "false（生产默认）" --&gt; R503["503 拒绝&lt;br/&gt;ALERT failMode=CLOSED"]
   OPEN -- "true（仅本地 dev）" --&gt; PASSW["放行（限流被绕过）&lt;br/&gt;ALERT failMode=OPEN"]</code></pre></details></article>
-<article class="diagram-card" id="diagram-2-3"><div class="card-head"><h3>4. C4 · L3 组件（服务内部与服务间）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：4. C4 · L3 组件（服务内部与服务间）</p><pre class="mermaid">flowchart TB
+<article class="diagram-card" id="diagram-2-4"><div class="card-head"><h3>4. C4 · L3 组件（服务内部与服务间）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：4. C4 · L3 组件（服务内部与服务间）</p><pre class="mermaid">flowchart TB
   subgraph CORE["retail-core :8090（本地事务红线）"]
     L1["债权 · 还款计划"]
     L2["代付 · 入金核销"]
@@ -518,7 +534,7 @@ if (!window.mermaid) {
   OUTBOX --&gt;|TITLE_RELEASE_REGISTERED| CORE &amp; A8
   OUTBOX --&gt;|CONSENT_WITHDRAWN（秒级刚性）| A4 &amp; A5
   OUTBOX --&gt;|REPAYMENT_RECEIVED| A8 &amp; A9</code></pre></details></article>
-<article class="diagram-card" id="diagram-2-4"><div class="card-head"><h3>7.2 异步：事后状态同步（Transactional Outbox）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：7.2 异步：事后状态同步（Transactional Outbox）</p><pre class="mermaid">flowchart LR
+<article class="diagram-card" id="diagram-2-5"><div class="card-head"><h3>7.2 异步：事后状态同步（Transactional Outbox）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：7.2 异步：事后状态同步（Transactional Outbox）</p><pre class="mermaid">flowchart LR
   TX["业务本地事务"] --&gt; OUTBOX[("core.outbox_events")]
   OUTBOX --&gt;|"轮询 PENDING"| DISP["RfEventDispatcher"]
   DISP --&gt; CLAIM{"event_consumptions&lt;br/&gt;原子认领成功？"}
@@ -537,7 +553,7 @@ if (!window.mermaid) {
   CONSUMER -- "失败" --&gt; FAILED["FAILED / 3 次 DEAD"]
   OUTBOX -.-&gt;|"MQ 开启（可选）"| MQ["RocketMQ&lt;br/&gt;密文信封"]
   MQ -.-&gt; CONSUMER</code></pre></details></article>
-<article class="diagram-card" id="diagram-2-5"><div class="card-head"><h3>7.4 出站调用韧性治理（P0-7）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：7.4 出站调用韧性治理（P0-7）</p><pre class="mermaid">flowchart LR
+<article class="diagram-card" id="diagram-2-6"><div class="card-head"><h3>7.4 出站调用韧性治理（P0-7）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">来源：<code>docs/R02-总体架构设计.md</code> · 章节：7.4 出站调用韧性治理（P0-7）</p><pre class="mermaid">flowchart LR
   CALL["出站逻辑调用"] --&gt; PROFILE{"策略档"}
   PROFILE --&gt;|"gate / gate-raw"| FEIGN["Feign 门禁&lt;br/&gt;500ms / 2s · 传输层最多 1 次重试"]
   PROFILE --&gt;|"query / write / advisory / financial / forward"| HTTP["JDK HttpClient&lt;br/&gt;超时 + 三态熔断"]

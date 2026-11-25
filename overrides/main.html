@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{#
+  在 Material bundle 之前加载本地 Mermaid 10.9.1，并接管 render 的 SVG 结果。
+  Material 会把 Mermaid SVG 放进 closed shadow root，外部脚本拿不到；
+  这里在 replaceWith 时把 SVG 字符串挂到宿主的点击事件上，交给
+  assets/diagram-zoom.js 弹出全屏浮层。
+#}
+{% block extrahead %}
+  {{ super() }}
+  <script src="{{ 'assets/mermaid-10.9.1.min.js' | url }}"></script>
+  <script>
+    (function () {
+      if (!window.mermaid || typeof window.mermaid.render !== "function") return;
+
+      var pending = [];
+      var norm = function (text) {
+        return String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+      };
+      var origRender = window.mermaid.render.bind(window.mermaid);
+      window.mermaid.render = function () {
+        var args = arguments;
+        return origRender.apply(null, args).then(function (result) {
+          if (result && typeof result.svg === "string") {
+            pending.push({ svg: result.svg, key: norm(args[1]) });
+          }
+          return result;
+        });
+      };
+
+      var origReplace = Element.prototype.replaceWith;
+      Element.prototype.replaceWith = function () {
+        var isMermaid = this.nodeType === 1 && this.matches && this.matches("pre.mermaid");
+        var source = isMermaid ? this.textContent : null;
+        var result = origReplace.apply(this, arguments);
+
+        if (isMermaid) {
+          var sourceKey = norm(source);
+          var index = pending.findIndex(function (item) { return item.key === sourceKey; });
+          if (index < 0) {
+            index = pending.findIndex(function (item) {
+              return item.key.slice(0, 80) === sourceKey.slice(0, 80);
+            });
+          }
+          if (index < 0) index = 0;
+          var picked = pending.length ? pending.splice(index, 1)[0] : null;
+          var svg = picked ? picked.svg : null;
+          var div = Array.prototype.find.call(arguments, function (node) {
+            return node && node.nodeType === 1 && node.classList && node.classList.contains("mermaid");
+          });
+          if (svg && div) {
+            div.setAttribute("role", "button");
+            div.setAttribute("tabindex", "0");
+            div.setAttribute("title", "点击放大 Mermaid 图");
+            div.style.cursor = "zoom-in";
+            var open = function () {
+              if (window.rfOpenMermaidZoom) window.rfOpenMermaidZoom(svg);
+            };
+
+            var wrap = document.createElement("div");
+            wrap.className = "rf-mermaid-wrap";
+            div.parentNode.insertBefore(wrap, div);
+            wrap.appendChild(div);
+
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "rf-zoom-btn";
+            btn.title = "放大查看";
+            btn.setAttribute("aria-label", "放大查看 Mermaid 图");
+            btn.innerHTML =
+              '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">' +
+              '<path d="M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5" ' +
+              'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+              "</svg> 放大";
+            btn.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              open();
+            });
+            wrap.appendChild(btn);
+
+            div.addEventListener("click", open);
+            div.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+              }
+            });
+          }
+        }
+        return result;
+      };
+    })();
+  </script>
+{% endblock %}

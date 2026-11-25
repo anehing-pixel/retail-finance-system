@@ -4,22 +4,81 @@
 # 预览：mkdocs serve
 # 构建：mkdocs build --strict
 #
-# 说明：导航由 MkDocs 自动生成（未写死 nav），新增文档不需要改本文件；
-# ADR 目录会作为独立 section 出现在左侧导航。
+# 说明：导航显式列出 28 份文档；新增文档时同步 nav，避免 MkDocs 在 --strict 下告警。
 
-site_name: 新车零售金融核心系统（RF）
+site_name: RF · 设计文档集
 site_description: 新车零售金融核心系统设计文档集
+repo_url: https://github.com/anehing-pixel/retail-finance-system
+repo_name: GitHub
+edit_uri: edit/master/docs/
+copyright: 新车零售金融核心系统（RF）· Docs-as-Code
+
 docs_dir: docs
 site_dir: site
 
 theme:
   name: material
   language: zh
+  logo: assets/rf-logo.svg
+  favicon: assets/rf-logo.svg
+  font: false
+  custom_dir: overrides
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
   features:
     - navigation.sections
     - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - toc.follow
+    - search.suggest
     - search.highlight
     - content.code.copy
+    - content.code.select
+    - content.tabs.link
+
+nav:
+  - 卷首 · 文档索引: 00-文档索引.md
+  - 设计文档 R00–R11:
+      - R00 设计基线: R00-设计基线与命名定源.md
+      - R01 业务定源: R01-业务定源与法务裁决清单.md
+      - R02 总体架构: R02-总体架构设计.md
+      - R03 中台共享: R03-中台共享能力契约.md
+      - R04 领域模型: R04-领域模型与状态机设计.md
+      - R05 业务流程: R05-业务流程设计.md
+      - R06 数据库: R06-数据库设计.md
+      - R07 外部集成: R07-外部集成接口文档.md
+      - R08 权限与合规: R08-权限与合规矩阵.md
+      - R09 接口与事件: R09-接口与事件契约.md
+      - R10 测试与验收: R10-测试与验收设计.md
+      - R11 演进路线: R11-演进路线图与开工门禁.md
+  - 架构决策记录 ADR-001–015:
+      - ADR-001 微服务架构: adr/ADR-RF-001-采用微服务架构与floorplan对齐.md
+      - ADR-002 交易形态: adr/ADR-RF-002-交易形态定源.md
+      - ADR-003 中台边界: adr/ADR-RF-003-中台共享边界：机制层共享语义层隔离.md
+      - ADR-004 双主体与 PII: adr/ADR-RF-004-双主体身份模型与PII隔离.md
+      - ADR-005 征信防腐: adr/ADR-RF-005-个人征信局上下文与防腐层.md
+      - ADR-006 解除链路: adr/ADR-RF-006-所有权保留解除不复用floorplan担保链路.md
+      - ADR-007 事件禁 PII: adr/ADR-RF-007-事件载荷禁止PII与业务主键可配置.md
+      - ADR-008 文件与中间件: adr/ADR-RF-008-本地文件存储与不引入新中间件.md
+      - ADR-009 数据库与迁移: adr/ADR-RF-009-独立数据库与迁移号段.md
+      - ADR-010 经销商主数据: adr/ADR-RF-010-经销商主数据共享角色隔离.md
+      - ADR-011 DMS 对接: adr/ADR-RF-011-DMS对接模式：数据集成商起步与核心直连演进.md
+      - ADR-012 Redis 与限流: adr/ADR-RF-012-引入Redis作为产品档位缓存与网关令牌桶限流.md
+      - ADR-013 回调幂等: adr/ADR-RF-013-回调幂等唯一索引与不引入分布式锁.md
+      - ADR-014 MQ 削峰: adr/ADR-RF-014-MQ削峰与密文信封投递.md
+      - ADR-015 Redisson 锁: adr/ADR-RF-015-引入Redisson分布式锁防重复进件与回调幂等.md
 
 markdown_extensions:
   - tables
@@ -28,4 +87,14 @@ markdown_extensions:
       permalink: true
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - assets/mkdocs-extra.css
+
+extra_javascript:
+  - assets/diagram-zoom.js
