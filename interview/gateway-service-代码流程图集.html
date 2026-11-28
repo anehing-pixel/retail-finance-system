@@ -1,0 +1,643 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_gateway_html.py；请修改 interview/gateway-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gateway-service 代码流程图集 · 路径切流与限流</title>
+<style>
+:root {
+  --bg: #f6f8fc;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dce3ef;
+  --brand: #c2410c;
+  --brand-2: #1d4ed8;
+  --soft: #ffedd5;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #7c2d12 0%, #111827 58%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #fed7aa; max-width: 980px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #ffedd5;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #fed7aa;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #0f172a; color: #ffedd5; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>gateway-service 代码流程图集</h1>
+    <p>路径切流、X-Request-Id、Redis / 进程内双模式令牌桶限流的代码走读图集，
+       源文件：<code>interview/gateway-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 18081</span>
+      <span class="chip">Spring Cloud Gateway</span>
+      <span class="chip">网关不验签</span>
+      <span class="chip">redis / memory 双模式</span>
+      <span class="chip">7 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>2. 启动与路由</span>
+<a href="#diagram-2">2.3 路由匹配流程</a>
+</div>
+<div class="nav-group">
+<span>3. X-Request-Id</span>
+<a href="#diagram-3">3.1 时序</a>
+</div>
+<div class="nav-group">
+<span>4. 双模式限流总览</span>
+<a href="#diagram-4">4. 双模式限流总览</a>
+</div>
+<div class="nav-group">
+<span>5. Redis 模式</span>
+<a href="#diagram-5">5.4 过滤器时序</a>
+</div>
+<div class="nav-group">
+<span>6. 进程内模式</span>
+<a href="#diagram-6">6.4 过滤器流程</a>
+</div>
+<div class="nav-group">
+<span>7. 客户端 IP 与可信代理</span>
+<a href="#diagram-7">7.2 解析流程</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>只切流、发请求号、限流，不验签</span></div>
+      <div class="card"><b>路由</b><span>精确路由在前，/api/** 兜底 core</span></div>
+      <div class="card"><b>限流</b><span>redis 默认；memory 单实例</span></div>
+      <div class="card"><b>失败语义</b><span>Redis 不可用生产 503</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    CLIENT["客户端"]
+    GW["api-gateway :18081"]
+
+    subgraph FILTERS["全局过滤器"]
+        RID["RequestIdFilter&lt;br/&gt;order -100"]
+        RL["RateLimitFilter / InMemoryRateLimitFilter&lt;br/&gt;order -90"]
+    end
+
+    subgraph REDIS["Redis 模式"]
+        RP["RateLimitProperties"]
+        RM["RateLimitRuleMatcher"]
+        RK["RateLimitKeyResolver"]
+        TB["TokenBucketLimiter"]
+        LUA["token_bucket.lua"]
+    end
+
+    subgraph MEMORY["进程内模式"]
+        MP["InMemoryRateLimitProperties"]
+        PR["RateLimitPolicyResolver"]
+        REG["RateLimitRegistry"]
+        BUCKET["TokenBucket"]
+    end
+
+    subgraph ROUTES["路由目标"]
+        AUTH["auth-service :8091"]
+        CUST["customer-service :8092"]
+        APP["application-service :8093"]
+        UW["underwriting-service :8094"]
+        BUR["bureau-service :8095"]
+        CON["contract-service :8096"]
+        TITLE["title-release-service :8097"]
+        SVC["servicing-service :8098"]
+        RECON["recon-service :8099"]
+        CORE["retail-core :8090"]
+    end
+
+    CLIENT --&gt; GW
+    GW --&gt; RID
+    RID --&gt; RL
+    RL --&gt; ROUTES
+    RL -. "redis 模式" .-&gt; RP
+    RP --&gt; RM
+    RP --&gt; RK
+    RL -. "memory 模式" .-&gt; MP
+    MP --&gt; PR
+    MP --&gt; REG
+    REG --&gt; BUCKET
+    TB --&gt; LUA</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    CLIENT["客户端"]
+    GW["api-gateway :18081"]
+
+    subgraph FILTERS["全局过滤器"]
+        RID["RequestIdFilter&lt;br/&gt;order -100"]
+        RL["RateLimitFilter / InMemoryRateLimitFilter&lt;br/&gt;order -90"]
+    end
+
+    subgraph REDIS["Redis 模式"]
+        RP["RateLimitProperties"]
+        RM["RateLimitRuleMatcher"]
+        RK["RateLimitKeyResolver"]
+        TB["TokenBucketLimiter"]
+        LUA["token_bucket.lua"]
+    end
+
+    subgraph MEMORY["进程内模式"]
+        MP["InMemoryRateLimitProperties"]
+        PR["RateLimitPolicyResolver"]
+        REG["RateLimitRegistry"]
+        BUCKET["TokenBucket"]
+    end
+
+    subgraph ROUTES["路由目标"]
+        AUTH["auth-service :8091"]
+        CUST["customer-service :8092"]
+        APP["application-service :8093"]
+        UW["underwriting-service :8094"]
+        BUR["bureau-service :8095"]
+        CON["contract-service :8096"]
+        TITLE["title-release-service :8097"]
+        SVC["servicing-service :8098"]
+        RECON["recon-service :8099"]
+        CORE["retail-core :8090"]
+    end
+
+    CLIENT --&gt; GW
+    GW --&gt; RID
+    RID --&gt; RL
+    RL --&gt; ROUTES
+    RL -. "redis 模式" .-&gt; RP
+    RP --&gt; RM
+    RP --&gt; RK
+    RL -. "memory 模式" .-&gt; MP
+    MP --&gt; PR
+    MP --&gt; REG
+    REG --&gt; BUCKET
+    TB --&gt; LUA</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>2. 启动与路由</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>2.3 路由匹配流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>2. 启动与路由</code> · 图：<code>2.3 路由匹配流程</code></p><pre class="mermaid">flowchart TD
+    A["入站请求"] --&gt; B["RequestIdFilter&lt;br/&gt;生成/透传 X-Request-Id"]
+    B --&gt; C["RateLimitFilter&lt;br/&gt;按路径取规则"]
+    C -- "限流命中" --&gt; D["429 RF_GATEWAY_001&lt;br/&gt;不转发下游"]
+    C -- "放行" --&gt; E{"匹配路由"}
+    E -- "/api/auth/**" --&gt; F["auth-service"]
+    E -- "/api/customers/** ..." --&gt; G["customer-service"]
+    E -- "/api/underwriting/** ..." --&gt; H["underwriting-service"]
+    E -- "/api/credit-inquiries/** ..." --&gt; I["bureau-service"]
+    E -- "其它精确路由" --&gt; J["对应业务服务"]
+    E -- "/api/** 兜底" --&gt; K["retail-core"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["入站请求"] --&gt; B["RequestIdFilter&lt;br/&gt;生成/透传 X-Request-Id"]
+    B --&gt; C["RateLimitFilter&lt;br/&gt;按路径取规则"]
+    C -- "限流命中" --&gt; D["429 RF_GATEWAY_001&lt;br/&gt;不转发下游"]
+    C -- "放行" --&gt; E{"匹配路由"}
+    E -- "/api/auth/**" --&gt; F["auth-service"]
+    E -- "/api/customers/** ..." --&gt; G["customer-service"]
+    E -- "/api/underwriting/** ..." --&gt; H["underwriting-service"]
+    E -- "/api/credit-inquiries/** ..." --&gt; I["bureau-service"]
+    E -- "其它精确路由" --&gt; J["对应业务服务"]
+    E -- "/api/** 兜底" --&gt; K["retail-core"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. X-Request-Id</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>3.1 时序</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. X-Request-Id</code> · 图：<code>3.1 时序</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 客户端
+    participant G as RequestIdFilter
+    participant S as 下游服务
+
+    C-&gt;&gt;G: 请求（可带 X-Request-Id）
+    alt 已有非空 X-Request-Id
+        G-&gt;&gt;G: 透传原值
+    else 缺失/空白
+        G-&gt;&gt;G: UUID 生成
+    end
+    G-&gt;&gt;G: 写入请求头 + 响应头
+    G-&gt;&gt;S: 转发请求（带 X-Request-Id）
+    S--&gt;&gt;C: 响应（带 X-Request-Id）</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 客户端
+    participant G as RequestIdFilter
+    participant S as 下游服务
+
+    C-&gt;&gt;G: 请求（可带 X-Request-Id）
+    alt 已有非空 X-Request-Id
+        G-&gt;&gt;G: 透传原值
+    else 缺失/空白
+        G-&gt;&gt;G: UUID 生成
+    end
+    G-&gt;&gt;G: 写入请求头 + 响应头
+    G-&gt;&gt;S: 转发请求（带 X-Request-Id）
+    S--&gt;&gt;C: 响应（带 X-Request-Id）</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 双模式限流总览</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>4. 双模式限流总览</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 双模式限流总览</code> · 图：<code>4. 双模式限流总览</code></p><pre class="mermaid">flowchart TD
+    A["retail.gateway.rate-limit.mode"] --&gt; B{"mode"}
+    B -- "redis（缺省）" --&gt; C["RateLimitConfig"]
+    B -- "memory" --&gt; D["InMemoryRateLimitConfig"]
+    C --&gt; E["RateLimitFilter&lt;br/&gt;一个 GlobalFilter"]
+    D --&gt; F["InMemoryRateLimitFilter&lt;br/&gt;一个 GlobalFilter"]
+    E --&gt; G["Redis 令牌桶"]
+    F --&gt; H["进程内令牌桶"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["retail.gateway.rate-limit.mode"] --&gt; B{"mode"}
+    B -- "redis（缺省）" --&gt; C["RateLimitConfig"]
+    B -- "memory" --&gt; D["InMemoryRateLimitConfig"]
+    C --&gt; E["RateLimitFilter&lt;br/&gt;一个 GlobalFilter"]
+    D --&gt; F["InMemoryRateLimitFilter&lt;br/&gt;一个 GlobalFilter"]
+    E --&gt; G["Redis 令牌桶"]
+    F --&gt; H["进程内令牌桶"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. Redis 模式</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>5.4 过滤器时序</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. Redis 模式</code> · 图：<code>5.4 过滤器时序</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 客户端
+    participant R as RequestIdFilter
+    participant F as RateLimitFilter
+    participant K as RateLimitKeyResolver
+    participant L as TokenBucketLimiter
+    participant Redis as Redis
+    participant D as 下游服务
+
+    C-&gt;&gt;R: 请求
+    R-&gt;&gt;F: 带 X-Request-Id
+    F-&gt;&gt;F: matcher.match(path)
+    alt 无规则
+        F-&gt;&gt;D: 直接放行
+    else 命中规则
+        F-&gt;&gt;K: 解析 Authorization / IP
+        K--&gt;&gt;F: clientKey
+        F-&gt;&gt;L: tryAcquire(key, capacity, rate)
+        L-&gt;&gt;Redis: EVAL token_bucket.lua
+        Redis--&gt;&gt;L: 1 / 0
+        alt 1
+            F-&gt;&gt;D: chain.filter
+        else 0
+            F--&gt;&gt;C: 429 RF_GATEWAY_001 + Retry-After
+        end
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 客户端
+    participant R as RequestIdFilter
+    participant F as RateLimitFilter
+    participant K as RateLimitKeyResolver
+    participant L as TokenBucketLimiter
+    participant Redis as Redis
+    participant D as 下游服务
+
+    C-&gt;&gt;R: 请求
+    R-&gt;&gt;F: 带 X-Request-Id
+    F-&gt;&gt;F: matcher.match(path)
+    alt 无规则
+        F-&gt;&gt;D: 直接放行
+    else 命中规则
+        F-&gt;&gt;K: 解析 Authorization / IP
+        K--&gt;&gt;F: clientKey
+        F-&gt;&gt;L: tryAcquire(key, capacity, rate)
+        L-&gt;&gt;Redis: EVAL token_bucket.lua
+        Redis--&gt;&gt;L: 1 / 0
+        alt 1
+            F-&gt;&gt;D: chain.filter
+        else 0
+            F--&gt;&gt;C: 429 RF_GATEWAY_001 + Retry-After
+        end
+    end</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 进程内模式</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>6.4 过滤器流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 进程内模式</code> · 图：<code>6.4 过滤器流程</code></p><pre class="mermaid">flowchart TD
+    A["请求"] --&gt; B["RequestIdFilter"]
+    B --&gt; C["InMemoryRateLimitFilter"]
+    C --&gt; D{"enabled？"}
+    D -- "否" --&gt; E["直接放行"]
+    D -- "是" --&gt; F["policyResolver.resolve(path)"]
+    F --&gt; G["ClientIpResolver.resolve"]
+    G --&gt; H["key = segment|clientIp"]
+    H --&gt; I["registry.acquire(key, policy, nowNanos)"]
+    I --&gt; J{"allowed？"}
+    J -- "是" --&gt; K["写 X-RateLimit-* 头&lt;br/&gt;放行"]
+    J -- "否" --&gt; L["429 RF_GATEWAY_001&lt;br/&gt;X-RateLimit-* / Retry-After&lt;br/&gt;不转发"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["请求"] --&gt; B["RequestIdFilter"]
+    B --&gt; C["InMemoryRateLimitFilter"]
+    C --&gt; D{"enabled？"}
+    D -- "否" --&gt; E["直接放行"]
+    D -- "是" --&gt; F["policyResolver.resolve(path)"]
+    F --&gt; G["ClientIpResolver.resolve"]
+    G --&gt; H["key = segment|clientIp"]
+    H --&gt; I["registry.acquire(key, policy, nowNanos)"]
+    I --&gt; J{"allowed？"}
+    J -- "是" --&gt; K["写 X-RateLimit-* 头&lt;br/&gt;放行"]
+    J -- "否" --&gt; L["429 RF_GATEWAY_001&lt;br/&gt;X-RateLimit-* / Retry-After&lt;br/&gt;不转发"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 客户端 IP 与可信代理</h2><span class="source">来源：interview/gateway-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>7.2 解析流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 客户端 IP 与可信代理</code> · 图：<code>7.2 解析流程</code></p><pre class="mermaid">flowchart TD
+    A["请求"] --&gt; B["remote = TCP 直连地址"]
+    B --&gt; C{"有可信代理配置？"}
+    C -- "否" --&gt; D["返回 remote"]
+    C -- "是" --&gt; E{"remote 在可信网段？"}
+    E -- "否" --&gt; D
+    E -- "是" --&gt; F["读取 X-Forwarded-For"]
+    F --&gt; G{"有合法 IP 字面量？"}
+    G -- "否" --&gt; D
+    G -- "是" --&gt; H["取第一个非可信地址"]
+    H --&gt; I["返回真实客户端 IP"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["请求"] --&gt; B["remote = TCP 直连地址"]
+    B --&gt; C{"有可信代理配置？"}
+    C -- "否" --&gt; D["返回 remote"]
+    C -- "是" --&gt; E{"remote 在可信网段？"}
+    E -- "否" --&gt; D
+    E -- "是" --&gt; F["读取 X-Forwarded-For"]
+    F --&gt; G{"有合法 IP 字面量？"}
+    G -- "否" --&gt; D
+    G -- "是" --&gt; H["取第一个非可信地址"]
+    H --&gt; I["返回真实客户端 IP"]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_gateway_html.py</code> ·
+     图源：<code>interview/gateway-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#ffedd5',
+        primaryBorderColor: '#c2410c',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

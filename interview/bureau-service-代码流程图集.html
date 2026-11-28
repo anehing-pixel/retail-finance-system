@@ -1,0 +1,1013 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_bureau_html.py；请修改 interview/bureau-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bureau-service 代码流程图集 · 征信防腐层</title>
+<style>
+:root {
+  --bg: #f4f8f8;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #d9e4e8;
+  --brand: #0f766e;
+  --brand-2: #1d4ed8;
+  --soft: #ecfdf5;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #134e4a 0%, #0f172a 58%, #111827 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #99f6e4; max-width: 980px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #ccfbf1;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #a7f3d0;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #0f172a; color: #ccfbf1; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>bureau-service 代码流程图集</h1>
+    <p>征信查询、报送、异议与事件驱动的代码走读图集，
+       源文件：<code>interview/bureau-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8095</span>
+      <span class="chip">core / integration schema</span>
+      <span class="chip">CIC / JICC ACL</span>
+      <span class="chip">同意 fail-closed</span>
+      <span class="chip">11 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 领域模型与数据表</span>
+<a href="#diagram-2">3.3 数据表关系（ER）</a>
+</div>
+<div class="nav-group">
+<span>4. 主流程一：征信查询</span>
+<a href="#diagram-3">4.2 时序图</a>
+<a href="#diagram-4">4.3 查询判定流程</a>
+</div>
+<div class="nav-group">
+<span>5. 主流程二：征信报送</span>
+<a href="#diagram-5">5.2 发送时序</a>
+<a href="#diagram-6">5.6 报送执行决策图</a>
+<a href="#diagram-7">5.7 人工报送通道</a>
+</div>
+<div class="nav-group">
+<span>6. 主流程三：事件驱动与报送日批</span>
+<a href="#diagram-8">6.1 `DPD_CHANGED` 事件链</a>
+<a href="#diagram-9">6.2 `LOAN_SETTLED` 结清报送</a>
+<a href="#diagram-10">6.3 报送日批</a>
+</div>
+<div class="nav-group">
+<span>7. 主流程四：征信异议</span>
+<a href="#diagram-11">7.2 异议流程</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>外部征信机构唯一出口，不碰贷款账务</span></div>
+      <div class="card"><b>查询</b><span>同意实时校验 + 失败 3 次转人工</span></div>
+      <div class="card"><b>报送</b><span>uk_report_loan_trigger 幂等 + T+1 日批</span></div>
+      <div class="card"><b>异议</b><span>30 日 SLA，超期 RF_BUREAU_002</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        C1["CreditInquiryController"]
+        C2["BureauReportController"]
+        C3["BureauDisputeController"]
+        H["HealthController"]
+    end
+
+    subgraph APP["application 层"]
+        A1["CreditInquiryAppService"]
+        A2["BureauReportAppService"]
+        A3["BureauReportExecutionService"]
+        A4["ManualReportAppService"]
+        A5["BureauDisputeAppService"]
+        A6["DpdChangedReportConsumer"]
+        A7["LoanSettledReportConsumer"]
+        A8["BureauReportBatchJob"]
+        A9["ConsentGateGuard"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["CreditBureau"]
+        D2["CreditBureauReportingPolicy"]
+        D3["InquiryStatus / ReportStatus / DisputeStatus"]
+    end
+
+    subgraph ACL["ACL 防腐层"]
+        L1["BureauAdapter"]
+        L2["CicStubAdapter"]
+        L3["JiccStubAdapter"]
+        L4["HttpCicAdapter"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["CreditInquiryRepository"]
+        R2["BureauReportRepository"]
+        R3["BureauDisputeRepository"]
+        R4["BureauMessageLogRepository"]
+        R5["BureauTriggerPort"]
+        R6["SettlementConsentAnchorPort"]
+    end
+
+    DB[("core / integration schema")]
+    OUT[("core.outbox_events")]
+    CS[["customer-service&lt;br/&gt;同意前置校验"]]
+    MQ[["MQ BUREAU 密文信封"]]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    APP --&gt; ACL
+    A9 --&gt; CS
+    A3 --&gt; R5
+    A3 --&gt; R6
+    A2 --&gt; R2
+    A1 --&gt; R1
+    A5 --&gt; R3
+    A6 --&gt; A3
+    A7 --&gt; A3
+    A8 --&gt; A3
+    A2 --&gt; R4
+    A5 --&gt; R4
+    R1 --&gt; DB
+    R2 --&gt; DB
+    R3 --&gt; DB
+    R4 --&gt; DB
+    R5 --&gt; DB
+    R6 --&gt; DB
+    A1 --&gt; OUT
+    A2 --&gt; OUT
+    A6 --&gt; MQ
+    A7 --&gt; MQ
+    MQ --&gt; A3</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        C1["CreditInquiryController"]
+        C2["BureauReportController"]
+        C3["BureauDisputeController"]
+        H["HealthController"]
+    end
+
+    subgraph APP["application 层"]
+        A1["CreditInquiryAppService"]
+        A2["BureauReportAppService"]
+        A3["BureauReportExecutionService"]
+        A4["ManualReportAppService"]
+        A5["BureauDisputeAppService"]
+        A6["DpdChangedReportConsumer"]
+        A7["LoanSettledReportConsumer"]
+        A8["BureauReportBatchJob"]
+        A9["ConsentGateGuard"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["CreditBureau"]
+        D2["CreditBureauReportingPolicy"]
+        D3["InquiryStatus / ReportStatus / DisputeStatus"]
+    end
+
+    subgraph ACL["ACL 防腐层"]
+        L1["BureauAdapter"]
+        L2["CicStubAdapter"]
+        L3["JiccStubAdapter"]
+        L4["HttpCicAdapter"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["CreditInquiryRepository"]
+        R2["BureauReportRepository"]
+        R3["BureauDisputeRepository"]
+        R4["BureauMessageLogRepository"]
+        R5["BureauTriggerPort"]
+        R6["SettlementConsentAnchorPort"]
+    end
+
+    DB[("core / integration schema")]
+    OUT[("core.outbox_events")]
+    CS[["customer-service&lt;br/&gt;同意前置校验"]]
+    MQ[["MQ BUREAU 密文信封"]]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    APP --&gt; ACL
+    A9 --&gt; CS
+    A3 --&gt; R5
+    A3 --&gt; R6
+    A2 --&gt; R2
+    A1 --&gt; R1
+    A5 --&gt; R3
+    A6 --&gt; A3
+    A7 --&gt; A3
+    A8 --&gt; A3
+    A2 --&gt; R4
+    A5 --&gt; R4
+    R1 --&gt; DB
+    R2 --&gt; DB
+    R3 --&gt; DB
+    R4 --&gt; DB
+    R5 --&gt; DB
+    R6 --&gt; DB
+    A1 --&gt; OUT
+    A2 --&gt; OUT
+    A6 --&gt; MQ
+    A7 --&gt; MQ
+    MQ --&gt; A3</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 领域模型与数据表</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.3 数据表关系（ER）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与数据表</code> · 图：<code>3.3 数据表关系（ER）</code></p><pre class="mermaid">erDiagram
+    CREDIT_INQUIRIES {
+        bigint inquiry_id PK
+        bigint case_id
+        bigint consent_id
+        varchar bureau
+        varchar purpose
+        varchar status
+        varchar result_snapshot_ref
+        bigint cost_amount
+    }
+
+    CREDIT_BUREAU_REPORTS {
+        bigint report_id PK
+        bigint loan_id
+        bigint consent_id
+        varchar bureau
+        varchar trigger
+        varchar status
+        varchar source
+        varchar response_ref
+        timestamptz sent_at
+    }
+
+    BUREAU_DISPUTES {
+        bigint dispute_id PK
+        varchar customer_ref
+        varchar bureau
+        varchar type
+        timestamptz due_at
+        varchar status
+        varchar resolution_ref
+    }
+
+    BUREAU_MESSAGE_LOGS {
+        bigint message_id PK
+        varchar direction
+        varchar bureau
+        varchar biz_ref
+        text message_text
+        varchar trace_id
+    }
+
+    BUREAU_REPORT_TRIGGERS {
+        bigint trigger_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar trigger_type
+        bigint consent_id
+        date target_biz_date
+        varchar status
+    }
+
+    BATCH_RUNS {
+        varchar job_name
+        date biz_date
+        varchar status
+    }
+
+    OUTBOX_EVENTS {
+        bigint event_id PK
+        varchar event_type
+        varchar aggregate_key
+        varchar status
+    }
+
+    CREDIT_INQUIRIES ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = inquiryId"
+    CREDIT_BUREAU_REPORTS ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = reportId"
+    BUREAU_DISPUTES ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = disputeId"
+    BUREAU_REPORT_TRIGGERS ||--o| CREDIT_BUREAU_REPORTS : "loanId + trigger 逻辑关联"
+    CREDIT_INQUIRIES ||--o| OUTBOX_EVENTS : "aggregate_key = inquiryId"
+    CREDIT_BUREAU_REPORTS ||--o| OUTBOX_EVENTS : "aggregate_key = reportId"</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    CREDIT_INQUIRIES {
+        bigint inquiry_id PK
+        bigint case_id
+        bigint consent_id
+        varchar bureau
+        varchar purpose
+        varchar status
+        varchar result_snapshot_ref
+        bigint cost_amount
+    }
+
+    CREDIT_BUREAU_REPORTS {
+        bigint report_id PK
+        bigint loan_id
+        bigint consent_id
+        varchar bureau
+        varchar trigger
+        varchar status
+        varchar source
+        varchar response_ref
+        timestamptz sent_at
+    }
+
+    BUREAU_DISPUTES {
+        bigint dispute_id PK
+        varchar customer_ref
+        varchar bureau
+        varchar type
+        timestamptz due_at
+        varchar status
+        varchar resolution_ref
+    }
+
+    BUREAU_MESSAGE_LOGS {
+        bigint message_id PK
+        varchar direction
+        varchar bureau
+        varchar biz_ref
+        text message_text
+        varchar trace_id
+    }
+
+    BUREAU_REPORT_TRIGGERS {
+        bigint trigger_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar trigger_type
+        bigint consent_id
+        date target_biz_date
+        varchar status
+    }
+
+    BATCH_RUNS {
+        varchar job_name
+        date biz_date
+        varchar status
+    }
+
+    OUTBOX_EVENTS {
+        bigint event_id PK
+        varchar event_type
+        varchar aggregate_key
+        varchar status
+    }
+
+    CREDIT_INQUIRIES ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = inquiryId"
+    CREDIT_BUREAU_REPORTS ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = reportId"
+    BUREAU_DISPUTES ||--o{ BUREAU_MESSAGE_LOGS : "biz_ref = disputeId"
+    BUREAU_REPORT_TRIGGERS ||--o| CREDIT_BUREAU_REPORTS : "loanId + trigger 逻辑关联"
+    CREDIT_INQUIRIES ||--o| OUTBOX_EVENTS : "aggregate_key = inquiryId"
+    CREDIT_BUREAU_REPORTS ||--o| OUTBOX_EVENTS : "aggregate_key = reportId"</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 主流程一：征信查询</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：征信查询</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 审查/前端
+    participant C as CreditInquiryController
+    participant S as CreditInquiryAppService
+    participant G as ConsentGateGuard
+    participant F as ConsentGateFacade
+    participant CS as customer-service
+    participant DB as core.credit_inquiries
+    participant L as bureau_message_logs
+    participant A as BureauAdapter
+    participant O as core.outbox_events
+
+    U-&gt;&gt;C: POST /api/credit-inquiries
+    C-&gt;&gt;S: execute(caseId, consentId, bureau, purpose)
+    S-&gt;&gt;S: 校验 policy / 机构组合 / purpose
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G-&gt;&gt;F: isConsentValid(consentId)
+    F-&gt;&gt;CS: GET /api/consents/{id}/disbursement-gate
+    CS--&gt;&gt;F: {allowed:true}
+    F--&gt;&gt;G: true
+    S-&gt;&gt;S: countFailed(caseId, bureau) &gt;= 3 ?
+    S-&gt;&gt;DB: INSERT REQUESTED
+    S-&gt;&gt;L: OUTBOUND 查询指令
+    S-&gt;&gt;A: inquire(command)
+    A--&gt;&gt;S: InquiryOutcome
+    S-&gt;&gt;L: INBOUND 机构应答
+    S-&gt;&gt;DB: UPDATE COMPLETED / FAILED
+    alt COMPLETED
+        S-&gt;&gt;O: CREDIT_INQUIRY_COMPLETED
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant U as 审查/前端
+    participant C as CreditInquiryController
+    participant S as CreditInquiryAppService
+    participant G as ConsentGateGuard
+    participant F as ConsentGateFacade
+    participant CS as customer-service
+    participant DB as core.credit_inquiries
+    participant L as bureau_message_logs
+    participant A as BureauAdapter
+    participant O as core.outbox_events
+
+    U-&gt;&gt;C: POST /api/credit-inquiries
+    C-&gt;&gt;S: execute(caseId, consentId, bureau, purpose)
+    S-&gt;&gt;S: 校验 policy / 机构组合 / purpose
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G-&gt;&gt;F: isConsentValid(consentId)
+    F-&gt;&gt;CS: GET /api/consents/{id}/disbursement-gate
+    CS--&gt;&gt;F: {allowed:true}
+    F--&gt;&gt;G: true
+    S-&gt;&gt;S: countFailed(caseId, bureau) &gt;= 3 ?
+    S-&gt;&gt;DB: INSERT REQUESTED
+    S-&gt;&gt;L: OUTBOUND 查询指令
+    S-&gt;&gt;A: inquire(command)
+    A--&gt;&gt;S: InquiryOutcome
+    S-&gt;&gt;L: INBOUND 机构应答
+    S-&gt;&gt;DB: UPDATE COMPLETED / FAILED
+    alt COMPLETED
+        S-&gt;&gt;O: CREDIT_INQUIRY_COMPLETED
+    end</code></pre></details></article>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>4.3 查询判定流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：征信查询</code> · 图：<code>4.3 查询判定流程</code></p><pre class="mermaid">flowchart TD
+    A["POST /api/credit-inquiries"] --&gt; B{"policy.enabled？"}
+    B -- 否 --&gt; B1["RF_VALID_002&lt;br/&gt;BUREAU_POLICY_DISABLED&lt;br/&gt;转人工查询"]
+    B -- 是 --&gt; C{"bureau 在组合内？"}
+    C -- 否 --&gt; C1["RF_VALID_001&lt;br/&gt;BUREAU_NOT_IN_COMBINATION"]
+    C -- 是 --&gt; D{"purpose 非空？"}
+    D -- 否 --&gt; D1["RF_VALID_001&lt;br/&gt;field=purpose"]
+    D -- 是 --&gt; E["ConsentGateGuard.requireConsentValid"]
+    E -- 不通过 --&gt; E1["RF_UW_003&lt;br/&gt;不写查询、不发事件"]
+    E -- 通过 --&gt; F{"同案件同机构失败 &gt;= 3 次？"}
+    F -- 是 --&gt; F1["RF_UW_001&lt;br/&gt;RETRY_LIMIT_REACHED&lt;br/&gt;转人工"]
+    F -- 否 --&gt; G["INSERT REQUESTED&lt;br/&gt;+ OUTBOUND 留痕"]
+    G --&gt; H["adapter.inquire"]
+    H -- 异常 --&gt; H1["markFinished(FAILED)&lt;br/&gt;+ INBOUND 错误留痕"]
+    H1 --&gt; H2["抛 RF_UW_001"]
+    H -- 非 COMPLETED --&gt; I["markFinished(FAILED)"]
+    I --&gt; I1["抛 RF_UW_001"]
+    H -- COMPLETED --&gt; J["markFinished(COMPLETED)&lt;br/&gt;+ INBOUND 应答留痕"]
+    J --&gt; K["发 CREDIT_INQUIRY_COMPLETED"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /api/credit-inquiries"] --&gt; B{"policy.enabled？"}
+    B -- 否 --&gt; B1["RF_VALID_002&lt;br/&gt;BUREAU_POLICY_DISABLED&lt;br/&gt;转人工查询"]
+    B -- 是 --&gt; C{"bureau 在组合内？"}
+    C -- 否 --&gt; C1["RF_VALID_001&lt;br/&gt;BUREAU_NOT_IN_COMBINATION"]
+    C -- 是 --&gt; D{"purpose 非空？"}
+    D -- 否 --&gt; D1["RF_VALID_001&lt;br/&gt;field=purpose"]
+    D -- 是 --&gt; E["ConsentGateGuard.requireConsentValid"]
+    E -- 不通过 --&gt; E1["RF_UW_003&lt;br/&gt;不写查询、不发事件"]
+    E -- 通过 --&gt; F{"同案件同机构失败 &gt;= 3 次？"}
+    F -- 是 --&gt; F1["RF_UW_001&lt;br/&gt;RETRY_LIMIT_REACHED&lt;br/&gt;转人工"]
+    F -- 否 --&gt; G["INSERT REQUESTED&lt;br/&gt;+ OUTBOUND 留痕"]
+    G --&gt; H["adapter.inquire"]
+    H -- 异常 --&gt; H1["markFinished(FAILED)&lt;br/&gt;+ INBOUND 错误留痕"]
+    H1 --&gt; H2["抛 RF_UW_001"]
+    H -- 非 COMPLETED --&gt; I["markFinished(FAILED)"]
+    I --&gt; I1["抛 RF_UW_001"]
+    H -- COMPLETED --&gt; J["markFinished(COMPLETED)&lt;br/&gt;+ INBOUND 应答留痕"]
+    J --&gt; K["发 CREDIT_INQUIRY_COMPLETED"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 主流程二：征信报送</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>5.2 发送时序</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：征信报送</code> · 图：<code>5.2 发送时序</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 员工/调用方
+    participant C as BureauReportController
+    participant S as BureauReportAppService
+    participant G as ConsentGateGuard
+    participant DB as integration.credit_bureau_reports
+    participant L as bureau_message_logs
+    participant A as BureauAdapter
+    participant O as core.outbox_events
+
+    U-&gt;&gt;C: POST /api/bureau-reports
+    C-&gt;&gt;S: sendReport(loanId, consentId, trigger)
+    S-&gt;&gt;S: trigger 非空
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G--&gt;&gt;S: ok
+    S-&gt;&gt;S: bureau = primaryReportBureau
+    S-&gt;&gt;DB: INSERT PENDING (source=AUTO)
+    alt 唯一键冲突
+        DB--&gt;&gt;S: 0 行
+        S--&gt;&gt;C: RF_CONFLICT_001
+    else 插入成功
+        alt policy.enabled = false
+            S-&gt;&gt;DB: mark PENDING (MANUAL_PENDING)
+            S-&gt;&gt;L: OUTBOUND manual
+            S--&gt;&gt;C: PENDING，无事件
+        else policy.enabled = true
+            S-&gt;&gt;L: OUTBOUND 报送指令
+            S-&gt;&gt;A: submitReport(command)
+            A--&gt;&gt;S: ReportOutcome
+            S-&gt;&gt;L: INBOUND 机构应答
+            S-&gt;&gt;DB: mark SENT / REJECTED
+            alt SENT
+                S-&gt;&gt;O: CREDIT_BUREAU_REPORT_SENT
+            else 非 SENT
+                S--&gt;&gt;C: RF_BUREAU_001
+            end
+        end
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant U as 员工/调用方
+    participant C as BureauReportController
+    participant S as BureauReportAppService
+    participant G as ConsentGateGuard
+    participant DB as integration.credit_bureau_reports
+    participant L as bureau_message_logs
+    participant A as BureauAdapter
+    participant O as core.outbox_events
+
+    U-&gt;&gt;C: POST /api/bureau-reports
+    C-&gt;&gt;S: sendReport(loanId, consentId, trigger)
+    S-&gt;&gt;S: trigger 非空
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G--&gt;&gt;S: ok
+    S-&gt;&gt;S: bureau = primaryReportBureau
+    S-&gt;&gt;DB: INSERT PENDING (source=AUTO)
+    alt 唯一键冲突
+        DB--&gt;&gt;S: 0 行
+        S--&gt;&gt;C: RF_CONFLICT_001
+    else 插入成功
+        alt policy.enabled = false
+            S-&gt;&gt;DB: mark PENDING (MANUAL_PENDING)
+            S-&gt;&gt;L: OUTBOUND manual
+            S--&gt;&gt;C: PENDING，无事件
+        else policy.enabled = true
+            S-&gt;&gt;L: OUTBOUND 报送指令
+            S-&gt;&gt;A: submitReport(command)
+            A--&gt;&gt;S: ReportOutcome
+            S-&gt;&gt;L: INBOUND 机构应答
+            S-&gt;&gt;DB: mark SENT / REJECTED
+            alt SENT
+                S-&gt;&gt;O: CREDIT_BUREAU_REPORT_SENT
+            else 非 SENT
+                S--&gt;&gt;C: RF_BUREAU_001
+            end
+        end
+    end</code></pre></details></article>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>5.6 报送执行决策图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：征信报送</code> · 图：<code>5.6 报送执行决策图</code></p><pre class="mermaid">flowchart TD
+    A["executeTrigger(trigger)"] --&gt; B{"已有 (loan, trigger) 留痕？"}
+    B -- "无" --&gt; C["sendReport"]
+    B -- "SENT" --&gt; D["trigger → CONSUMED&lt;br/&gt;SKIP_ALREADY_SENT"]
+    B -- "REJECTED" --&gt; E["resend&lt;br/&gt;trigger → CONSUMED"]
+    B -- "PENDING" --&gt; F["保持 PENDING&lt;br/&gt;等人工结果"]
+
+    C --&gt; G{"同意前置校验"}
+    G -- "RF_UW_003" --&gt; H["trigger → BLOCKED&lt;br/&gt;正常返回"]
+    G -- "通过" --&gt; I{"policy 开关"}
+    I -- "关" --&gt; J["report PENDING&lt;br/&gt;MANUAL_PENDING"]
+    I -- "开" --&gt; K["adapter.submitReport"]
+    K -- "SENT" --&gt; L["report SENT&lt;br/&gt;trigger → CONSUMED&lt;br/&gt;发事件"]
+    K -- "REJECTED" --&gt; M["report REJECTED&lt;br/&gt;异常上抛/重试"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["executeTrigger(trigger)"] --&gt; B{"已有 (loan, trigger) 留痕？"}
+    B -- "无" --&gt; C["sendReport"]
+    B -- "SENT" --&gt; D["trigger → CONSUMED&lt;br/&gt;SKIP_ALREADY_SENT"]
+    B -- "REJECTED" --&gt; E["resend&lt;br/&gt;trigger → CONSUMED"]
+    B -- "PENDING" --&gt; F["保持 PENDING&lt;br/&gt;等人工结果"]
+
+    C --&gt; G{"同意前置校验"}
+    G -- "RF_UW_003" --&gt; H["trigger → BLOCKED&lt;br/&gt;正常返回"]
+    G -- "通过" --&gt; I{"policy 开关"}
+    I -- "关" --&gt; J["report PENDING&lt;br/&gt;MANUAL_PENDING"]
+    I -- "开" --&gt; K["adapter.submitReport"]
+    K -- "SENT" --&gt; L["report SENT&lt;br/&gt;trigger → CONSUMED&lt;br/&gt;发事件"]
+    K -- "REJECTED" --&gt; M["report REJECTED&lt;br/&gt;异常上抛/重试"]</code></pre></details></article>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>5.7 人工报送通道</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：征信报送</code> · 图：<code>5.7 人工报送通道</code></p><pre class="mermaid">flowchart LR
+    A["POST /api/bureau-reports/manual-requests"] --&gt; B["INSERT PENDING&lt;br/&gt;trigger=MANUAL, source=MANUAL"]
+    B --&gt; C["OUTBOUND MANUAL_REQUEST 留痕"]
+    C --&gt; D["POST /{id}/manual-result"]
+    D --&gt; E{"outcome=ACCEPTED？"}
+    E -- "是" --&gt; F["mark SENT&lt;br/&gt;INBOUND 报文留痕"]
+    E -- "否" --&gt; G["mark REJECTED&lt;br/&gt;INBOUND 报文留痕"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart LR
+    A["POST /api/bureau-reports/manual-requests"] --&gt; B["INSERT PENDING&lt;br/&gt;trigger=MANUAL, source=MANUAL"]
+    B --&gt; C["OUTBOUND MANUAL_REQUEST 留痕"]
+    C --&gt; D["POST /{id}/manual-result"]
+    D --&gt; E{"outcome=ACCEPTED？"}
+    E -- "是" --&gt; F["mark SENT&lt;br/&gt;INBOUND 报文留痕"]
+    E -- "否" --&gt; G["mark REJECTED&lt;br/&gt;INBOUND 报文留痕"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 主流程三：事件驱动与报送日批</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-8"><div class="card-head"><h3>6.1 `DPD_CHANGED` 事件链</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：事件驱动与报送日批</code> · 图：<code>6.1 `DPD_CHANGED` 事件链</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant SV as servicing-service
+    participant O as core.outbox_events
+    participant D as 事件调度器
+    participant B as DpdChangedReportConsumer
+    participant T as core.bureau_report_triggers
+    participant E as BureauReportExecutionService
+    participant MQ as MQ BUREAU
+    participant EC as BureauReportEnvelopeConsumer
+
+    SV-&gt;&gt;O: DPD_CHANGED (loanId)
+    O--&gt;&gt;D: 轮询取事件
+    D-&gt;&gt;B: consume(event)
+    B-&gt;&gt;B: 必须有 loanId
+    B-&gt;&gt;T: findByLoanAndType(loanId, DELINQUENCY)
+    alt 无触发 / 非 REGISTERED
+        B--&gt;&gt;D: no-op
+    else MQ 开启
+        B-&gt;&gt;MQ: 封密文信封（trigger 快照）
+        MQ-&gt;&gt;EC: 解密后消费
+        EC-&gt;&gt;E: executeTrigger(trigger)
+    else MQ 关闭
+        B-&gt;&gt;E: executeTrigger(trigger)
+    end
+    E-&gt;&gt;T: CONSUMED / BLOCKED</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant SV as servicing-service
+    participant O as core.outbox_events
+    participant D as 事件调度器
+    participant B as DpdChangedReportConsumer
+    participant T as core.bureau_report_triggers
+    participant E as BureauReportExecutionService
+    participant MQ as MQ BUREAU
+    participant EC as BureauReportEnvelopeConsumer
+
+    SV-&gt;&gt;O: DPD_CHANGED (loanId)
+    O--&gt;&gt;D: 轮询取事件
+    D-&gt;&gt;B: consume(event)
+    B-&gt;&gt;B: 必须有 loanId
+    B-&gt;&gt;T: findByLoanAndType(loanId, DELINQUENCY)
+    alt 无触发 / 非 REGISTERED
+        B--&gt;&gt;D: no-op
+    else MQ 开启
+        B-&gt;&gt;MQ: 封密文信封（trigger 快照）
+        MQ-&gt;&gt;EC: 解密后消费
+        EC-&gt;&gt;E: executeTrigger(trigger)
+    else MQ 关闭
+        B-&gt;&gt;E: executeTrigger(trigger)
+    end
+    E-&gt;&gt;T: CONSUMED / BLOCKED</code></pre></details></article>
+<article class="diagram-card" id="diagram-9"><div class="card-head"><h3>6.2 `LOAN_SETTLED` 结清报送</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：事件驱动与报送日批</code> · 图：<code>6.2 `LOAN_SETTLED` 结清报送</code></p><pre class="mermaid">flowchart TD
+    A["LOAN_SETTLED"] --&gt; B["LoanSettledReportConsumer"]
+    B --&gt; C{"MQ 开启？"}
+    C -- "是" --&gt; D["封 SETTLEMENT 密文信封"]
+    D --&gt; E["BureauReportEnvelopeConsumer"]
+    E --&gt; F["executeSettlement(loanId)"]
+    C -- "否" --&gt; F
+    F --&gt; G{"已有 (loan, SETTLED) 留痕？"}
+    G -- "SENT" --&gt; H["SKIP_ALREADY_SENT"]
+    G -- "REJECTED" --&gt; I["resend"]
+    G -- "无" --&gt; J["解析 consent 锚点"]
+    J --&gt; K{"锚点存在？"}
+    K -- "否" --&gt; L["RF_VALID_001&lt;br/&gt;SETTLEMENT_CONSENT_ANCHOR_NOT_FOUND"]
+    K -- "是" --&gt; M["sendReport(trigger=SETTLED)"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["LOAN_SETTLED"] --&gt; B["LoanSettledReportConsumer"]
+    B --&gt; C{"MQ 开启？"}
+    C -- "是" --&gt; D["封 SETTLEMENT 密文信封"]
+    D --&gt; E["BureauReportEnvelopeConsumer"]
+    E --&gt; F["executeSettlement(loanId)"]
+    C -- "否" --&gt; F
+    F --&gt; G{"已有 (loan, SETTLED) 留痕？"}
+    G -- "SENT" --&gt; H["SKIP_ALREADY_SENT"]
+    G -- "REJECTED" --&gt; I["resend"]
+    G -- "无" --&gt; J["解析 consent 锚点"]
+    J --&gt; K{"锚点存在？"}
+    K -- "否" --&gt; L["RF_VALID_001&lt;br/&gt;SETTLEMENT_CONSENT_ANCHOR_NOT_FOUND"]
+    K -- "是" --&gt; M["sendReport(trigger=SETTLED)"]</code></pre></details></article>
+<article class="diagram-card" id="diagram-10"><div class="card-head"><h3>6.3 报送日批</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：事件驱动与报送日批</code> · 图：<code>6.3 报送日批</code></p><pre class="mermaid">flowchart TD
+    A["cron 08:00 JST"] --&gt; B{"retail.bureau.report-schedule-enabled？"}
+    B -- "false" --&gt; C["完全不跑&lt;br/&gt;不写 batch_runs"]
+    B -- "true" --&gt; D["batch_runs.start(BUREAU_REPORT, today)"]
+    D --&gt; E{"businessCalendar.isBusinessDay(today)？"}
+    E -- "否" --&gt; F["batch_runs.finish(SKIPPED)"]
+    E -- "是" --&gt; G["triggerPort.findDue(today)"]
+    G --&gt; H["逐条 executeTrigger"]
+    H --&gt; I["batch_runs.finish(SUCCESS)"]
+    I --&gt; J["统计 sent / skipped / blocked"]
+    H -- "运行时异常" --&gt; K["batch_runs.finish(FAILED)"]
+    K --&gt; L["异常上抛"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["cron 08:00 JST"] --&gt; B{"retail.bureau.report-schedule-enabled？"}
+    B -- "false" --&gt; C["完全不跑&lt;br/&gt;不写 batch_runs"]
+    B -- "true" --&gt; D["batch_runs.start(BUREAU_REPORT, today)"]
+    D --&gt; E{"businessCalendar.isBusinessDay(today)？"}
+    E -- "否" --&gt; F["batch_runs.finish(SKIPPED)"]
+    E -- "是" --&gt; G["triggerPort.findDue(today)"]
+    G --&gt; H["逐条 executeTrigger"]
+    H --&gt; I["batch_runs.finish(SUCCESS)"]
+    I --&gt; J["统计 sent / skipped / blocked"]
+    H -- "运行时异常" --&gt; K["batch_runs.finish(FAILED)"]
+    K --&gt; L["异常上抛"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 主流程四：征信异议</h2><span class="source">来源：interview/bureau-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-11"><div class="card-head"><h3>7.2 异议流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：征信异议</code> · 图：<code>7.2 异议流程</code></p><pre class="mermaid">flowchart TD
+    A["POST /api/bureau-disputes"] --&gt; B["校验 customerRef / type"]
+    B --&gt; C["bureau 缺省 CIC"]
+    C --&gt; D["INSERT OPEN&lt;br/&gt;due_at = now + SLA"]
+    D --&gt; E["OUTBOUND DISPUTE_OPEN 留痕"]
+
+    E --&gt; F["POST /{id}/handle"]
+    F --&gt; G{"status=RESOLVED？"}
+    G -- "是" --&gt; G1["RF_VALID_002&lt;br/&gt;ALREADY_RESOLVED"]
+    G -- "否" --&gt; H{"now &gt; due_at？"}
+    H -- "是" --&gt; H1["RF_BUREAU_002&lt;br/&gt;合规升级；状态仍 OPEN"]
+    H -- "否" --&gt; I["adapter.fileDispute"]
+    I --&gt; J["INBOUND 机构应答留痕"]
+    J --&gt; K["mark RESOLVED&lt;br/&gt;resolution_ref"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /api/bureau-disputes"] --&gt; B["校验 customerRef / type"]
+    B --&gt; C["bureau 缺省 CIC"]
+    C --&gt; D["INSERT OPEN&lt;br/&gt;due_at = now + SLA"]
+    D --&gt; E["OUTBOUND DISPUTE_OPEN 留痕"]
+
+    E --&gt; F["POST /{id}/handle"]
+    F --&gt; G{"status=RESOLVED？"}
+    G -- "是" --&gt; G1["RF_VALID_002&lt;br/&gt;ALREADY_RESOLVED"]
+    G -- "否" --&gt; H{"now &gt; due_at？"}
+    H -- "是" --&gt; H1["RF_BUREAU_002&lt;br/&gt;合规升级；状态仍 OPEN"]
+    H -- "否" --&gt; I["adapter.fileDispute"]
+    I --&gt; J["INBOUND 机构应答留痕"]
+    J --&gt; K["mark RESOLVED&lt;br/&gt;resolution_ref"]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_bureau_html.py</code> ·
+     图源：<code>interview/bureau-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#ccfbf1',
+        primaryBorderColor: '#0f766e',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,803 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_customer_html.py；请修改 interview/customer-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>customer-service 代码流程图集 · 个人信息金库</title>
+<style>
+:root {
+  --bg: #f5f6fb;
+  --panel: #ffffff;
+  --ink: #111827;
+  --muted: #64748b;
+  --line: #dde2ef;
+  --brand: #4338ca;
+  --brand-2: #0f766e;
+  --soft: #eef2ff;
+  --shadow: 0 10px 30px rgba(30, 41, 59, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #312e81 0%, #111827 58%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #a5b4fc; max-width: 960px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #e0e7ff;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #c7d2fe;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #111827; color: #e0e7ff; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>customer-service 代码流程图集</h1>
+    <p>个人信息金库、同意管理、身份核验与客户自助的代码走读图集，
+       源文件：<code>interview/customer-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8092</span>
+      <span class="chip">pii / audit schema</span>
+      <span class="chip">AES-256-GCM + HMAC</span>
+      <span class="chip">双主体隔离</span>
+      <span class="chip">9 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 领域模型与数据表</span>
+<a href="#diagram-2">3.1 数据表关系（ER）</a>
+</div>
+<div class="nav-group">
+<span>4. 主流程一：客户注册与 PII 加密落库</span>
+<a href="#diagram-3">4.2 时序图</a>
+</div>
+<div class="nav-group">
+<span>5. 主流程二：PII 视图（脱敏 vs 全量）</span>
+<a href="#diagram-4">5.2 视图选择流程</a>
+</div>
+<div class="nav-group">
+<span>6. 主流程三：同意管理</span>
+<a href="#diagram-5">6.2 同意状态机</a>
+<a href="#diagram-6">6.3 撤回时序</a>
+<a href="#diagram-7">6.4 代付门禁与有效性</a>
+</div>
+<div class="nav-group">
+<span>7. 主流程四：身份核验</span>
+<a href="#diagram-8">7.2 状态机</a>
+<a href="#diagram-9">7.3 材料提交：同步 vs MQ</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心红线</b><span>默认脱敏，全量视图必须授权 + 用途 + 留痕</span></div>
+      <div class="card"><b>PII 落库</b><span>字段级密文 + HMAC 检索，不存明文</span></div>
+      <div class="card"><b>同意门禁</b><span>查不到 / 已撤回 / 已过期一律 fail-closed</span></div>
+      <div class="card"><b>双主体</b><span>员工 JWT 与客户 JWT 分流验签</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        C1["CustomerPiiController"]
+        C2["ConsentController"]
+        C3["IdentityVerificationController"]
+        C4["CustomerSelfController"]
+        C5["HealthController"]
+    end
+
+    subgraph APP["app 层"]
+        A1["CustomerPiiService"]
+        A2["ConsentService"]
+        A3["IdentityVerificationService"]
+        A4["IdentityDocumentHandler"]
+        A5["RfEventPayloads"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["CustomerPiiData"]
+        D2["PiiViewPolicy"]
+        D3["Consent / ConsentGatePolicy"]
+        D4["IdentityVerification / Status"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["PiiRepository"]
+        R2["ConsentRepository"]
+        R3["IdentityVerificationRepository"]
+        R4["PiiAccessLogRepository"]
+        R5["MyBatis Mappers"]
+    end
+
+    subgraph INFRA["infra / integration / messaging"]
+        I1["PiiCryptoService&lt;br/&gt;AES-256-GCM + HMAC"]
+        I2["KycProvider&lt;br/&gt;可选 eKYC"]
+        I3["IdentityDocumentEnvelopeConsumer&lt;br/&gt;MQ 密文信封"]
+    end
+
+    DB[("pii / audit schema")]
+    OUT[("core.outbox_events")]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    REPO --&gt; R5
+    R5 --&gt; DB
+    R1 --&gt; I1
+    A2 --&gt; A5
+    A3 --&gt; A4
+    A3 --&gt; I2
+    A3 --&gt; A5
+    A4 --&gt; R3
+    A2 --&gt; OUT
+    A3 --&gt; OUT
+    I3 --&gt; A4</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        C1["CustomerPiiController"]
+        C2["ConsentController"]
+        C3["IdentityVerificationController"]
+        C4["CustomerSelfController"]
+        C5["HealthController"]
+    end
+
+    subgraph APP["app 层"]
+        A1["CustomerPiiService"]
+        A2["ConsentService"]
+        A3["IdentityVerificationService"]
+        A4["IdentityDocumentHandler"]
+        A5["RfEventPayloads"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["CustomerPiiData"]
+        D2["PiiViewPolicy"]
+        D3["Consent / ConsentGatePolicy"]
+        D4["IdentityVerification / Status"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["PiiRepository"]
+        R2["ConsentRepository"]
+        R3["IdentityVerificationRepository"]
+        R4["PiiAccessLogRepository"]
+        R5["MyBatis Mappers"]
+    end
+
+    subgraph INFRA["infra / integration / messaging"]
+        I1["PiiCryptoService&lt;br/&gt;AES-256-GCM + HMAC"]
+        I2["KycProvider&lt;br/&gt;可选 eKYC"]
+        I3["IdentityDocumentEnvelopeConsumer&lt;br/&gt;MQ 密文信封"]
+    end
+
+    DB[("pii / audit schema")]
+    OUT[("core.outbox_events")]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    REPO --&gt; R5
+    R5 --&gt; DB
+    R1 --&gt; I1
+    A2 --&gt; A5
+    A3 --&gt; A4
+    A3 --&gt; I2
+    A3 --&gt; A5
+    A4 --&gt; R3
+    A2 --&gt; OUT
+    A3 --&gt; OUT
+    I3 --&gt; A4</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 领域模型与数据表</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.1 数据表关系（ER）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与数据表</code> · 图：<code>3.1 数据表关系（ER）</code></p><pre class="mermaid">erDiagram
+    CUSTOMERS ||--|| CUSTOMER_PII : "1 客户 1 PII 行"
+    CUSTOMERS ||--o{ CONSENTS : "1 客户 N 同意"
+    CONSENTS ||--o| CONSENT_WITHDRAWALS : "1 同意 0..1 撤回"
+    CUSTOMERS ||--o{ IDENTITY_VERIFICATIONS : "1 客户 N 核验"
+    IDENTITY_VERIFICATIONS ||--o{ IDENTITY_DOCUMENTS : "1 核验 N 材料"
+    CUSTOMERS ||--o{ PII_ACCESS_LOGS : "访问留痕"
+
+    CUSTOMERS {
+        bigint customer_id PK
+        varchar external_ref
+        varchar status
+        varchar created_via
+        int version
+    }
+
+    CUSTOMER_PII {
+        bigint customer_id PK
+        bytea encrypted_name
+        bytea encrypted_name_kana
+        bytea encrypted_address
+        bytea encrypted_birth_date
+        bytea encrypted_phone
+        bytea encrypted_employer
+        bytea encrypted_annual_income
+        char name_hash
+        char name_kana_hash
+        varchar key_version
+    }
+
+    CONSENTS {
+        bigint consent_id PK
+        bigint customer_id FK
+        varchar purpose
+        varchar consent_version
+        varchar status
+        timestamptz granted_at
+        timestamptz expires_at
+    }
+
+    CONSENT_WITHDRAWALS {
+        bigint withdrawal_id PK
+        bigint consent_id FK
+        timestamptz withdrawn_at
+        varchar reason
+    }
+
+    IDENTITY_VERIFICATIONS {
+        bigint verification_id PK
+        bigint customer_id FK
+        varchar status
+        varchar method
+        timestamptz verified_at
+        varchar reviewer_id
+        jsonb result_snapshot
+    }
+
+    IDENTITY_DOCUMENTS {
+        bigint document_id PK
+        bigint verification_id FK
+        varchar document_type
+        bigint attachment_id
+        date expiry_date
+        varchar masked_number
+    }
+
+    PII_ACCESS_LOGS {
+        bigint log_id PK
+        varchar actor
+        varchar actor_subject
+        bigint customer_id
+        varchar fields
+        varchar purpose
+        varchar trace_id
+    }</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    CUSTOMERS ||--|| CUSTOMER_PII : "1 客户 1 PII 行"
+    CUSTOMERS ||--o{ CONSENTS : "1 客户 N 同意"
+    CONSENTS ||--o| CONSENT_WITHDRAWALS : "1 同意 0..1 撤回"
+    CUSTOMERS ||--o{ IDENTITY_VERIFICATIONS : "1 客户 N 核验"
+    IDENTITY_VERIFICATIONS ||--o{ IDENTITY_DOCUMENTS : "1 核验 N 材料"
+    CUSTOMERS ||--o{ PII_ACCESS_LOGS : "访问留痕"
+
+    CUSTOMERS {
+        bigint customer_id PK
+        varchar external_ref
+        varchar status
+        varchar created_via
+        int version
+    }
+
+    CUSTOMER_PII {
+        bigint customer_id PK
+        bytea encrypted_name
+        bytea encrypted_name_kana
+        bytea encrypted_address
+        bytea encrypted_birth_date
+        bytea encrypted_phone
+        bytea encrypted_employer
+        bytea encrypted_annual_income
+        char name_hash
+        char name_kana_hash
+        varchar key_version
+    }
+
+    CONSENTS {
+        bigint consent_id PK
+        bigint customer_id FK
+        varchar purpose
+        varchar consent_version
+        varchar status
+        timestamptz granted_at
+        timestamptz expires_at
+    }
+
+    CONSENT_WITHDRAWALS {
+        bigint withdrawal_id PK
+        bigint consent_id FK
+        timestamptz withdrawn_at
+        varchar reason
+    }
+
+    IDENTITY_VERIFICATIONS {
+        bigint verification_id PK
+        bigint customer_id FK
+        varchar status
+        varchar method
+        timestamptz verified_at
+        varchar reviewer_id
+        jsonb result_snapshot
+    }
+
+    IDENTITY_DOCUMENTS {
+        bigint document_id PK
+        bigint verification_id FK
+        varchar document_type
+        bigint attachment_id
+        date expiry_date
+        varchar masked_number
+    }
+
+    PII_ACCESS_LOGS {
+        bigint log_id PK
+        varchar actor
+        varchar actor_subject
+        bigint customer_id
+        varchar fields
+        varchar purpose
+        varchar trace_id
+    }</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 主流程一：客户注册与 PII 加密落库</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：客户注册与 PII 加密落库</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 受理岗
+    participant CT as CustomerPiiController
+    participant S as CustomerPiiService
+    participant R as PiiRepository
+    participant CR as PiiCryptoService
+    participant DB as pii schema
+
+    C-&gt;&gt;CT: POST /api/customers
+    CT-&gt;&gt;S: register(data, "PORTAL", traceId)
+    S-&gt;&gt;S: data.assertRequired()
+    S-&gt;&gt;R: createCustomer(data, "PORTAL", traceId)
+    R-&gt;&gt;DB: INSERT pii.customers
+    DB--&gt;&gt;R: customer_id
+    R-&gt;&gt;CR: encryptField(...) / hmacHash(...)
+    CR--&gt;&gt;R: BYTEA 密文 + HMAC
+    R-&gt;&gt;DB: INSERT pii.customer_pii
+    R--&gt;&gt;S: customerId
+    S--&gt;&gt;CT: customerId
+    CT--&gt;&gt;C: {"customerId": ...}</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 受理岗
+    participant CT as CustomerPiiController
+    participant S as CustomerPiiService
+    participant R as PiiRepository
+    participant CR as PiiCryptoService
+    participant DB as pii schema
+
+    C-&gt;&gt;CT: POST /api/customers
+    CT-&gt;&gt;S: register(data, "PORTAL", traceId)
+    S-&gt;&gt;S: data.assertRequired()
+    S-&gt;&gt;R: createCustomer(data, "PORTAL", traceId)
+    R-&gt;&gt;DB: INSERT pii.customers
+    DB--&gt;&gt;R: customer_id
+    R-&gt;&gt;CR: encryptField(...) / hmacHash(...)
+    CR--&gt;&gt;R: BYTEA 密文 + HMAC
+    R-&gt;&gt;DB: INSERT pii.customer_pii
+    R--&gt;&gt;S: customerId
+    S--&gt;&gt;CT: customerId
+    CT--&gt;&gt;C: {"customerId": ...}</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 主流程二：PII 视图（脱敏 vs 全量）</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>5.2 视图选择流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：PII 视图（脱敏 vs 全量）</code> · 图：<code>5.2 视图选择流程</code></p><pre class="mermaid">flowchart TD
+    A["GET /api/pii/customers/{id}"] --&gt; B{"视图类型"}
+    B -- "脱敏视图" --&gt; C["员工 JWT"]
+    C --&gt; D["CustomerPiiService.maskedView"]
+    D --&gt; E["loadDecrypted + PiiRepository.maskedFields"]
+    E --&gt; F["INSERT audit.pii_access_logs"]
+    F --&gt; G["返回脱敏 Map"]
+
+    B -- "全量视图" --&gt; H["员工 JWT + PII_VIEW_FULL"]
+    H --&gt; I{"purpose 非空？"}
+    I -- 否 --&gt; J["RF_PII_002"]
+    I -- 是 --&gt; K["CustomerPiiService.fullView"]
+    K --&gt; L["INSERT audit.pii_access_logs"]
+    L --&gt; M["返回明文 Map"]
+
+    B -- "客户自助" --&gt; N["客户 JWT"]
+    N --&gt; O["/api/customer-self/me"]
+    O --&gt; P["maskedView（CUSTOMER_SELF_VIEW）"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["GET /api/pii/customers/{id}"] --&gt; B{"视图类型"}
+    B -- "脱敏视图" --&gt; C["员工 JWT"]
+    C --&gt; D["CustomerPiiService.maskedView"]
+    D --&gt; E["loadDecrypted + PiiRepository.maskedFields"]
+    E --&gt; F["INSERT audit.pii_access_logs"]
+    F --&gt; G["返回脱敏 Map"]
+
+    B -- "全量视图" --&gt; H["员工 JWT + PII_VIEW_FULL"]
+    H --&gt; I{"purpose 非空？"}
+    I -- 否 --&gt; J["RF_PII_002"]
+    I -- 是 --&gt; K["CustomerPiiService.fullView"]
+    K --&gt; L["INSERT audit.pii_access_logs"]
+    L --&gt; M["返回明文 Map"]
+
+    B -- "客户自助" --&gt; N["客户 JWT"]
+    N --&gt; O["/api/customer-self/me"]
+    O --&gt; P["maskedView（CUSTOMER_SELF_VIEW）"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 主流程三：同意管理</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>6.2 同意状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：同意管理</code> · 图：<code>6.2 同意状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; GRANTED: POST /api/consents
+    GRANTED --&gt; WITHDRAWN: DELETE /api/consents/{id}
+    GRANTED --&gt; EXPIRED: expires_at &lt;= now（逻辑判定，不落库）
+    WITHDRAWN --&gt; [*]
+    EXPIRED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; GRANTED: POST /api/consents
+    GRANTED --&gt; WITHDRAWN: DELETE /api/consents/{id}
+    GRANTED --&gt; EXPIRED: expires_at &lt;= now（逻辑判定，不落库）
+    WITHDRAWN --&gt; [*]
+    EXPIRED --&gt; [*]</code></pre></details></article>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>6.3 撤回时序</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：同意管理</code> · 图：<code>6.3 撤回时序</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 员工
+    participant CT as ConsentController
+    participant S as ConsentService
+    participant R as ConsentRepository
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: DELETE /api/consents/{id}
+    CT-&gt;&gt;S: withdraw(id, reason, traceId)
+    S-&gt;&gt;R: findById(id)
+    S-&gt;&gt;S: consent.withdraw(now)
+    S-&gt;&gt;R: markWithdrawn + insertWithdrawal
+    S-&gt;&gt;O: CONSENT_WITHDRAWN</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 员工
+    participant CT as ConsentController
+    participant S as ConsentService
+    participant R as ConsentRepository
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: DELETE /api/consents/{id}
+    CT-&gt;&gt;S: withdraw(id, reason, traceId)
+    S-&gt;&gt;R: findById(id)
+    S-&gt;&gt;S: consent.withdraw(now)
+    S-&gt;&gt;R: markWithdrawn + insertWithdrawal
+    S-&gt;&gt;O: CONSENT_WITHDRAWN</code></pre></details></article>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>6.4 代付门禁与有效性</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：同意管理</code> · 图：<code>6.4 代付门禁与有效性</code></p><pre class="mermaid">flowchart TD
+    A["GET /api/consents/{id}/disbursement-gate"] --&gt; B["ConsentRepository.findById"]
+    B --&gt; C{"同意存在？"}
+    C -- 否 --&gt; D["allowed=false&lt;br/&gt;CONSENT_NOT_FOUND"]
+    C -- 是 --&gt; E["ConsentGatePolicy.decide(consent, now)"]
+    E --&gt; F{"GRANTED 且未过期？"}
+    F -- 否 --&gt; G["allowed=false&lt;br/&gt;CONSENT_WITHDRAWN / CONSENT_EXPIRED"]
+    F -- 是 --&gt; H["allowed=true"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["GET /api/consents/{id}/disbursement-gate"] --&gt; B["ConsentRepository.findById"]
+    B --&gt; C{"同意存在？"}
+    C -- 否 --&gt; D["allowed=false&lt;br/&gt;CONSENT_NOT_FOUND"]
+    C -- 是 --&gt; E["ConsentGatePolicy.decide(consent, now)"]
+    E --&gt; F{"GRANTED 且未过期？"}
+    F -- 否 --&gt; G["allowed=false&lt;br/&gt;CONSENT_WITHDRAWN / CONSENT_EXPIRED"]
+    F -- 是 --&gt; H["allowed=true"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 主流程四：身份核验</h2><span class="source">来源：interview/customer-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-8"><div class="card-head"><h3>7.2 状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：身份核验</code> · 图：<code>7.2 状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: POST /api/identity-verifications
+    PENDING --&gt; DOCUMENTS_RECEIVED: POST /{id}/documents
+    DOCUMENTS_RECEIVED --&gt; DOCUMENTS_RECEIVED: 补件
+    DOCUMENTS_RECEIVED --&gt; VERIFYING: POST /{id}/start
+    VERIFYING --&gt; VERIFIED: review approve
+    VERIFYING --&gt; REJECTED: review reject
+    VERIFIED --&gt; [*]
+    REJECTED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; PENDING: POST /api/identity-verifications
+    PENDING --&gt; DOCUMENTS_RECEIVED: POST /{id}/documents
+    DOCUMENTS_RECEIVED --&gt; DOCUMENTS_RECEIVED: 补件
+    DOCUMENTS_RECEIVED --&gt; VERIFYING: POST /{id}/start
+    VERIFYING --&gt; VERIFIED: review approve
+    VERIFYING --&gt; REJECTED: review reject
+    VERIFIED --&gt; [*]
+    REJECTED --&gt; [*]</code></pre></details></article>
+<article class="diagram-card" id="diagram-9"><div class="card-head"><h3>7.3 材料提交：同步 vs MQ</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：身份核验</code> · 图：<code>7.3 材料提交：同步 vs MQ</code></p><pre class="mermaid">flowchart TD
+    A["POST /api/identity-verifications/{id}/documents"] --&gt; B{"retail.mq.enabled？"}
+    B -- 否 --&gt; C["IdentityDocumentHandler.register"]
+    C --&gt; D["load 聚合 + submitDocument"]
+    D --&gt; E["INSERT pii.identity_documents"]
+    E --&gt; F["UPDATE status = DOCUMENTS_RECEIVED"]
+    B -- 是 --&gt; G["CipherEnvelope.seal(IDENTITY_DOCUMENT)"]
+    G --&gt; H["MQ publish（broker 只见密文信封）"]
+    H --&gt; I["IdentityDocumentEnvelopeConsumer"]
+    I --&gt; J["decrypt + handler.register"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /api/identity-verifications/{id}/documents"] --&gt; B{"retail.mq.enabled？"}
+    B -- 否 --&gt; C["IdentityDocumentHandler.register"]
+    C --&gt; D["load 聚合 + submitDocument"]
+    D --&gt; E["INSERT pii.identity_documents"]
+    E --&gt; F["UPDATE status = DOCUMENTS_RECEIVED"]
+    B -- 是 --&gt; G["CipherEnvelope.seal(IDENTITY_DOCUMENT)"]
+    G --&gt; H["MQ publish（broker 只见密文信封）"]
+    H --&gt; I["IdentityDocumentEnvelopeConsumer"]
+    I --&gt; J["decrypt + handler.register"]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_customer_html.py</code> ·
+     图源：<code>interview/customer-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#e0e7ff',
+        primaryBorderColor: '#4338ca',
+        primaryTextColor: '#111827',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

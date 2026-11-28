@@ -1,0 +1,567 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_auth_html.py；请修改 interview/auth-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>auth-service 代码流程图集 · 双主体 JWT</title>
+<style>
+:root {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dce3ef;
+  --brand: #0369a1;
+  --brand-2: #1d4ed8;
+  --soft: #e0f2fe;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #0c4a6e 0%, #111827 58%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #bae6fd; max-width: 980px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #e0f2fe;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #bae6fd;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #0f172a; color: #e0f2fe; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>auth-service 代码流程图集</h1>
+    <p>员工登录、双主体 JWT 签发与验签、角色权限展开、客户开发桥的代码走读图集，
+       源文件：<code>interview/auth-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8091</span>
+      <span class="chip">core.users / core.user_roles</span>
+      <span class="chip">员工 / 客户双密钥</span>
+      <span class="chip">BCrypt + JWT</span>
+      <span class="chip">6 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 数据模型与角色</span>
+<a href="#diagram-2">3.1 表关系</a>
+</div>
+<div class="nav-group">
+<span>4. 员工登录</span>
+<a href="#diagram-3">4.2 时序图</a>
+</div>
+<div class="nav-group">
+<span>5. 角色 → 权限展开</span>
+<a href="#diagram-4">5.2 展开流程</a>
+</div>
+<div class="nav-group">
+<span>6. JWT 验签与授权链路</span>
+<a href="#diagram-5">6.1 双主体分流</a>
+</div>
+<div class="nav-group">
+<span>7. 客户登录开发桥</span>
+<a href="#diagram-6">7.2 流程</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>只签发，不做客户真实认证</span></div>
+      <div class="card"><b>员工登录</b><span>BCrypt + 角色/权限 → EMPLOYEE token</span></div>
+      <div class="card"><b>客户登录</b><span>开发桥；生产默认 403</span></div>
+      <div class="card"><b>隔离</b><span>双密钥 + subjectType 强校验</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        C1["AuthController"]
+        H["HealthController"]
+    end
+
+    subgraph AUTH["认证逻辑"]
+        R1["StaffUserRepository"]
+        M1["StaffUserMapper"]
+        P1["RolePermissions"]
+        V1["staffTokenVerifier&lt;br/&gt;EMPLOYEE"]
+        V2["customerTokenVerifier&lt;br/&gt;CUSTOMER"]
+    end
+
+    DB[("core.users / core.user_roles")]
+    CFG["RfSecurityConfig"]
+    ENC["BCryptPasswordEncoder"]
+
+    C1 --&gt; R1
+    C1 --&gt; P1
+    C1 --&gt; V1
+    C1 --&gt; V2
+    C1 --&gt; ENC
+    R1 --&gt; M1
+    M1 --&gt; DB
+    CFG --&gt; V1
+    CFG --&gt; V2
+    CFG --&gt; ENC</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        C1["AuthController"]
+        H["HealthController"]
+    end
+
+    subgraph AUTH["认证逻辑"]
+        R1["StaffUserRepository"]
+        M1["StaffUserMapper"]
+        P1["RolePermissions"]
+        V1["staffTokenVerifier&lt;br/&gt;EMPLOYEE"]
+        V2["customerTokenVerifier&lt;br/&gt;CUSTOMER"]
+    end
+
+    DB[("core.users / core.user_roles")]
+    CFG["RfSecurityConfig"]
+    ENC["BCryptPasswordEncoder"]
+
+    C1 --&gt; R1
+    C1 --&gt; P1
+    C1 --&gt; V1
+    C1 --&gt; V2
+    C1 --&gt; ENC
+    R1 --&gt; M1
+    M1 --&gt; DB
+    CFG --&gt; V1
+    CFG --&gt; V2
+    CFG --&gt; ENC</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 数据模型与角色</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.1 表关系</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 数据模型与角色</code> · 图：<code>3.1 表关系</code></p><pre class="mermaid">erDiagram
+    USERS {
+        bigint user_id PK
+        varchar username
+        varchar password_hash
+        varchar display_name
+        boolean enabled
+        int version
+    }
+
+    USER_ROLES {
+        bigint user_id PK
+        varchar role_key PK
+    }
+
+    USERS ||--o{ USER_ROLES : "user_id"</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    USERS {
+        bigint user_id PK
+        varchar username
+        varchar password_hash
+        varchar display_name
+        boolean enabled
+        int version
+    }
+
+    USER_ROLES {
+        bigint user_id PK
+        varchar role_key PK
+    }
+
+    USERS ||--o{ USER_ROLES : "user_id"</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 员工登录</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 员工登录</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 前端
+    participant C as AuthController
+    participant R as StaffUserRepository
+    participant DB as core.users / core.user_roles
+    participant P as RolePermissions
+    participant V as staffTokenVerifier
+
+    U-&gt;&gt;C: POST /api/auth/staff/login
+    C-&gt;&gt;R: findByUsername(username)
+    R-&gt;&gt;DB: SELECT ... FROM core.users
+    DB--&gt;&gt;R: 用户行 / 空
+    C-&gt;&gt;C: BCrypt.matches + enabled
+    alt 用户不存在 / 密码错误 / 已禁用
+        C--&gt;&gt;U: RF_AUTH_001 / BAD_CREDENTIALS
+    else 校验通过
+        C-&gt;&gt;R: findRoles(userId)
+        R-&gt;&gt;DB: SELECT role_key FROM core.user_roles
+        C-&gt;&gt;P: effectivePermissions(roles)
+        P--&gt;&gt;C: perms
+        C-&gt;&gt;V: sign(username, claims, tokenHours)
+        V--&gt;&gt;C: JWT
+        C--&gt;&gt;U: token / expiresAt / roles / permissions
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant U as 前端
+    participant C as AuthController
+    participant R as StaffUserRepository
+    participant DB as core.users / core.user_roles
+    participant P as RolePermissions
+    participant V as staffTokenVerifier
+
+    U-&gt;&gt;C: POST /api/auth/staff/login
+    C-&gt;&gt;R: findByUsername(username)
+    R-&gt;&gt;DB: SELECT ... FROM core.users
+    DB--&gt;&gt;R: 用户行 / 空
+    C-&gt;&gt;C: BCrypt.matches + enabled
+    alt 用户不存在 / 密码错误 / 已禁用
+        C--&gt;&gt;U: RF_AUTH_001 / BAD_CREDENTIALS
+    else 校验通过
+        C-&gt;&gt;R: findRoles(userId)
+        R-&gt;&gt;DB: SELECT role_key FROM core.user_roles
+        C-&gt;&gt;P: effectivePermissions(roles)
+        P--&gt;&gt;C: perms
+        C-&gt;&gt;V: sign(username, claims, tokenHours)
+        V--&gt;&gt;C: JWT
+        C--&gt;&gt;U: token / expiresAt / roles / permissions
+    end</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 角色 → 权限展开</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>5.2 展开流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 角色 → 权限展开</code> · 图：<code>5.2 展开流程</code></p><pre class="mermaid">flowchart TD
+    A["roles = core.user_roles"] --&gt; B["遍历每个 role_key"]
+    B --&gt; C{"MAPPING 有该角色？"}
+    C -- "是" --&gt; D["加入对应权限集合"]
+    C -- "否" --&gt; E["跳过"]
+    D --&gt; F["返回 perms"]
+    E --&gt; F</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["roles = core.user_roles"] --&gt; B["遍历每个 role_key"]
+    B --&gt; C{"MAPPING 有该角色？"}
+    C -- "是" --&gt; D["加入对应权限集合"]
+    C -- "否" --&gt; E["跳过"]
+    D --&gt; F["返回 perms"]
+    E --&gt; F</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. JWT 验签与授权链路</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>6.1 双主体分流</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. JWT 验签与授权链路</code> · 图：<code>6.1 双主体分流</code></p><pre class="mermaid">flowchart TD
+    A["请求带 Authorization: Bearer ..."] --&gt; B{"路径"}
+    B -- "/api/customer-self/**" --&gt; C["customerTokenVerifier&lt;br/&gt;CUSTOMER"]
+    B -- "其他 /api/**" --&gt; D["staffTokenVerifier&lt;br/&gt;EMPLOYEE"]
+
+    C --&gt; E{"签名有效且&lt;br/&gt;subjectType=CUSTOMER？"}
+    D --&gt; F{"签名有效且&lt;br/&gt;subjectType=EMPLOYEE？"}
+
+    E -- "否" --&gt; G["RF_AUTH_001 / 401"]
+    F -- "否" --&gt; G
+    E -- "是" --&gt; H["VerifiedToken&lt;br/&gt;subject + roles + perms"]
+    F -- "是" --&gt; I["VerifiedToken&lt;br/&gt;subject + roles + perms"]
+    H --&gt; J["@RequireSubject(CUSTOMER)"]
+    I --&gt; K["@RequirePermission(...)"]
+    K --&gt; L["授权通过 / RF_AUTH_002 403"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["请求带 Authorization: Bearer ..."] --&gt; B{"路径"}
+    B -- "/api/customer-self/**" --&gt; C["customerTokenVerifier&lt;br/&gt;CUSTOMER"]
+    B -- "其他 /api/**" --&gt; D["staffTokenVerifier&lt;br/&gt;EMPLOYEE"]
+
+    C --&gt; E{"签名有效且&lt;br/&gt;subjectType=CUSTOMER？"}
+    D --&gt; F{"签名有效且&lt;br/&gt;subjectType=EMPLOYEE？"}
+
+    E -- "否" --&gt; G["RF_AUTH_001 / 401"]
+    F -- "否" --&gt; G
+    E -- "是" --&gt; H["VerifiedToken&lt;br/&gt;subject + roles + perms"]
+    F -- "是" --&gt; I["VerifiedToken&lt;br/&gt;subject + roles + perms"]
+    H --&gt; J["@RequireSubject(CUSTOMER)"]
+    I --&gt; K["@RequirePermission(...)"]
+    K --&gt; L["授权通过 / RF_AUTH_002 403"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 客户登录开发桥</h2><span class="source">来源：interview/auth-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>7.2 流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 客户登录开发桥</code> · 图：<code>7.2 流程</code></p><pre class="mermaid">flowchart TD
+    A["POST /api/auth/customer/login"] --&gt; B{"customer-dev-login-enabled？"}
+    B -- "false" --&gt; C["RF_AUTH_002 / 403&lt;br/&gt;CUSTOMER_LOGIN_NOT_ENABLED"]
+    B -- "true" --&gt; D{"username 非空？"}
+    D -- "否" --&gt; E["RF_VALID_001 / 400"]
+    D -- "是" --&gt; F["customerTokenVerifier.sign(username, displayName)"]
+    F --&gt; G["CUSTOMER token"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /api/auth/customer/login"] --&gt; B{"customer-dev-login-enabled？"}
+    B -- "false" --&gt; C["RF_AUTH_002 / 403&lt;br/&gt;CUSTOMER_LOGIN_NOT_ENABLED"]
+    B -- "true" --&gt; D{"username 非空？"}
+    D -- "否" --&gt; E["RF_VALID_001 / 400"]
+    D -- "是" --&gt; F["customerTokenVerifier.sign(username, displayName)"]
+    F --&gt; G["CUSTOMER token"]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_auth_html.py</code> ·
+     图源：<code>interview/auth-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#e0f2fe',
+        primaryBorderColor: '#0369a1',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

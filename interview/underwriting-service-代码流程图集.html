@@ -1,0 +1,943 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_underwriting_html.py；请修改 interview/underwriting-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>underwriting-service 代码流程图集 · 审查授信</title>
+<style>
+:root {
+  --bg: #f6f7fb;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dde3ef;
+  --brand: #7c3aed;
+  --brand-2: #1d4ed8;
+  --soft: #f3e8ff;
+  --shadow: 0 10px 30px rgba(30, 41, 59, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #4c1d95 0%, #111827 58%, #0f172a 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #ddd6fe; max-width: 980px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #ede9fe;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #ddd6fe;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #111827; color: #ede9fe; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>underwriting-service 代码流程图集</h1>
+    <p>审查案件、支付能力评估、决定 / 复核 / SOD、代付前置校验与 DMS 结果通知的代码走读图集，
+       源文件：<code>interview/underwriting-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8094</span>
+      <span class="chip">core / integration schema</span>
+      <span class="chip">C-03 挡板策略点</span>
+      <span class="chip">SOD 硬阻断</span>
+      <span class="chip">11 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 领域模型与数据表</span>
+<a href="#diagram-2">3.1 审查状态机</a>
+<a href="#diagram-3">3.4 数据表关系（ER）</a>
+</div>
+<div class="nav-group">
+<span>4. 主流程一：建立审查案件</span>
+<a href="#diagram-4">4.2 时序图</a>
+</div>
+<div class="nav-group">
+<span>5. 主流程二：征信查询状态衔接</span>
+<a href="#diagram-5">5.2 本服务只推进状态，不执行查询</a>
+</div>
+<div class="nav-group">
+<span>6. 主流程三：支付能力评估</span>
+<a href="#diagram-6">6.2 判定流程</a>
+</div>
+<div class="nav-group">
+<span>7. 主流程四：审查决定与人工复核</span>
+<a href="#diagram-7">7.1 决定</a>
+<a href="#diagram-8">7.2 人工复核 / override</a>
+</div>
+<div class="nav-group">
+<span>8. 代付前审查前置校验</span>
+<a href="#diagram-9">8.2 判定</a>
+</div>
+<div class="nav-group">
+<span>9. DMS 结果通知与出站任务</span>
+<a href="#diagram-10">9.1 事件链</a>
+<a href="#diagram-11">9.3 outbound_tasks 状态机</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>只做审查，不执行征信查询、不放款</span></div>
+      <div class="card"><b>状态机</b><span>PENDING → 查询 → 评估 → 决定</span></div>
+      <div class="card"><b>SOD</b><span>复核人 ≠ 决定人，硬阻断</span></div>
+      <div class="card"><b>DMS</b><span>结果通知失败落 outbound_tasks</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        C1["UnderwritingCaseController"]
+        C2["OutboundTaskRetryController"]
+        H["HealthController"]
+    end
+
+    subgraph APP["application 层"]
+        A1["UnderwritingCaseAppService"]
+        A2["UnderwritingGateProvider"]
+        A3["InquiryCompletedConsumer"]
+        A4["DmsResultNotificationConsumer"]
+        A5["OutboundTaskRetryService"]
+        A6["ConsentGateGuard"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["UnderwritingCase"]
+        D2["UnderwritingStatus"]
+        D3["AffordabilityPolicy / StubAffordabilityPolicy"]
+        D4["DecisionOutcome / AssessmentOutput"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["UnderwritingCaseRepository"]
+        R2["AffordabilityAssessmentRepository"]
+        R3["OutboundTaskMapper"]
+        R4["UnderwritingCaseMapper"]
+        R5["AffordabilityAssessmentMapper"]
+    end
+
+    subgraph INTEGRATION["DMS 出站"]
+        I1["DmsResultSender"]
+        I2["HttpDmsOutboundAdapter"]
+        I3["DmsOutboundTaskScheduler"]
+    end
+
+    CORE[("core schema")]
+    INT[("integration schema")]
+    OUT[("core.outbox_events")]
+    CS[["customer-service&lt;br/&gt;同意前置校验"]]
+    DMS[["DMS 集成商"]]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    A1 --&gt; A6
+    A6 --&gt; CS
+    A1 --&gt; D1
+    A1 --&gt; D3
+    A1 --&gt; OUT
+    A3 --&gt; R1
+    A4 --&gt; I1
+    A4 --&gt; R3
+    A5 --&gt; R3
+    I1 --&gt; I2
+    I2 --&gt; DMS
+    I3 --&gt; R3
+    I3 --&gt; I1
+    R1 --&gt; R4
+    R2 --&gt; R5
+    R4 --&gt; CORE
+    R5 --&gt; CORE
+    R3 --&gt; INT</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        C1["UnderwritingCaseController"]
+        C2["OutboundTaskRetryController"]
+        H["HealthController"]
+    end
+
+    subgraph APP["application 层"]
+        A1["UnderwritingCaseAppService"]
+        A2["UnderwritingGateProvider"]
+        A3["InquiryCompletedConsumer"]
+        A4["DmsResultNotificationConsumer"]
+        A5["OutboundTaskRetryService"]
+        A6["ConsentGateGuard"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        D1["UnderwritingCase"]
+        D2["UnderwritingStatus"]
+        D3["AffordabilityPolicy / StubAffordabilityPolicy"]
+        D4["DecisionOutcome / AssessmentOutput"]
+    end
+
+    subgraph REPO["repo / mapper"]
+        R1["UnderwritingCaseRepository"]
+        R2["AffordabilityAssessmentRepository"]
+        R3["OutboundTaskMapper"]
+        R4["UnderwritingCaseMapper"]
+        R5["AffordabilityAssessmentMapper"]
+    end
+
+    subgraph INTEGRATION["DMS 出站"]
+        I1["DmsResultSender"]
+        I2["HttpDmsOutboundAdapter"]
+        I3["DmsOutboundTaskScheduler"]
+    end
+
+    CORE[("core schema")]
+    INT[("integration schema")]
+    OUT[("core.outbox_events")]
+    CS[["customer-service&lt;br/&gt;同意前置校验"]]
+    DMS[["DMS 集成商"]]
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; REPO
+    A1 --&gt; A6
+    A6 --&gt; CS
+    A1 --&gt; D1
+    A1 --&gt; D3
+    A1 --&gt; OUT
+    A3 --&gt; R1
+    A4 --&gt; I1
+    A4 --&gt; R3
+    A5 --&gt; R3
+    I1 --&gt; I2
+    I2 --&gt; DMS
+    I3 --&gt; R3
+    I3 --&gt; I1
+    R1 --&gt; R4
+    R2 --&gt; R5
+    R4 --&gt; CORE
+    R5 --&gt; CORE
+    R3 --&gt; INT</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 领域模型与数据表</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.1 审查状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与数据表</code> · 图：<code>3.1 审查状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 建立案件
+    PENDING --&gt; INQUIRY_IN_PROGRESS: startInquiry
+    INQUIRY_IN_PROGRESS --&gt; INQUIRY_DONE: CREDIT_INQUIRY_COMPLETED / COMPLETED
+    INQUIRY_IN_PROGRESS --&gt; INQUIRY_FAILED: CREDIT_INQUIRY_COMPLETED / FAILED
+    INQUIRY_FAILED --&gt; INQUIRY_IN_PROGRESS: 重试
+    INQUIRY_DONE --&gt; ASSESSING: assessAffordability
+    ASSESSING --&gt; APPROVED: decide APPROVED
+    ASSESSING --&gt; DECLINED: decide DECLINED
+    ASSESSING --&gt; REFERRED: decide REFERRED
+    REFERRED --&gt; APPROVED: override APPROVED
+    REFERRED --&gt; DECLINED: override DECLINED
+    APPROVED --&gt; EXPIRED: expire
+    DECLINED --&gt; [*]
+    EXPIRED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; PENDING: 建立案件
+    PENDING --&gt; INQUIRY_IN_PROGRESS: startInquiry
+    INQUIRY_IN_PROGRESS --&gt; INQUIRY_DONE: CREDIT_INQUIRY_COMPLETED / COMPLETED
+    INQUIRY_IN_PROGRESS --&gt; INQUIRY_FAILED: CREDIT_INQUIRY_COMPLETED / FAILED
+    INQUIRY_FAILED --&gt; INQUIRY_IN_PROGRESS: 重试
+    INQUIRY_DONE --&gt; ASSESSING: assessAffordability
+    ASSESSING --&gt; APPROVED: decide APPROVED
+    ASSESSING --&gt; DECLINED: decide DECLINED
+    ASSESSING --&gt; REFERRED: decide REFERRED
+    REFERRED --&gt; APPROVED: override APPROVED
+    REFERRED --&gt; DECLINED: override DECLINED
+    APPROVED --&gt; EXPIRED: expire
+    DECLINED --&gt; [*]
+    EXPIRED --&gt; [*]</code></pre></details></article>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>3.4 数据表关系（ER）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与数据表</code> · 图：<code>3.4 数据表关系（ER）</code></p><pre class="mermaid">erDiagram
+    UNDERWRITING_CASES {
+        bigint case_id PK
+        bigint application_id
+        bigint consent_id
+        varchar status
+        varchar outcome
+        varchar decided_by
+        varchar reviewed_by
+        varchar rule_version
+        int version
+    }
+
+    AFFORDABILITY_ASSESSMENTS {
+        bigint assessment_id PK
+        bigint case_id
+        varchar annual_income_enc_ref
+        bigint existing_debt_total
+        bigint threshold_amount
+        varchar result
+        varchar policy_version
+        jsonb input_snapshot
+    }
+
+    CREDIT_INQUIRIES {
+        bigint inquiry_id PK
+        bigint case_id
+        bigint consent_id
+        varchar bureau
+        varchar status
+    }
+
+    CONSENTS {
+        bigint consent_id PK
+        bigint customer_id
+        varchar purpose
+        varchar status
+    }
+
+    OUTBOUND_TASKS {
+        bigint task_id PK
+        varchar task_type
+        varchar payload_ref
+        varchar status
+        int retry_count
+        timestamptz next_retry_at
+        int version
+    }
+
+    OUTBOX_EVENTS {
+        bigint event_id PK
+        varchar event_type
+        varchar aggregate_key
+        varchar status
+    }
+
+    UNDERWRITING_CASES ||--o{ AFFORDABILITY_ASSESSMENTS : "case_id"
+    UNDERWRITING_CASES ||--o{ CREDIT_INQUIRIES : "case_id 逻辑关联（bureau 写入）"
+    UNDERWRITING_CASES ||--o| CONSENTS : "consent_id 逻辑关联（customer-service 真相源）"
+    UNDERWRITING_CASES ||--o{ OUTBOUND_TASKS : "payload_ref 内含 caseId（逻辑关联）"
+    UNDERWRITING_CASES ||--o{ OUTBOX_EVENTS : "aggregate_key = caseId"</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    UNDERWRITING_CASES {
+        bigint case_id PK
+        bigint application_id
+        bigint consent_id
+        varchar status
+        varchar outcome
+        varchar decided_by
+        varchar reviewed_by
+        varchar rule_version
+        int version
+    }
+
+    AFFORDABILITY_ASSESSMENTS {
+        bigint assessment_id PK
+        bigint case_id
+        varchar annual_income_enc_ref
+        bigint existing_debt_total
+        bigint threshold_amount
+        varchar result
+        varchar policy_version
+        jsonb input_snapshot
+    }
+
+    CREDIT_INQUIRIES {
+        bigint inquiry_id PK
+        bigint case_id
+        bigint consent_id
+        varchar bureau
+        varchar status
+    }
+
+    CONSENTS {
+        bigint consent_id PK
+        bigint customer_id
+        varchar purpose
+        varchar status
+    }
+
+    OUTBOUND_TASKS {
+        bigint task_id PK
+        varchar task_type
+        varchar payload_ref
+        varchar status
+        int retry_count
+        timestamptz next_retry_at
+        int version
+    }
+
+    OUTBOX_EVENTS {
+        bigint event_id PK
+        varchar event_type
+        varchar aggregate_key
+        varchar status
+    }
+
+    UNDERWRITING_CASES ||--o{ AFFORDABILITY_ASSESSMENTS : "case_id"
+    UNDERWRITING_CASES ||--o{ CREDIT_INQUIRIES : "case_id 逻辑关联（bureau 写入）"
+    UNDERWRITING_CASES ||--o| CONSENTS : "consent_id 逻辑关联（customer-service 真相源）"
+    UNDERWRITING_CASES ||--o{ OUTBOUND_TASKS : "payload_ref 内含 caseId（逻辑关联）"
+    UNDERWRITING_CASES ||--o{ OUTBOX_EVENTS : "aggregate_key = caseId"</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 主流程一：建立审查案件</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：建立审查案件</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 审查前端
+    participant C as UnderwritingCaseController
+    participant S as UnderwritingCaseAppService
+    participant G as ConsentGateGuard
+    participant F as ConsentGateFacade
+    participant CS as customer-service
+    participant D as UnderwritingCase
+    participant R as UnderwritingCaseRepository
+    participant DB as core.underwriting_cases
+
+    U-&gt;&gt;C: POST /api/underwriting/cases
+    C-&gt;&gt;S: createCase(applicationId, consentId, ruleVersion)
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G-&gt;&gt;F: isConsentValid(consentId)
+    F-&gt;&gt;CS: GET /api/consents/{id}/disbursement-gate
+    CS--&gt;&gt;F: {allowed:true}
+    F--&gt;&gt;G: true
+    S-&gt;&gt;D: UnderwritingCase.start(...)
+    D--&gt;&gt;S: status=PENDING
+    S-&gt;&gt;R: insert(case)
+    R-&gt;&gt;DB: INSERT ... status=PENDING
+    DB--&gt;&gt;R: case_id
+    R--&gt;&gt;S: caseId
+    S--&gt;&gt;C: case PENDING</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant U as 审查前端
+    participant C as UnderwritingCaseController
+    participant S as UnderwritingCaseAppService
+    participant G as ConsentGateGuard
+    participant F as ConsentGateFacade
+    participant CS as customer-service
+    participant D as UnderwritingCase
+    participant R as UnderwritingCaseRepository
+    participant DB as core.underwriting_cases
+
+    U-&gt;&gt;C: POST /api/underwriting/cases
+    C-&gt;&gt;S: createCase(applicationId, consentId, ruleVersion)
+    S-&gt;&gt;G: requireConsentValid(consentId)
+    G-&gt;&gt;F: isConsentValid(consentId)
+    F-&gt;&gt;CS: GET /api/consents/{id}/disbursement-gate
+    CS--&gt;&gt;F: {allowed:true}
+    F--&gt;&gt;G: true
+    S-&gt;&gt;D: UnderwritingCase.start(...)
+    D--&gt;&gt;S: status=PENDING
+    S-&gt;&gt;R: insert(case)
+    R-&gt;&gt;DB: INSERT ... status=PENDING
+    DB--&gt;&gt;R: case_id
+    R--&gt;&gt;S: caseId
+    S--&gt;&gt;C: case PENDING</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 主流程二：征信查询状态衔接</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>5.2 本服务只推进状态，不执行查询</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：征信查询状态衔接</code> · 图：<code>5.2 本服务只推进状态，不执行查询</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant U as 审查前端
+    participant C as UnderwritingCaseController
+    participant S as UnderwritingCaseAppService
+    participant R as UnderwritingCaseRepository
+    participant BS as bureau-service
+    participant O as core.outbox_events
+    participant IC as InquiryCompletedConsumer
+
+    U-&gt;&gt;C: POST /cases/{id}/start-inquiry
+    C-&gt;&gt;S: startInquiry(caseId)
+    S-&gt;&gt;R: load + UPDATE status=INQUIRY_IN_PROGRESS
+    C--&gt;&gt;U: status=INQUIRY_IN_PROGRESS
+
+    U-&gt;&gt;BS: POST /api/credit-inquiries
+    BS-&gt;&gt;O: CREDIT_INQUIRY_COMPLETED
+    O-&gt;&gt;IC: consume(event)
+    IC-&gt;&gt;R: load case
+    alt 当前状态不是 INQUIRY_IN_PROGRESS
+        IC--&gt;&gt;O: 跳过（幂等）
+    else status=COMPLETED
+        IC-&gt;&gt;R: UPDATE status=INQUIRY_DONE
+    else status=FAILED
+        IC-&gt;&gt;R: UPDATE status=INQUIRY_FAILED
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant U as 审查前端
+    participant C as UnderwritingCaseController
+    participant S as UnderwritingCaseAppService
+    participant R as UnderwritingCaseRepository
+    participant BS as bureau-service
+    participant O as core.outbox_events
+    participant IC as InquiryCompletedConsumer
+
+    U-&gt;&gt;C: POST /cases/{id}/start-inquiry
+    C-&gt;&gt;S: startInquiry(caseId)
+    S-&gt;&gt;R: load + UPDATE status=INQUIRY_IN_PROGRESS
+    C--&gt;&gt;U: status=INQUIRY_IN_PROGRESS
+
+    U-&gt;&gt;BS: POST /api/credit-inquiries
+    BS-&gt;&gt;O: CREDIT_INQUIRY_COMPLETED
+    O-&gt;&gt;IC: consume(event)
+    IC-&gt;&gt;R: load case
+    alt 当前状态不是 INQUIRY_IN_PROGRESS
+        IC--&gt;&gt;O: 跳过（幂等）
+    else status=COMPLETED
+        IC-&gt;&gt;R: UPDATE status=INQUIRY_DONE
+    else status=FAILED
+        IC-&gt;&gt;R: UPDATE status=INQUIRY_FAILED
+    end</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 主流程三：支付能力评估</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>6.2 判定流程</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：支付能力评估</code> · 图：<code>6.2 判定流程</code></p><pre class="mermaid">flowchart TD
+    A["POST /cases/{id}/affordability"] --&gt; B["load case"]
+    B --&gt; C{"已有评估快照？"}
+    C -- "是" --&gt; C1["RF_CONFLICT_001&lt;br/&gt;ASSESSMENT_EXISTS"]
+    C -- "否" --&gt; D["beginAssessment()&lt;br/&gt;INQUIRY_DONE → ASSESSING"]
+    D --&gt; E{"当前状态是 INQUIRY_DONE？"}
+    E -- "否" --&gt; E1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    E -- "是" --&gt; F["policy.assess(input)"]
+    F --&gt; G{"scheme 为空？"}
+    G -- "是" --&gt; G1["RF_DMS_003"]
+    G -- "否" --&gt; H{"enabled=false？"}
+    H -- "是" --&gt; H1["REFER / POLICY_DISABLED"]
+    H -- "否" --&gt; I{"incomeEncRef 为空？"}
+    I -- "是" --&gt; I1["REFER / INCOME_DOCUMENT_MISSING"]
+    I -- "否" --&gt; J{"threshold &lt;= 0？"}
+    J -- "是" --&gt; J1["REFER / THRESHOLD_NOT_CONFIGURED"]
+    J -- "否" --&gt; K{"requested &gt; threshold？"}
+    K -- "是" --&gt; K1["FAIL / OVER_AFFORDABILITY_THRESHOLD"]
+    K -- "否" --&gt; L["PASS / WITHIN_THRESHOLD"]
+    H1 --&gt; M["insert snapshot&lt;br/&gt;append-only"]
+    I1 --&gt; M
+    J1 --&gt; M
+    K1 --&gt; M
+    L --&gt; M
+    M --&gt; N["UPDATE case status=ASSESSING"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /cases/{id}/affordability"] --&gt; B["load case"]
+    B --&gt; C{"已有评估快照？"}
+    C -- "是" --&gt; C1["RF_CONFLICT_001&lt;br/&gt;ASSESSMENT_EXISTS"]
+    C -- "否" --&gt; D["beginAssessment()&lt;br/&gt;INQUIRY_DONE → ASSESSING"]
+    D --&gt; E{"当前状态是 INQUIRY_DONE？"}
+    E -- "否" --&gt; E1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    E -- "是" --&gt; F["policy.assess(input)"]
+    F --&gt; G{"scheme 为空？"}
+    G -- "是" --&gt; G1["RF_DMS_003"]
+    G -- "否" --&gt; H{"enabled=false？"}
+    H -- "是" --&gt; H1["REFER / POLICY_DISABLED"]
+    H -- "否" --&gt; I{"incomeEncRef 为空？"}
+    I -- "是" --&gt; I1["REFER / INCOME_DOCUMENT_MISSING"]
+    I -- "否" --&gt; J{"threshold &lt;= 0？"}
+    J -- "是" --&gt; J1["REFER / THRESHOLD_NOT_CONFIGURED"]
+    J -- "否" --&gt; K{"requested &gt; threshold？"}
+    K -- "是" --&gt; K1["FAIL / OVER_AFFORDABILITY_THRESHOLD"]
+    K -- "否" --&gt; L["PASS / WITHIN_THRESHOLD"]
+    H1 --&gt; M["insert snapshot&lt;br/&gt;append-only"]
+    I1 --&gt; M
+    J1 --&gt; M
+    K1 --&gt; M
+    L --&gt; M
+    M --&gt; N["UPDATE case status=ASSESSING"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 主流程四：审查决定与人工复核</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>7.1 决定</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：审查决定与人工复核</code> · 图：<code>7.1 决定</code></p><pre class="mermaid">flowchart TD
+    A["POST /cases/{id}/decision"] --&gt; B["load case"]
+    B --&gt; C["ConsentGateGuard.requireConsentValid"]
+    C -- "失败" --&gt; C1["RF_UW_003&lt;br/&gt;中止决定"]
+    C -- "通过" --&gt; D{"status=ASSESSING？"}
+    D -- "否" --&gt; D1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    D -- "是" --&gt; E["decidedBy = 验签主体"]
+    E --&gt; F{"outcome"}
+    F -- "APPROVED" --&gt; G["UPDATE APPROVED&lt;br/&gt;发 UNDERWRITING_APPROVED"]
+    F -- "DECLINED" --&gt; H["UPDATE DECLINED&lt;br/&gt;发 UNDERWRITING_DECLINED"]
+    F -- "REFERRED" --&gt; I["UPDATE REFERRED&lt;br/&gt;不发事件"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /cases/{id}/decision"] --&gt; B["load case"]
+    B --&gt; C["ConsentGateGuard.requireConsentValid"]
+    C -- "失败" --&gt; C1["RF_UW_003&lt;br/&gt;中止决定"]
+    C -- "通过" --&gt; D{"status=ASSESSING？"}
+    D -- "否" --&gt; D1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    D -- "是" --&gt; E["decidedBy = 验签主体"]
+    E --&gt; F{"outcome"}
+    F -- "APPROVED" --&gt; G["UPDATE APPROVED&lt;br/&gt;发 UNDERWRITING_APPROVED"]
+    F -- "DECLINED" --&gt; H["UPDATE DECLINED&lt;br/&gt;发 UNDERWRITING_DECLINED"]
+    F -- "REFERRED" --&gt; I["UPDATE REFERRED&lt;br/&gt;不发事件"]</code></pre></details></article>
+<article class="diagram-card" id="diagram-8"><div class="card-head"><h3>7.2 人工复核 / override</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：审查决定与人工复核</code> · 图：<code>7.2 人工复核 / override</code></p><pre class="mermaid">flowchart TD
+    A["POST /cases/{id}/override"] --&gt; B["load case"]
+    B --&gt; C["ConsentGateGuard.requireConsentValid"]
+    C -- "失败" --&gt; C1["RF_UW_003"]
+    C -- "通过" --&gt; D{"status=REFERRED？"}
+    D -- "否" --&gt; D1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    D -- "是" --&gt; E["reviewedBy = 验签主体"]
+    E --&gt; F{"reviewedBy == decidedBy？"}
+    F -- "是" --&gt; F1["RF_AUTH_003&lt;br/&gt;SOD_SELF_OVERRIDE"]
+    F -- "否" --&gt; G{"outcome"}
+    G -- "APPROVED" --&gt; H["UPDATE APPROVED&lt;br/&gt;发 UNDERWRITING_APPROVED"]
+    G -- "DECLINED" --&gt; I["UPDATE DECLINED&lt;br/&gt;发 UNDERWRITING_DECLINED"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /cases/{id}/override"] --&gt; B["load case"]
+    B --&gt; C["ConsentGateGuard.requireConsentValid"]
+    C -- "失败" --&gt; C1["RF_UW_003"]
+    C -- "通过" --&gt; D{"status=REFERRED？"}
+    D -- "否" --&gt; D1["RF_VALID_002&lt;br/&gt;ILLEGAL_TRANSITION"]
+    D -- "是" --&gt; E["reviewedBy = 验签主体"]
+    E --&gt; F{"reviewedBy == decidedBy？"}
+    F -- "是" --&gt; F1["RF_AUTH_003&lt;br/&gt;SOD_SELF_OVERRIDE"]
+    F -- "否" --&gt; G{"outcome"}
+    G -- "APPROVED" --&gt; H["UPDATE APPROVED&lt;br/&gt;发 UNDERWRITING_APPROVED"]
+    G -- "DECLINED" --&gt; I["UPDATE DECLINED&lt;br/&gt;发 UNDERWRITING_DECLINED"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>8. 代付前审查前置校验</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-9"><div class="card-head"><h3>8.2 判定</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>8. 代付前审查前置校验</code> · 图：<code>8.2 判定</code></p><pre class="mermaid">flowchart TD
+    A["GET /cases/{id}/disbursement-gate"] --&gt; B["UnderwritingGateProvider.check(id)"]
+    B --&gt; C{"案件存在？"}
+    C -- "否" --&gt; C1["allowed=false&lt;br/&gt;CASE_NOT_FOUND"]
+    C -- "是" --&gt; D{"status=APPROVED？"}
+    D -- "是" --&gt; E["allowed=true"]
+    D -- "否" --&gt; F["allowed=false&lt;br/&gt;status.name()"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["GET /cases/{id}/disbursement-gate"] --&gt; B["UnderwritingGateProvider.check(id)"]
+    B --&gt; C{"案件存在？"}
+    C -- "否" --&gt; C1["allowed=false&lt;br/&gt;CASE_NOT_FOUND"]
+    C -- "是" --&gt; D{"status=APPROVED？"}
+    D -- "是" --&gt; E["allowed=true"]
+    D -- "否" --&gt; F["allowed=false&lt;br/&gt;status.name()"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>9. DMS 结果通知与出站任务</h2><span class="source">来源：interview/underwriting-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-10"><div class="card-head"><h3>9.1 事件链</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>9. DMS 结果通知与出站任务</code> · 图：<code>9.1 事件链</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant O as core.outbox_events
+    participant C as DmsResultNotificationConsumer
+    participant A as DmsResultSender
+    participant DMS as DMS 集成商
+    participant T as integration.outbound_tasks
+    participant S as DmsOutboundTaskScheduler
+
+    O-&gt;&gt;C: UNDERWRITING_APPROVED / DECLINED
+    alt adapter 为空（DMS 挡板）
+        C--&gt;&gt;O: no-op
+    else adapter 非空
+        C-&gt;&gt;A: sendResult(caseId, applicationId, decision, reasonCode, traceId)
+        alt 返回 dmsRef
+            A--&gt;&gt;C: dmsRef
+            C--&gt;&gt;O: 成功，无任务
+        else 返回 null
+            A--&gt;&gt;C: null
+            C-&gt;&gt;T: insertPending(DMS_RESULT_NOTIFY, payload_ref, 60s)
+            S-&gt;&gt;T: claimDue / 重试
+            S-&gt;&gt;A: 再次 sendResult
+        end
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant O as core.outbox_events
+    participant C as DmsResultNotificationConsumer
+    participant A as DmsResultSender
+    participant DMS as DMS 集成商
+    participant T as integration.outbound_tasks
+    participant S as DmsOutboundTaskScheduler
+
+    O-&gt;&gt;C: UNDERWRITING_APPROVED / DECLINED
+    alt adapter 为空（DMS 挡板）
+        C--&gt;&gt;O: no-op
+    else adapter 非空
+        C-&gt;&gt;A: sendResult(caseId, applicationId, decision, reasonCode, traceId)
+        alt 返回 dmsRef
+            A--&gt;&gt;C: dmsRef
+            C--&gt;&gt;O: 成功，无任务
+        else 返回 null
+            A--&gt;&gt;C: null
+            C-&gt;&gt;T: insertPending(DMS_RESULT_NOTIFY, payload_ref, 60s)
+            S-&gt;&gt;T: claimDue / 重试
+            S-&gt;&gt;A: 再次 sendResult
+        end
+    end</code></pre></details></article>
+<article class="diagram-card" id="diagram-11"><div class="card-head"><h3>9.3 outbound_tasks 状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>9. DMS 结果通知与出站任务</code> · 图：<code>9.3 outbound_tasks 状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING: 消费失败落任务
+    PENDING --&gt; IN_PROGRESS: claimDue
+    IN_PROGRESS --&gt; DONE: send 成功
+    IN_PROGRESS --&gt; RETRY: 发送失败且未达上限
+    RETRY --&gt; IN_PROGRESS: 到期再认领
+    IN_PROGRESS --&gt; DEAD: 达到最大重试
+    DEAD --&gt; PENDING: 人工 retry
+    DONE --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; PENDING: 消费失败落任务
+    PENDING --&gt; IN_PROGRESS: claimDue
+    IN_PROGRESS --&gt; DONE: send 成功
+    IN_PROGRESS --&gt; RETRY: 发送失败且未达上限
+    RETRY --&gt; IN_PROGRESS: 到期再认领
+    IN_PROGRESS --&gt; DEAD: 达到最大重试
+    DEAD --&gt; PENDING: 人工 retry
+    DONE --&gt; [*]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_underwriting_html.py</code> ·
+     图源：<code>interview/underwriting-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#ede9fe',
+        primaryBorderColor: '#7c3aed',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

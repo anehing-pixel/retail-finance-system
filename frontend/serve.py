@@ -44,6 +44,12 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stdout.write("[fe:{}]\n".format(fmt % args))
 
+    def end_headers(self):
+        # 本地开发服务器：静态页与代理响应一律不缓存——改了 index.html / app.js
+        # 后浏览器必须立即看到新版，否则会出现「退出登录按钮不存在」这类旧页面假象
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     # ---- 代理 ----
 
     def _route(self):
@@ -81,7 +87,6 @@ class Handler(SimpleHTTPRequestHandler):
         ctype = headers.get("Content-Type") if hasattr(headers, "get") else None
         self.send_header("Content-Type", ctype or "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)

@@ -1,0 +1,1230 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_retail_core_html.py；请修改 interview/retail-core-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>retail-core 代码流程图集 · 核心账务服务</title>
+<style>
+:root {
+  --bg: #f4f7fb;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dbe3ee;
+  --brand: #0f766e;
+  --brand-2: #1d4ed8;
+  --soft: #eef6f6;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #134e4a 0%, #0f172a 58%, #111827 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #94a3b8; max-width: 920px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #dbeafe;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+  transition: grid-template-columns .18s ease, max-width .18s ease;
+}
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+  transition: padding .18s ease;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #cfe6e3;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #0f172a; color: #dbeafe; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview,
+  .nav-toggle, .nav-rail-toggle { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>retail-core 代码流程图集</h1>
+    <p>核心账务服务（债权 / 还款计划 / 代付 / 入金核销 / 结清 / 余额对拍 / 产品档位）
+       的代码走读图集，源文件：<code>interview/retail-core-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8090</span>
+      <span class="chip">core schema</span>
+      <span class="chip">本地事务 + outbox</span>
+      <span class="chip">12 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 领域模型与不变式</span>
+<a href="#diagram-2">3.1 聚合关系</a>
+</div>
+<div class="nav-group">
+<span>4. 主流程一：还款计划生成（计息）</span>
+<a href="#diagram-3">4.2 时序图</a>
+<a href="#diagram-4">4.3 generate 内部流程图</a>
+<a href="#diagram-5">1 条计划头 + N 条期次（ER）</a>
+</div>
+<div class="nav-group">
+<span>5. 主流程二：从申请到债权 ACTIVE（代付）</span>
+<a href="#diagram-6">5.0 前置链路：申请 → 合同 → 债权记录 → 代付 → ACTIVE</a>
+<a href="#diagram-7">5.2 时序图</a>
+</div>
+<div class="nav-group">
+<span>6. 主流程三：入金核销</span>
+<a href="#diagram-8">6.2 时序图</a>
+<a href="#diagram-9">6.4 期次状态机</a>
+</div>
+<div class="nav-group">
+<span>7. 主流程四：结清</span>
+<a href="#diagram-10">7.2 流程图</a>
+</div>
+<div class="nav-group">
+<span>8. 批处理：到期滚转与逾期判断</span>
+<a href="#diagram-11">逾期判断：期次状态 + DPD（不对比 PaymentAllocation）</a>
+</div>
+<div class="nav-group">
+<span>10. 状态机接线</span>
+<a href="#diagram-12">10.1 债权状态图</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>账务不拆，本服务一个本地事务</span></div>
+      <div class="card"><b>计息口径</b><span>计划生成时一次性计提</span></div>
+      <div class="card"><b>跨服务一致性</b><span>outbox + 唯一索引 + 对拍</span></div>
+      <div class="card"><b>状态机</b><span>领域图唯一事实源</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        LC["LoanController"]
+        RPC["RepaymentPlanController"]
+        DC["DisbursementController"]
+        PC["PaymentController"]
+        SC["SettlementController"]
+        FPC["FinancialProductController"]
+        JC["JobController"]
+    end
+
+    subgraph APP["application 层（事务边界）"]
+        LAS["LoanApplicationService"]
+        RPS["RepaymentPlanApplicationService"]
+        DAS["DisbursementApplicationService"]
+        PAS["PaymentApplicationService"]
+        SAS["SettlementApplicationService"]
+        PCS["ProductCatalogService"]
+        RAS["ReconciliationApplicationService"]
+        SDJ["ScheduleDueJobService"]
+        DTX["DisbursementTxExecutor"]
+        PTX["PaymentTxExecutor"]
+        STX["SettlementTxExecutor"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        LOAN["Loan / LoanStatus"]
+        GEN["RepaymentScheduleGenerator"]
+        ALLOC["PaymentAllocationPlanner"]
+        SETTLE["SettlementCalculator"]
+        TERMS["ProductTermsResolver"]
+        ITEM["ScheduleItemStatus"]
+        RECON["BalanceReconciliation"]
+    end
+
+    subgraph PERSIST["persistence / mapper"]
+        REPO["Repository"]
+        MAPPER["MyBatis Mapper"]
+    end
+
+    subgraph INFRA["基础设施"]
+        DB[("PostgreSQL core schema")]
+        OUTBOX[("core.outbox_events")]
+        CACHE[("Caffeine L1 + Redis L2")]
+        FEIGN["Feign：contract / underwriting 门禁"]
+        BANK["BankPayAdapter：挡板 / HTTP"]
+    end
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; PERSIST
+    PERSIST --&gt; MAPPER
+    MAPPER --&gt; DB
+    APP --&gt; OUTBOX
+    PCS --&gt; CACHE
+    DAS --&gt; FEIGN
+    DTX --&gt; BANK</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        LC["LoanController"]
+        RPC["RepaymentPlanController"]
+        DC["DisbursementController"]
+        PC["PaymentController"]
+        SC["SettlementController"]
+        FPC["FinancialProductController"]
+        JC["JobController"]
+    end
+
+    subgraph APP["application 层（事务边界）"]
+        LAS["LoanApplicationService"]
+        RPS["RepaymentPlanApplicationService"]
+        DAS["DisbursementApplicationService"]
+        PAS["PaymentApplicationService"]
+        SAS["SettlementApplicationService"]
+        PCS["ProductCatalogService"]
+        RAS["ReconciliationApplicationService"]
+        SDJ["ScheduleDueJobService"]
+        DTX["DisbursementTxExecutor"]
+        PTX["PaymentTxExecutor"]
+        STX["SettlementTxExecutor"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        LOAN["Loan / LoanStatus"]
+        GEN["RepaymentScheduleGenerator"]
+        ALLOC["PaymentAllocationPlanner"]
+        SETTLE["SettlementCalculator"]
+        TERMS["ProductTermsResolver"]
+        ITEM["ScheduleItemStatus"]
+        RECON["BalanceReconciliation"]
+    end
+
+    subgraph PERSIST["persistence / mapper"]
+        REPO["Repository"]
+        MAPPER["MyBatis Mapper"]
+    end
+
+    subgraph INFRA["基础设施"]
+        DB[("PostgreSQL core schema")]
+        OUTBOX[("core.outbox_events")]
+        CACHE[("Caffeine L1 + Redis L2")]
+        FEIGN["Feign：contract / underwriting 门禁"]
+        BANK["BankPayAdapter：挡板 / HTTP"]
+    end
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; PERSIST
+    PERSIST --&gt; MAPPER
+    MAPPER --&gt; DB
+    APP --&gt; OUTBOX
+    PCS --&gt; CACHE
+    DAS --&gt; FEIGN
+    DTX --&gt; BANK</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 领域模型与不变式</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.1 聚合关系</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与不变式</code> · 图：<code>3.1 聚合关系</code></p><pre class="mermaid">classDiagram
+    class Loan {
+      +Long loanId
+      +long contractId
+      +LoanStatus status
+      +long principal
+      +long feeAmount
+      +long interestAccrued
+      +long balance
+      +Instant disbursedAt
+      +Instant settledAt
+      +String settlementType
+      +long waiverAmount
+      +long settlementFee
+      +int version
+    }
+
+    class RepaymentPlan {
+      +long planId
+      +long loanId
+      +String method
+      +int installmentCount
+      +LocalDate firstDueDate
+      +Integer bonusMonth
+      +int planVersion
+      +String productCode
+      +Integer productVersion
+      +int rateBp
+    }
+
+    class ScheduleItem {
+      +long itemId
+      +long planId
+      +int periodNo
+      +LocalDate dueDate
+      +long amountDue
+      +long principalDue
+      +long interestDue
+      +String status
+      +long paidAmount
+      +long paidInterest
+      +long paidPrincipal
+      +long waivedAmount
+      +int version
+    }
+
+    class Payment {
+      +long paymentId
+      +String paymentRef
+      +String accountRef
+      +String transactionId
+      +long amount
+      +String status
+    }
+
+    class PaymentAllocation {
+      +long allocationId
+      +long paymentId
+      +long loanId
+      +long feeAmount
+      +long interestAmount
+      +long principalAmount
+    }
+
+    class SettlementAdjustment {
+      +long loanId
+      +String settlementType
+      +long principalWaiver
+      +long interestWaiver
+      +long feeWaiver
+      +long settlementFee
+    }
+
+    Loan "1" --&gt; "0..1" RepaymentPlan : 一份债权一个计划版本
+    RepaymentPlan "1" --&gt; "1..*" ScheduleItem : 期次
+    Loan "1" --&gt; "0..*" PaymentAllocation : 核销流水
+    Payment "1" --&gt; "0..1" PaymentAllocation : 一笔入金只核销一次
+    Loan "1" --&gt; "0..1" SettlementAdjustment : 一债权一次结清调整</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>classDiagram
+    class Loan {
+      +Long loanId
+      +long contractId
+      +LoanStatus status
+      +long principal
+      +long feeAmount
+      +long interestAccrued
+      +long balance
+      +Instant disbursedAt
+      +Instant settledAt
+      +String settlementType
+      +long waiverAmount
+      +long settlementFee
+      +int version
+    }
+
+    class RepaymentPlan {
+      +long planId
+      +long loanId
+      +String method
+      +int installmentCount
+      +LocalDate firstDueDate
+      +Integer bonusMonth
+      +int planVersion
+      +String productCode
+      +Integer productVersion
+      +int rateBp
+    }
+
+    class ScheduleItem {
+      +long itemId
+      +long planId
+      +int periodNo
+      +LocalDate dueDate
+      +long amountDue
+      +long principalDue
+      +long interestDue
+      +String status
+      +long paidAmount
+      +long paidInterest
+      +long paidPrincipal
+      +long waivedAmount
+      +int version
+    }
+
+    class Payment {
+      +long paymentId
+      +String paymentRef
+      +String accountRef
+      +String transactionId
+      +long amount
+      +String status
+    }
+
+    class PaymentAllocation {
+      +long allocationId
+      +long paymentId
+      +long loanId
+      +long feeAmount
+      +long interestAmount
+      +long principalAmount
+    }
+
+    class SettlementAdjustment {
+      +long loanId
+      +String settlementType
+      +long principalWaiver
+      +long interestWaiver
+      +long feeWaiver
+      +long settlementFee
+    }
+
+    Loan "1" --&gt; "0..1" RepaymentPlan : 一份债权一个计划版本
+    RepaymentPlan "1" --&gt; "1..*" ScheduleItem : 期次
+    Loan "1" --&gt; "0..*" PaymentAllocation : 核销流水
+    Payment "1" --&gt; "0..1" PaymentAllocation : 一笔入金只核销一次
+    Loan "1" --&gt; "0..1" SettlementAdjustment : 一债权一次结清调整</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 主流程一：还款计划生成（计息）</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：还款计划生成（计息）</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 运营
+    participant CT as RepaymentPlanController
+    participant S as RepaymentPlanApplicationService
+    participant PC as ProductCatalogService
+    participant R as RepaymentPlanRepository
+    participant G as RepaymentScheduleGenerator
+    participant L as LoanRepository
+    participant DB as core schema
+
+    C-&gt;&gt;CT: POST /api/repayment-plans
+    CT-&gt;&gt;S: generate(...)
+    S-&gt;&gt;L: findByIdForUpdate(loanId)
+    L--&gt;&gt;S: Loan（行锁）
+    S-&gt;&gt;S: 解析 method / 校验 firstDueDate
+    alt 指定 productCode
+        S-&gt;&gt;PC: findEffective(productCode)
+        PC--&gt;&gt;S: ProductProfile（L1 → L2 → DB）
+        S-&gt;&gt;S: ProductTermsResolver.resolve(档位, 覆盖值)
+    else 纯入参模式
+        S-&gt;&gt;S: ProductTermsResolver.fromDirectInput(...)
+    end
+    S-&gt;&gt;R: planExistsForLoan(loanId)
+    alt 已有计划
+        S--&gt;&gt;CT: RF_CONFLICT_001
+    else 无计划
+        S-&gt;&gt;G: equalPayment / equalPrincipal / bonusPayment / lumpSum
+        G--&gt;&gt;S: List&lt;ScheduleItem&gt;
+        S-&gt;&gt;R: insertPlan + insertItems
+        S-&gt;&gt;S: Σ interestDue
+        S-&gt;&gt;L: loan.accrueInterest(Σ) + updateAfterPlanGeneration
+        L--&gt;&gt;S: 乐观锁结果
+        S--&gt;&gt;CT: PlanView（总额 / 本金 / 利息）
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 运营
+    participant CT as RepaymentPlanController
+    participant S as RepaymentPlanApplicationService
+    participant PC as ProductCatalogService
+    participant R as RepaymentPlanRepository
+    participant G as RepaymentScheduleGenerator
+    participant L as LoanRepository
+    participant DB as core schema
+
+    C-&gt;&gt;CT: POST /api/repayment-plans
+    CT-&gt;&gt;S: generate(...)
+    S-&gt;&gt;L: findByIdForUpdate(loanId)
+    L--&gt;&gt;S: Loan（行锁）
+    S-&gt;&gt;S: 解析 method / 校验 firstDueDate
+    alt 指定 productCode
+        S-&gt;&gt;PC: findEffective(productCode)
+        PC--&gt;&gt;S: ProductProfile（L1 → L2 → DB）
+        S-&gt;&gt;S: ProductTermsResolver.resolve(档位, 覆盖值)
+    else 纯入参模式
+        S-&gt;&gt;S: ProductTermsResolver.fromDirectInput(...)
+    end
+    S-&gt;&gt;R: planExistsForLoan(loanId)
+    alt 已有计划
+        S--&gt;&gt;CT: RF_CONFLICT_001
+    else 无计划
+        S-&gt;&gt;G: equalPayment / equalPrincipal / bonusPayment / lumpSum
+        G--&gt;&gt;S: List&lt;ScheduleItem&gt;
+        S-&gt;&gt;R: insertPlan + insertItems
+        S-&gt;&gt;S: Σ interestDue
+        S-&gt;&gt;L: loan.accrueInterest(Σ) + updateAfterPlanGeneration
+        L--&gt;&gt;S: 乐观锁结果
+        S--&gt;&gt;CT: PlanView（总额 / 本金 / 利息）
+    end</code></pre></details></article>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>4.3 generate 内部流程图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：还款计划生成（计息）</code> · 图：<code>4.3 generate 内部流程图</code></p><pre class="mermaid">flowchart TD
+    A["generate(...) 开始&lt;br/&gt;@Transactional"] --&gt; B["loanRepository.findByIdForUpdate(loanId)&lt;br/&gt;SELECT ... FOR UPDATE"]
+    B --&gt; C{"债权存在？"}
+    C -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;债权不存在"]
+    C -- 是 --&gt; D["parseMethod(method)&lt;br/&gt;RepaymentMethod.valueOf"]
+    D --&gt; D1{"method 合法？"}
+    D1 -- 否 --&gt; E2["RF_VALID_001&lt;br/&gt;method 必须是 EQUAL_PAYMENT / ..."]
+    D1 -- 是 --&gt; F{"firstDueDate == null？"}
+    F -- 是 --&gt; E3["RF_VALID_001&lt;br/&gt;firstDueDate 必填"]
+    F -- 否 --&gt; G{"productCode 非空？"}
+    G -- 是 --&gt; H["ProductCatalogService.findEffective(productCode)&lt;br/&gt;L1 Caffeine → L2 Redis → DB"]
+    H --&gt; I["ProductTermsResolver.resolve(profile, 覆盖值)&lt;br/&gt;授信覆盖 &gt; 档位默认"]
+    G -- 否 --&gt; J["ProductTermsResolver.fromDirectInput(...)&lt;br/&gt;纯入参模式"]
+    I --&gt; K{"参数合法？&lt;br/&gt;termCount &gt; 0 / rateBp &gt;= 0 / bonusMonth 1-12"}
+    J --&gt; K
+    K -- 否 --&gt; E4["RF_VALID_001&lt;br/&gt;参数错误"]
+    K -- 是 --&gt; L{"planRepository.planExistsForLoan(loanId)？"}
+    L -- 是 --&gt; E5["RF_CONFLICT_001&lt;br/&gt;该债权已存在还款计划"]
+    L -- 否 --&gt; M["new RepaymentScheduleGenerator(terms.rateBp())"]
+    M --&gt; N{"repaymentMethod"}
+    N -- EQUAL_PAYMENT --&gt; O1["generator.equalPayment(principal, firstDueDate, termCount)"]
+    N -- EQUAL_PRINCIPAL --&gt; O2["generator.equalPrincipal(...)"]
+    N -- BONUS_PAYMENT --&gt; O3{"bonusMonth == null？"}
+    O3 -- 是 --&gt; O4["回退 equalPayment(...)"]
+    O3 -- 否 --&gt; O5["generator.bonusPayment(..., bonusMonth)"]
+    N -- LUMP_SUM --&gt; O6["generator.lumpSum(principal, firstDueDate)"]
+    O1 --&gt; P["planRepository.insertPlan(...)&lt;br/&gt;plan_version = 1"]
+    O2 --&gt; P
+    O4 --&gt; P
+    O5 --&gt; P
+    O6 --&gt; P
+    P --&gt; Q["planRepository.insertItems(planId, items, traceId)&lt;br/&gt;batch INSERT core.schedule_items，status=OPEN"]
+    Q --&gt; R["totalInterestDue = Σ item.interestDue"]
+    R --&gt; S["loan.accrueInterest(totalInterestDue)&lt;br/&gt;interestAccrued = total；balance += total"]
+    S --&gt; T["loanRepository.updateAfterPlanGeneration(loan)&lt;br/&gt;UPDATE ... WHERE version = ?"]
+    T --&gt; U{"affected rows == 0？"}
+    U -- 是 --&gt; E6["RF_CONFLICT_001&lt;br/&gt;债权并发更新冲突"]
+    U -- 否 --&gt; V["return PlanView(...)"]
+    V --&gt; W["事务提交"]
+    E1 --&gt; X["事务回滚"]
+    E2 --&gt; X
+    E3 --&gt; X
+    E4 --&gt; X
+    E5 --&gt; X
+    E6 --&gt; X</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["generate(...) 开始&lt;br/&gt;@Transactional"] --&gt; B["loanRepository.findByIdForUpdate(loanId)&lt;br/&gt;SELECT ... FOR UPDATE"]
+    B --&gt; C{"债权存在？"}
+    C -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;债权不存在"]
+    C -- 是 --&gt; D["parseMethod(method)&lt;br/&gt;RepaymentMethod.valueOf"]
+    D --&gt; D1{"method 合法？"}
+    D1 -- 否 --&gt; E2["RF_VALID_001&lt;br/&gt;method 必须是 EQUAL_PAYMENT / ..."]
+    D1 -- 是 --&gt; F{"firstDueDate == null？"}
+    F -- 是 --&gt; E3["RF_VALID_001&lt;br/&gt;firstDueDate 必填"]
+    F -- 否 --&gt; G{"productCode 非空？"}
+    G -- 是 --&gt; H["ProductCatalogService.findEffective(productCode)&lt;br/&gt;L1 Caffeine → L2 Redis → DB"]
+    H --&gt; I["ProductTermsResolver.resolve(profile, 覆盖值)&lt;br/&gt;授信覆盖 &gt; 档位默认"]
+    G -- 否 --&gt; J["ProductTermsResolver.fromDirectInput(...)&lt;br/&gt;纯入参模式"]
+    I --&gt; K{"参数合法？&lt;br/&gt;termCount &gt; 0 / rateBp &gt;= 0 / bonusMonth 1-12"}
+    J --&gt; K
+    K -- 否 --&gt; E4["RF_VALID_001&lt;br/&gt;参数错误"]
+    K -- 是 --&gt; L{"planRepository.planExistsForLoan(loanId)？"}
+    L -- 是 --&gt; E5["RF_CONFLICT_001&lt;br/&gt;该债权已存在还款计划"]
+    L -- 否 --&gt; M["new RepaymentScheduleGenerator(terms.rateBp())"]
+    M --&gt; N{"repaymentMethod"}
+    N -- EQUAL_PAYMENT --&gt; O1["generator.equalPayment(principal, firstDueDate, termCount)"]
+    N -- EQUAL_PRINCIPAL --&gt; O2["generator.equalPrincipal(...)"]
+    N -- BONUS_PAYMENT --&gt; O3{"bonusMonth == null？"}
+    O3 -- 是 --&gt; O4["回退 equalPayment(...)"]
+    O3 -- 否 --&gt; O5["generator.bonusPayment(..., bonusMonth)"]
+    N -- LUMP_SUM --&gt; O6["generator.lumpSum(principal, firstDueDate)"]
+    O1 --&gt; P["planRepository.insertPlan(...)&lt;br/&gt;plan_version = 1"]
+    O2 --&gt; P
+    O4 --&gt; P
+    O5 --&gt; P
+    O6 --&gt; P
+    P --&gt; Q["planRepository.insertItems(planId, items, traceId)&lt;br/&gt;batch INSERT core.schedule_items，status=OPEN"]
+    Q --&gt; R["totalInterestDue = Σ item.interestDue"]
+    R --&gt; S["loan.accrueInterest(totalInterestDue)&lt;br/&gt;interestAccrued = total；balance += total"]
+    S --&gt; T["loanRepository.updateAfterPlanGeneration(loan)&lt;br/&gt;UPDATE ... WHERE version = ?"]
+    T --&gt; U{"affected rows == 0？"}
+    U -- 是 --&gt; E6["RF_CONFLICT_001&lt;br/&gt;债权并发更新冲突"]
+    U -- 否 --&gt; V["return PlanView(...)"]
+    V --&gt; W["事务提交"]
+    E1 --&gt; X["事务回滚"]
+    E2 --&gt; X
+    E3 --&gt; X
+    E4 --&gt; X
+    E5 --&gt; X
+    E6 --&gt; X</code></pre></details></article>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>1 条计划头 + N 条期次（ER）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：还款计划生成（计息）</code> · 图：<code>1 条计划头 + N 条期次（ER）</code></p><pre class="mermaid">erDiagram
+    LOANS ||--o| REPAYMENT_PLANS : "1 债权 1 个计划版本"
+    REPAYMENT_PLANS ||--o{ SCHEDULE_ITEMS : "1 计划 N 期"
+
+    LOANS {
+        bigint loan_id PK
+        bigint contract_id
+        bigint principal
+        bigint fee_amount
+        bigint interest_accrued
+        bigint balance
+        varchar status
+    }
+
+    REPAYMENT_PLANS {
+        bigint plan_id PK
+        bigint loan_id FK
+        varchar method
+        int installment_count
+        date first_due_date
+        int bonus_month
+        int plan_version
+        varchar product_code
+        int product_version
+        int rate_bp
+    }
+
+    SCHEDULE_ITEMS {
+        bigint item_id PK
+        bigint plan_id FK
+        int period_no
+        date due_date
+        bigint amount_due
+        bigint principal_due
+        bigint interest_due
+        varchar status
+        bigint paid_amount
+        bigint paid_interest
+        bigint paid_principal
+        bigint waived_amount
+    }</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    LOANS ||--o| REPAYMENT_PLANS : "1 债权 1 个计划版本"
+    REPAYMENT_PLANS ||--o{ SCHEDULE_ITEMS : "1 计划 N 期"
+
+    LOANS {
+        bigint loan_id PK
+        bigint contract_id
+        bigint principal
+        bigint fee_amount
+        bigint interest_accrued
+        bigint balance
+        varchar status
+    }
+
+    REPAYMENT_PLANS {
+        bigint plan_id PK
+        bigint loan_id FK
+        varchar method
+        int installment_count
+        date first_due_date
+        int bonus_month
+        int plan_version
+        varchar product_code
+        int product_version
+        int rate_bp
+    }
+
+    SCHEDULE_ITEMS {
+        bigint item_id PK
+        bigint plan_id FK
+        int period_no
+        date due_date
+        bigint amount_due
+        bigint principal_due
+        bigint interest_due
+        varchar status
+        bigint paid_amount
+        bigint paid_interest
+        bigint paid_principal
+        bigint waived_amount
+    }</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 主流程二：从申请到债权 ACTIVE（代付）</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>5.0 前置链路：申请 → 合同 → 债权记录 → 代付 → ACTIVE</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：从申请到债权 ACTIVE（代付）</code> · 图：<code>5.0 前置链路：申请 → 合同 → 债权记录 → 代付 → ACTIVE</code></p><pre class="mermaid">flowchart LR
+    A["用户申请&lt;br/&gt;application-service&lt;br/&gt;core.applications"] --&gt; B["审查&lt;br/&gt;underwriting-service&lt;br/&gt;underwriting_cases"]
+    B --&gt; C["合同生效&lt;br/&gt;contract-service&lt;br/&gt;contracts EFFECTIVE"]
+    C --&gt; D["创建债权记录&lt;br/&gt;retail-core POST /api/loans&lt;br/&gt;core.loans PENDING_DISBURSEMENT"]
+    D --&gt; E["生成还款计划&lt;br/&gt;POST /api/repayment-plans&lt;br/&gt;repayment_plans + schedule_items"]
+    E --&gt; F["执行代付&lt;br/&gt;POST /api/disbursements&lt;br/&gt;G8 合同+审查前置校验"]
+    F --&gt; G["银行把钱付给销售店"]
+    G --&gt; H["债权 ACTIVE&lt;br/&gt;DISBURSEMENT_PAID"]
+    H --&gt; I["入金核销 → 结清"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart LR
+    A["用户申请&lt;br/&gt;application-service&lt;br/&gt;core.applications"] --&gt; B["审查&lt;br/&gt;underwriting-service&lt;br/&gt;underwriting_cases"]
+    B --&gt; C["合同生效&lt;br/&gt;contract-service&lt;br/&gt;contracts EFFECTIVE"]
+    C --&gt; D["创建债权记录&lt;br/&gt;retail-core POST /api/loans&lt;br/&gt;core.loans PENDING_DISBURSEMENT"]
+    D --&gt; E["生成还款计划&lt;br/&gt;POST /api/repayment-plans&lt;br/&gt;repayment_plans + schedule_items"]
+    E --&gt; F["执行代付&lt;br/&gt;POST /api/disbursements&lt;br/&gt;G8 合同+审查前置校验"]
+    F --&gt; G["银行把钱付给销售店"]
+    G --&gt; H["债权 ACTIVE&lt;br/&gt;DISBURSEMENT_PAID"]
+    H --&gt; I["入金核销 → 结清"]</code></pre></details></article>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>5.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：从申请到债权 ACTIVE（代付）</code> · 图：<code>5.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 运营
+    participant CT as DisbursementController
+    participant S as DisbursementApplicationService
+    participant G as DisbursementGateChecker
+    participant T as DisbursementTxExecutor
+    participant SM as LoanTransitionService
+    participant B as BankPayAdapter
+    participant DB as core schema
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: POST /api/disbursements（Idempotency-Key）
+    CT-&gt;&gt;S: execute(request)
+    S-&gt;&gt;S: IdempotencyGuard（同键同指纹 → 重放）
+    S-&gt;&gt;G: checkAll(contractId, underwritingCaseId)
+    G--&gt;&gt;S: allowed / 拒绝（fail-closed）
+    S-&gt;&gt;T: disburse(request) 本地事务
+    T-&gt;&gt;DB: SELECT ... FOR UPDATE loans
+    T-&gt;&gt;T: 校验 loanId / contractId
+    T-&gt;&gt;T: assertDisbursementAllowed（INV-1）
+    T-&gt;&gt;SM: DISBURSE_START
+    SM--&gt;&gt;T: PENDING/DISBURSE_FAILED → DISBURSING
+    T-&gt;&gt;B: pay(instructionRef, principal, accountRef)
+    B--&gt;&gt;T: PAID / failed
+    alt 银行未受理
+        T--&gt;&gt;S: RF_SYS_001，事务回滚
+    else 银行受理
+        T-&gt;&gt;DB: INSERT core.disbursements（PAID）
+        T-&gt;&gt;SM: PAYMENT_CONFIRMED
+        SM--&gt;&gt;T: DISBURSING → ACTIVE
+        T-&gt;&gt;DB: UPDATE loans（乐观锁 version）
+        T-&gt;&gt;O: DISBURSEMENT_PAID（聚合键 disbursementId）
+        T--&gt;&gt;S: DisbursementView
+    end
+    S-&gt;&gt;S: 保存幂等记录与首次响应
+    S--&gt;&gt;CT: ApiResponse</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 运营
+    participant CT as DisbursementController
+    participant S as DisbursementApplicationService
+    participant G as DisbursementGateChecker
+    participant T as DisbursementTxExecutor
+    participant SM as LoanTransitionService
+    participant B as BankPayAdapter
+    participant DB as core schema
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: POST /api/disbursements（Idempotency-Key）
+    CT-&gt;&gt;S: execute(request)
+    S-&gt;&gt;S: IdempotencyGuard（同键同指纹 → 重放）
+    S-&gt;&gt;G: checkAll(contractId, underwritingCaseId)
+    G--&gt;&gt;S: allowed / 拒绝（fail-closed）
+    S-&gt;&gt;T: disburse(request) 本地事务
+    T-&gt;&gt;DB: SELECT ... FOR UPDATE loans
+    T-&gt;&gt;T: 校验 loanId / contractId
+    T-&gt;&gt;T: assertDisbursementAllowed（INV-1）
+    T-&gt;&gt;SM: DISBURSE_START
+    SM--&gt;&gt;T: PENDING/DISBURSE_FAILED → DISBURSING
+    T-&gt;&gt;B: pay(instructionRef, principal, accountRef)
+    B--&gt;&gt;T: PAID / failed
+    alt 银行未受理
+        T--&gt;&gt;S: RF_SYS_001，事务回滚
+    else 银行受理
+        T-&gt;&gt;DB: INSERT core.disbursements（PAID）
+        T-&gt;&gt;SM: PAYMENT_CONFIRMED
+        SM--&gt;&gt;T: DISBURSING → ACTIVE
+        T-&gt;&gt;DB: UPDATE loans（乐观锁 version）
+        T-&gt;&gt;O: DISBURSEMENT_PAID（聚合键 disbursementId）
+        T--&gt;&gt;S: DisbursementView
+    end
+    S-&gt;&gt;S: 保存幂等记录与首次响应
+    S--&gt;&gt;CT: ApiResponse</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 主流程三：入金核销</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-8"><div class="card-head"><h3>6.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：入金核销</code> · 图：<code>6.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as 运营/批导
+    participant CT as PaymentController
+    participant S as PaymentApplicationService
+    participant T as PaymentTxExecutor
+    participant P as PaymentAllocationPlanner
+    participant R as RepaymentPlanRepository
+    participant L as LoanRepository
+    participant DB as core schema
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: POST /api/payments（Idempotency-Key）
+    CT-&gt;&gt;S: allocate(request)
+    S-&gt;&gt;S: 校验 channel / amount / 必填项
+    S-&gt;&gt;S: IdempotencyGuard
+    alt loanId &lt;= 0
+        S-&gt;&gt;DB: INSERT payments（UNMATCHED）
+    else loanId &gt; 0
+        S-&gt;&gt;T: allocateInTx(request)
+        T-&gt;&gt;DB: INSERT/UPDATE payment（ALLOCATED）
+        T-&gt;&gt;L: findByIdForUpdate(loanId)
+        T-&gt;&gt;L: assertAllocationAllowed（ACTIVE/DELINQUENT）
+        T-&gt;&gt;R: findPlanIdByLoanId + findItemRows
+        T-&gt;&gt;T: feeOutstanding = feeAmount − Σ已核销费用
+        T-&gt;&gt;P: plan(feeOutstanding, 可核销期次, amount)
+        P--&gt;&gt;T: fee / interest / principal 拆分
+        alt remainder &gt; 0
+            T--&gt;&gt;S: RF_PAY_002（X-8 超额入金）
+        else 拆分完整
+            T-&gt;&gt;L: applyAllocation(total)
+            opt 债权为 DELINQUENT
+                T-&gt;&gt;L: cureFromDelinquent（引擎迁移）
+            end
+            T-&gt;&gt;DB: INSERT payment_allocations
+            T-&gt;&gt;R: updateItemAfterAllocation（逐期）
+            T-&gt;&gt;L: updateAfterAllocation（乐观锁）
+            T-&gt;&gt;T: reconciliation.assertConsistent（INV-2）
+            T-&gt;&gt;O: REPAYMENT_RECEIVED（聚合键 paymentRef）
+        end
+    end</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant C as 运营/批导
+    participant CT as PaymentController
+    participant S as PaymentApplicationService
+    participant T as PaymentTxExecutor
+    participant P as PaymentAllocationPlanner
+    participant R as RepaymentPlanRepository
+    participant L as LoanRepository
+    participant DB as core schema
+    participant O as core.outbox_events
+
+    C-&gt;&gt;CT: POST /api/payments（Idempotency-Key）
+    CT-&gt;&gt;S: allocate(request)
+    S-&gt;&gt;S: 校验 channel / amount / 必填项
+    S-&gt;&gt;S: IdempotencyGuard
+    alt loanId &lt;= 0
+        S-&gt;&gt;DB: INSERT payments（UNMATCHED）
+    else loanId &gt; 0
+        S-&gt;&gt;T: allocateInTx(request)
+        T-&gt;&gt;DB: INSERT/UPDATE payment（ALLOCATED）
+        T-&gt;&gt;L: findByIdForUpdate(loanId)
+        T-&gt;&gt;L: assertAllocationAllowed（ACTIVE/DELINQUENT）
+        T-&gt;&gt;R: findPlanIdByLoanId + findItemRows
+        T-&gt;&gt;T: feeOutstanding = feeAmount − Σ已核销费用
+        T-&gt;&gt;P: plan(feeOutstanding, 可核销期次, amount)
+        P--&gt;&gt;T: fee / interest / principal 拆分
+        alt remainder &gt; 0
+            T--&gt;&gt;S: RF_PAY_002（X-8 超额入金）
+        else 拆分完整
+            T-&gt;&gt;L: applyAllocation(total)
+            opt 债权为 DELINQUENT
+                T-&gt;&gt;L: cureFromDelinquent（引擎迁移）
+            end
+            T-&gt;&gt;DB: INSERT payment_allocations
+            T-&gt;&gt;R: updateItemAfterAllocation（逐期）
+            T-&gt;&gt;L: updateAfterAllocation（乐观锁）
+            T-&gt;&gt;T: reconciliation.assertConsistent（INV-2）
+            T-&gt;&gt;O: REPAYMENT_RECEIVED（聚合键 paymentRef）
+        end
+    end</code></pre></details></article>
+<article class="diagram-card" id="diagram-9"><div class="card-head"><h3>6.4 期次状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：入金核销</code> · 图：<code>6.4 期次状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; OPEN
+    OPEN --&gt; DUE: due_date &lt;= bizDate
+    DUE --&gt; OVERDUE: due_date &lt; bizDate
+    DUE --&gt; PARTIAL: 部分核销
+    OVERDUE --&gt; PARTIAL: 部分核销
+    DUE --&gt; PAID: 全额核销
+    OVERDUE --&gt; PAID: 全额核销（补救）
+    PARTIAL --&gt; PAID: 补齐
+    DUE --&gt; WAIVED: 结清豁免
+    OVERDUE --&gt; WAIVED: 结清豁免
+    PAID --&gt; [*]
+    WAIVED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; OPEN
+    OPEN --&gt; DUE: due_date &lt;= bizDate
+    DUE --&gt; OVERDUE: due_date &lt; bizDate
+    DUE --&gt; PARTIAL: 部分核销
+    OVERDUE --&gt; PARTIAL: 部分核销
+    DUE --&gt; PAID: 全额核销
+    OVERDUE --&gt; PAID: 全额核销（补救）
+    PARTIAL --&gt; PAID: 补齐
+    DUE --&gt; WAIVED: 结清豁免
+    OVERDUE --&gt; WAIVED: 结清豁免
+    PAID --&gt; [*]
+    WAIVED --&gt; [*]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 主流程四：结清</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-10"><div class="card-head"><h3>7.2 流程图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 主流程四：结清</code> · 图：<code>7.2 流程图</code></p><pre class="mermaid">flowchart TD
+    A["POST /api/loans/{id}/settle"] --&gt; B{"type"}
+    B --&gt;|"NORMAL"| C["校验无未清偿期次"]
+    C --&gt; D["Loan.assertSettlementAllowed：余额精确为 0"]
+    D --&gt; E["状态机 SETTLE → SETTLED"]
+    B --&gt;|"EARLY"| F["加载未清偿期次"]
+    F --&gt; G["SettlementCalculator.planClosure"]
+    G --&gt; H["quote = 剩余本金 − 减免额 + 手续费"]
+    H --&gt; I["手续费计提：balance += settlementFee"]
+    I --&gt; J["结清入金核销：balance −= quote"]
+    J --&gt; K["豁免：未到期利息 + 折让本金 + 未核销费用"]
+    K --&gt; L["期次关闭：PAID / WAIVED"]
+    L --&gt; M["状态机 EARLY_SETTLE → EARLY_SETTLED"]
+    M --&gt; N["INSERT settlement_adjustments"]
+    N --&gt; O["INV-2 断言：余额精确为 0"]
+    O --&gt; P["outbox LOAN_SETTLED"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["POST /api/loans/{id}/settle"] --&gt; B{"type"}
+    B --&gt;|"NORMAL"| C["校验无未清偿期次"]
+    C --&gt; D["Loan.assertSettlementAllowed：余额精确为 0"]
+    D --&gt; E["状态机 SETTLE → SETTLED"]
+    B --&gt;|"EARLY"| F["加载未清偿期次"]
+    F --&gt; G["SettlementCalculator.planClosure"]
+    G --&gt; H["quote = 剩余本金 − 减免额 + 手续费"]
+    H --&gt; I["手续费计提：balance += settlementFee"]
+    I --&gt; J["结清入金核销：balance −= quote"]
+    J --&gt; K["豁免：未到期利息 + 折让本金 + 未核销费用"]
+    K --&gt; L["期次关闭：PAID / WAIVED"]
+    L --&gt; M["状态机 EARLY_SETTLE → EARLY_SETTLED"]
+    M --&gt; N["INSERT settlement_adjustments"]
+    N --&gt; O["INV-2 断言：余额精确为 0"]
+    O --&gt; P["outbox LOAN_SETTLED"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>8. 批处理：到期滚转与逾期判断</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-11"><div class="card-head"><h3>逾期判断：期次状态 + DPD（不对比 PaymentAllocation）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>8. 批处理：到期滚转与逾期判断</code> · 图：<code>逾期判断：期次状态 + DPD（不对比 PaymentAllocation）</code></p><pre class="mermaid">flowchart TD
+    A["core.schedule_items&lt;br/&gt;due_date / status / paid_*"] --&gt; B["03:00 schedule-due-rollup&lt;br/&gt;（retail-core）"]
+    B --&gt; C{"status = DUE&lt;br/&gt;且 due_date &lt; bizDate？"}
+    C -- 是 --&gt; D["status = OVERDUE"]
+    C -- 否 --&gt; E["保持原状态"]
+
+    A --&gt; F["03:30 dpd-snapshot&lt;br/&gt;（servicing-service）"]
+    F --&gt; G{"status 不是 PAID / WAIVED&lt;br/&gt;且 due_date &lt; today？"}
+    G -- 是 --&gt; H["dpd = today - due_date&lt;br/&gt;stage = CURRENT/M1/M2/M3/M4"]
+    G -- 否 --&gt; I["dpd = 0，不计逾期"]
+    H --&gt; J["写 core.dpd_snapshots"]
+    J --&gt; K{"stage != CURRENT？"}
+    K -- 是 --&gt; L["开催收案件&lt;br/&gt;+ DPD_CHANGED"]
+    K -- 否 --&gt; M["不催收"]
+
+    N["PaymentAllocation&lt;br/&gt;费用/利息/本金拆分"] -.-&gt;|"只在入金核销时更新&lt;br/&gt;paid_* / status"| A</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["core.schedule_items&lt;br/&gt;due_date / status / paid_*"] --&gt; B["03:00 schedule-due-rollup&lt;br/&gt;（retail-core）"]
+    B --&gt; C{"status = DUE&lt;br/&gt;且 due_date &lt; bizDate？"}
+    C -- 是 --&gt; D["status = OVERDUE"]
+    C -- 否 --&gt; E["保持原状态"]
+
+    A --&gt; F["03:30 dpd-snapshot&lt;br/&gt;（servicing-service）"]
+    F --&gt; G{"status 不是 PAID / WAIVED&lt;br/&gt;且 due_date &lt; today？"}
+    G -- 是 --&gt; H["dpd = today - due_date&lt;br/&gt;stage = CURRENT/M1/M2/M3/M4"]
+    G -- 否 --&gt; I["dpd = 0，不计逾期"]
+    H --&gt; J["写 core.dpd_snapshots"]
+    J --&gt; K{"stage != CURRENT？"}
+    K -- 是 --&gt; L["开催收案件&lt;br/&gt;+ DPD_CHANGED"]
+    K -- 否 --&gt; M["不催收"]
+
+    N["PaymentAllocation&lt;br/&gt;费用/利息/本金拆分"] -.-&gt;|"只在入金核销时更新&lt;br/&gt;paid_* / status"| A</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>10. 状态机接线</h2><span class="source">来源：interview/retail-core-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-12"><div class="card-head"><h3>10.1 债权状态图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>10. 状态机接线</code> · 图：<code>10.1 债权状态图</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; PENDING_DISBURSEMENT
+    PENDING_DISBURSEMENT --&gt; DISBURSING: DISBURSE_START
+    PENDING_DISBURSEMENT --&gt; CANCELLED: CANCEL
+    DISBURSING --&gt; ACTIVE: PAYMENT_CONFIRMED
+    DISBURSING --&gt; DISBURSE_FAILED: DISBURSE_FAILED
+    DISBURSE_FAILED --&gt; DISBURSING: DISBURSE_START
+    DISBURSE_FAILED --&gt; CANCELLED: CANCEL
+    ACTIVE --&gt; DELINQUENT: 未接线
+    ACTIVE --&gt; SETTLED: SETTLE
+    ACTIVE --&gt; EARLY_SETTLED: EARLY_SETTLE
+    ACTIVE --&gt; WRITTEN_OFF: 未接线
+    DELINQUENT --&gt; ACTIVE: CURE
+    DELINQUENT --&gt; SETTLED: SETTLE
+    DELINQUENT --&gt; WRITTEN_OFF: 未接线
+    SETTLED --&gt; [*]
+    EARLY_SETTLED --&gt; [*]
+    WRITTEN_OFF --&gt; [*]
+    CANCELLED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; PENDING_DISBURSEMENT
+    PENDING_DISBURSEMENT --&gt; DISBURSING: DISBURSE_START
+    PENDING_DISBURSEMENT --&gt; CANCELLED: CANCEL
+    DISBURSING --&gt; ACTIVE: PAYMENT_CONFIRMED
+    DISBURSING --&gt; DISBURSE_FAILED: DISBURSE_FAILED
+    DISBURSE_FAILED --&gt; DISBURSING: DISBURSE_START
+    DISBURSE_FAILED --&gt; CANCELLED: CANCEL
+    ACTIVE --&gt; DELINQUENT: 未接线
+    ACTIVE --&gt; SETTLED: SETTLE
+    ACTIVE --&gt; EARLY_SETTLED: EARLY_SETTLE
+    ACTIVE --&gt; WRITTEN_OFF: 未接线
+    DELINQUENT --&gt; ACTIVE: CURE
+    DELINQUENT --&gt; SETTLED: SETTLE
+    DELINQUENT --&gt; WRITTEN_OFF: 未接线
+    SETTLED --&gt; [*]
+    EARLY_SETTLED --&gt; [*]
+    WRITTEN_OFF --&gt; [*]
+    CANCELLED --&gt; [*]</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_retail_core_html.py</code> ·
+     图源：<code>interview/retail-core-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#e0f2fe',
+        primaryBorderColor: '#0284c7',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

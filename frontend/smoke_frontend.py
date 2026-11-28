@@ -92,6 +92,21 @@ check("F0 app.js 200 且含关键步骤函数", code == 200 and "s11All" in text
 code, text = req("GET", FE + "/gw/api/health")
 check("F0 代理 /gw → 网关健康 UP", code == 200 and '"status":"UP"' in text,
       "HTTP {} {}".format(code, text[:120]))
+code, text = req("GET", FE + "/login.html")
+check("F0 员工登录页 200 且含账号/密码表单",
+      code == 200 and 'id="login-user"' in text and 'id="login-pass"' in text,
+      "HTTP {} {}".format(code, text[:120]))
+code, text = req("GET", FE + "/session.js")
+check("F0 员工会话脚本可加载（登录页与控制台共用）",
+      code == 200 and "RFStaffSession" in text, "HTTP {} {}".format(code, text[:120]))
+code, text = req("GET", FE + "/customers.html")
+check("F0 客户管理页 200 且含建档/查询入口",
+      code == 200 and 'id="register-form"' in text and 'id="lookup-id"' in text,
+      "HTTP {} {}".format(code, text[:120]))
+code, text = req("GET", FE + "/customers.js")
+check("F0 客户管理脚本可加载（PII / 核验 / 同意）",
+      code == 200 and "pii/customers" in text and "identity-verifications" in text,
+      "HTTP {} {}".format(code, text[:120]))
 
 # ---- F1 员工登录 ----
 code, data, text = api("POST", "/gw/api/auth/staff/login",
@@ -267,7 +282,10 @@ for idx, item in enumerate(ITEMS, start=1):
         check("F9 第{}期对拍".format(idx), False, json.dumps(cur, ensure_ascii=False)[:200])
         break
 if pay_ok:
-    check("F9 三期逐笔核销 + schedule_item PAID 对拍", True)
+    # ITEMS 为空时上面的 for 循环不会执行，pay_ok 仍为 True——必须显式断言期次数，
+    # 否则「计划读不到」会被判成「逐笔核销通过」（2026-11-26 实测踩过）。
+    check("F9 三期逐笔核销 + schedule_item PAID 对拍", len(ITEMS) == 3,
+          "还款计划期次数={}，逐笔核销未真实执行".format(len(ITEMS)))
 code, data, text = api("GET", "/gw/api/loans/{}/balance".format(LOAN), token=T)
 check("F9 还清后余额=0", code == 200 and (data or {}).get("balance") == 0,
       "HTTP {} {}".format(code, text[:160]))

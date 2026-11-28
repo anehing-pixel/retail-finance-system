@@ -1,0 +1,1298 @@
+<!doctype html>
+<!-- 自动生成：python interview/tools/gen_servicing_html.py；请修改 interview/servicing-service-代码流程.md，不要手改本文件 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>servicing-service 代码流程图集 · 贷后服务</title>
+<style>
+:root {
+  --bg: #f4f7fb;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #dbe3ee;
+  --brand: #0f766e;
+  --brand-2: #1d4ed8;
+  --soft: #eef6f6;
+  --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+a { color: var(--brand-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.hero {
+  background: radial-gradient(1100px 420px at 8% -20%, #134e4a 0%, #0f172a 58%, #111827 100%);
+  color: #e2e8f0;
+  padding: 42px 32px 34px;
+}
+.hero-inner { max-width: 1280px; margin: 0 auto; }
+.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
+.hero p { margin: 0; color: #94a3b8; max-width: 920px; }
+.hero .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; border: 1px solid rgba(148,163,184,.35);
+  border-radius: 999px; background: rgba(15,23,42,.35); color: #dbeafe;
+  font-size: 13px;
+}
+.layout {
+  display: grid; grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px; max-width: 1280px; margin: 24px auto 52px; padding: 0 24px;
+}
+.sidebar {
+  position: sticky; top: 18px; align-self: start;
+  max-height: calc(100vh - 36px); overflow: auto;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 14px; box-shadow: var(--shadow);
+}
+.sidebar h2 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 4px 6px 10px; }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover { background: var(--soft); text-decoration: none; color: var(--brand); }
+main { min-width: 0; }
+.overview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin-bottom: 22px;
+}
+.overview .card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.overview .card b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+.overview .card span { display: block; margin-top: 3px; font-size: 15px; font-weight: 700; }
+.doc-group { margin: 30px 0 10px; }
+.doc-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  border-bottom: 2px solid var(--line); padding-bottom: 8px; margin-bottom: 14px;
+}
+.doc-head h2 { margin: 0; font-size: 22px; }
+.doc-head .source { color: var(--muted); font-size: 13px; }
+.diagram-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 18px 12px; margin: 16px 0 22px; box-shadow: var(--shadow);
+  scroll-margin-top: 18px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card-head h3 { margin: 0; font-size: 17px; }
+.badge {
+  flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  color: var(--brand); background: var(--soft); border: 1px solid #cfe6e3;
+  border-radius: 999px; padding: 3px 9px;
+}
+.meta { margin: 4px 0 12px; color: var(--muted); font-size: 12.5px; }
+.meta code { color: #334155; }
+pre.mermaid {
+  margin: 0; padding: 12px; overflow: auto;
+  background: #fbfdff; border: 1px dashed #cbd5e1; border-radius: 12px;
+  text-align: center;
+}
+pre.mermaid svg { max-width: 100%; height: auto; }
+.diagram-card.natural pre.mermaid svg { max-width: none; height: auto; }
+.card-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.zoom-btn {
+  border: 1px solid var(--line); background: #fff; color: #334155;
+  border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+.zoom-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--soft); }
+details { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+summary { cursor: pointer; color: var(--brand); font-size: 13px; }
+pre.source-code {
+  margin: 10px 0 0; padding: 12px; overflow: auto;
+  background: #0f172a; color: #dbeafe; border-radius: 10px;
+  font-size: 12px; line-height: 1.5;
+}
+#mermaid-warning {
+  display: none; max-width: 1280px; margin: 18px auto 0; padding: 12px 16px;
+  background: #fff7ed; border: 1px solid #fdba74; color: #9a3412;
+  border-radius: 12px;
+}
+body.mermaid-failed #mermaid-warning { display: block; }
+.footer {
+  max-width: 1280px; margin: 0 auto 40px; padding: 0 24px;
+  color: var(--muted); font-size: 12.5px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 0 14px; }
+  .sidebar { position: static; max-height: none; }
+  .hero { padding: 30px 18px 24px; }
+}
+@media print {
+  body { background: #fff; }
+  .hero { background: #fff; color: #000; padding: 0 0 12px; }
+  .hero p, .hero .stats, .sidebar, .overview { display: none; }
+  .layout { display: block; max-width: none; margin: 0; padding: 0; }
+  .diagram-card { box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  pre.mermaid { border-color: #ccc; }
+  details { display: none; }
+}
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+.layout { transition: grid-template-columns .18s ease, max-width .18s ease; }
+.sidebar { transition: padding .18s ease; }
+.layout.nav-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+  max-width: 1600px;
+}
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin: 0 0 8px;
+}
+.sidebar-head h2 {
+  font-size: 13px; letter-spacing: .08em; color: var(--muted); margin: 0;
+}
+.nav-toggle {
+  border: 1px solid var(--line); background: #fff; color: var(--brand);
+  border-radius: 8px; padding: 3px 7px; font-size: 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.nav-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.nav-group { margin: 12px 0 16px; }
+.nav-group > span {
+  display: block; font-size: 12px; font-weight: 700; color: var(--brand);
+  margin: 0 6px 5px; letter-spacing: .04em;
+}
+.nav-group a {
+  display: block; padding: 5px 8px; border-radius: 8px;
+  color: #334155; font-size: 13px; line-height: 1.35;
+}
+.nav-group a:hover {
+  background: var(--soft); text-decoration: none; color: var(--brand);
+}
+.nav-rail-toggle {
+  display: none;
+  width: 100%; border: 1px solid var(--line); background: #fff;
+  color: var(--brand); border-radius: 10px; padding: 10px 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  cursor: pointer;
+}
+.nav-rail-toggle:hover { border-color: var(--brand); background: var(--soft); }
+.layout.nav-collapsed .sidebar { padding: 10px 6px; }
+.layout.nav-collapsed .sidebar-head,
+.layout.nav-collapsed .nav-group { display: none; }
+.layout.nav-collapsed .nav-rail-toggle { display: block; }
+@media (max-width: 960px) {
+  .layout.nav-collapsed { grid-template-columns: 52px minmax(0, 1fr); }
+}
+@media print {
+  .nav-toggle, .nav-rail-toggle, .sidebar { display: none; }
+}
+</style>
+<script src="../docs/assets/mermaid-10.9.1.min.js"></script>
+<script>
+if (!window.mermaid) {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"><\/script>');
+}
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>servicing-service 代码流程图集</h1>
+    <p>贷后服务（DPD 快照 / 催收案件 / 征信报送触发）的代码走读图集，
+       源文件：<code>interview/servicing-service-代码流程.md</code>。</p>
+    <div class="stats">
+      <span class="chip">端口 8098</span>
+      <span class="chip">core / audit schema</span>
+      <span class="chip">DPD 日批 + outbox</span>
+      <span class="chip">14 张 Mermaid 图</span>
+      <span class="chip">Mermaid 10.9.1 · 离线可渲染</span>
+    </div>
+  </div>
+</header>
+<div id="mermaid-warning"></div>
+<div class="layout">
+  <aside class="sidebar" id="rf-sidebar"><div class="sidebar-head">
+<h2>图目录</h2>
+<button id="nav-toggle" class="nav-toggle" type="button"
+        aria-controls="rf-sidebar" aria-expanded="true"
+        title="向左收起图目录">‹ 收起</button>
+</div>
+<div class="nav-group">
+<span>1. 代码地图</span>
+<a href="#diagram-1">1.2 组件与依赖方向</a>
+</div>
+<div class="nav-group">
+<span>3. 领域模型与不变式</span>
+<a href="#diagram-2">3.1 聚合与值对象</a>
+<a href="#diagram-3">3.3 DPD 分层口径</a>
+</div>
+<div class="nav-group">
+<span>4. 主流程一：DPD 快照日批（dpd-snapshot）</span>
+<a href="#diagram-4">4.2 时序图</a>
+<a href="#diagram-5">4.3 run / doRun 内部流程图</a>
+</div>
+<div class="nav-group">
+<span>5. 主流程二：催收案件处置</span>
+<a href="#diagram-6">5.2 时序图</a>
+<a href="#diagram-7">5.3 executeAction 流程图</a>
+<a href="#diagram-8">5.4 催收案件状态机</a>
+</div>
+<div class="nav-group">
+<span>6. 主流程三：征信报送触发</span>
+<a href="#diagram-9">6.2 时序图</a>
+<a href="#diagram-10">6.3 register 流程图</a>
+<a href="#diagram-11">6.4 同意前置校验（fail-closed）</a>
+</div>
+<div class="nav-group">
+<span>7. 日批调度与批次护栏</span>
+<a href="#diagram-12">7.2 抢占与失败处理</a>
+</div>
+<div class="nav-group">
+<span>10. 数据表与迁移</span>
+<a href="#diagram-13">10.1 表关系</a>
+</div>
+<div class="nav-group">
+<span>12. 事件与外部依赖</span>
+<a href="#diagram-14">12.1 依赖方向</a>
+</div>
+<button id="nav-rail-toggle" class="nav-rail-toggle" type="button" aria-controls="rf-sidebar" aria-expanded="false" title="展开图目录">目录</button></aside>
+  <main>
+    <section class="overview">
+      <div class="card"><b>核心边界</b><span>只读核心账务表，只写贷后自有表</span></div>
+      <div class="card"><b>DPD 口径</b><span>自然日 + 宽限期，M1–M4 分层</span></div>
+      <div class="card"><b>幂等</b><span>唯一索引 + 快照可重跑</span></div>
+      <div class="card"><b>催收</b><span>案件状态机 + 时段 fail-closed</span></div>
+      <div class="card"><b>宽图查看</b><span>点「原始尺寸」横向滚动</span></div>
+    </section>
+    <section class="doc-group">
+<div class="doc-head"><h2>1. 代码地图</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-1"><div class="card-head"><h3>1.2 组件与依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>1. 代码地图</code> · 图：<code>1.2 组件与依赖方向</code></p><pre class="mermaid">flowchart TD
+    subgraph WEB["web 层"]
+        CCC["CollectionCaseController"]
+        BRC["BureauReportTriggerController"]
+        SJC["ServicingJobController"]
+        HC["HealthController"]
+    end
+
+    subgraph APP["application 层（事务边界）"]
+        DBA["DpdBatchAppService"]
+        CCA["CollectionCaseAppService"]
+        BRA["BureauReportTriggerAppService"]
+        AUD["AuditWriter"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        CALC["DpdCalculator / DpdStage"]
+        CASE["CollectionCase / CollectionCaseStatus / CollectionActionType"]
+        TIME["CollectionTimePolicy"]
+    end
+
+    subgraph PERSIST["infrastructure / mapper"]
+        PORTS["Repository 端口实现"]
+        MAPPER["MyBatis Mapper"]
+    end
+
+    subgraph INFRA["基础设施 / 外部"]
+        DB[("PostgreSQL core / audit schema")]
+        OUTBOX[("core.outbox_events")]
+        SCHED["DpdSnapshotScheduler + BatchRunGuard"]
+        CUST["customer-service：同意前置校验"]
+        BUREAU["bureau-service：报送执行方"]
+    end
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; PERSIST
+    PERSIST --&gt; MAPPER
+    MAPPER --&gt; DB
+    DBA --&gt; OUTBOX
+    BRA --&gt; CUST
+    SCHED --&gt; DBA
+    OUTBOX --&gt; BUREAU</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    subgraph WEB["web 层"]
+        CCC["CollectionCaseController"]
+        BRC["BureauReportTriggerController"]
+        SJC["ServicingJobController"]
+        HC["HealthController"]
+    end
+
+    subgraph APP["application 层（事务边界）"]
+        DBA["DpdBatchAppService"]
+        CCA["CollectionCaseAppService"]
+        BRA["BureauReportTriggerAppService"]
+        AUD["AuditWriter"]
+    end
+
+    subgraph DOMAIN["domain 层（纯 Java）"]
+        CALC["DpdCalculator / DpdStage"]
+        CASE["CollectionCase / CollectionCaseStatus / CollectionActionType"]
+        TIME["CollectionTimePolicy"]
+    end
+
+    subgraph PERSIST["infrastructure / mapper"]
+        PORTS["Repository 端口实现"]
+        MAPPER["MyBatis Mapper"]
+    end
+
+    subgraph INFRA["基础设施 / 外部"]
+        DB[("PostgreSQL core / audit schema")]
+        OUTBOX[("core.outbox_events")]
+        SCHED["DpdSnapshotScheduler + BatchRunGuard"]
+        CUST["customer-service：同意前置校验"]
+        BUREAU["bureau-service：报送执行方"]
+    end
+
+    WEB --&gt; APP
+    APP --&gt; DOMAIN
+    APP --&gt; PERSIST
+    PERSIST --&gt; MAPPER
+    MAPPER --&gt; DB
+    DBA --&gt; OUTBOX
+    BRA --&gt; CUST
+    SCHED --&gt; DBA
+    OUTBOX --&gt; BUREAU</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>3. 领域模型与不变式</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-2"><div class="card-head"><h3>3.1 聚合与值对象</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与不变式</code> · 图：<code>3.1 聚合与值对象</code></p><pre class="mermaid">classDiagram
+    class CollectionCase {
+      +long caseId
+      +long loanId
+      +String dpdStage
+      +CollectionCaseStatus status
+      +String assignedTo
+      +long version
+      +assign(assignee, actor, traceId)
+      +contact(note, actor, traceId)
+      +promise(note, actor, traceId)
+      +promiseBroken(note, actor, traceId)
+      +close(outcome, note, actor, traceId)
+      +persistencePatch()
+      +isClosed()
+    }
+
+    class CollectionCaseStatus {
+      &lt;&lt;enumeration&gt;&gt;
+      OPEN
+      ASSIGNED
+      IN_CONTACT
+      PROMISED
+      CLOSED
+      +canTransitionTo(target)
+      +isTerminal()
+    }
+
+    class CollectionActionType {
+      &lt;&lt;enumeration&gt;&gt;
+      ASSIGN
+      CONTACT
+      PROMISE
+      CLOSE
+      +targetStatus()
+    }
+
+    class CollectionTimePolicy {
+      +LocalTime windowStart
+      +LocalTime windowEnd
+      +allows(at)
+      +defaults()
+    }
+
+    class DpdCalculator {
+      +int gracePeriodDays
+      +compute(items, today)
+    }
+
+    class DpdStage {
+      &lt;&lt;enumeration&gt;&gt;
+      CURRENT
+      M1
+      M2
+      M3
+      M4
+      +fromDays(dpdDays)
+    }
+
+    CollectionCase --&gt; CollectionCaseStatus : 状态
+    CollectionCase --&gt; CollectionActionType : 动作
+    CollectionActionType --&gt; CollectionCaseStatus : 目标状态
+    DpdCalculator --&gt; DpdStage : 分层</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>classDiagram
+    class CollectionCase {
+      +long caseId
+      +long loanId
+      +String dpdStage
+      +CollectionCaseStatus status
+      +String assignedTo
+      +long version
+      +assign(assignee, actor, traceId)
+      +contact(note, actor, traceId)
+      +promise(note, actor, traceId)
+      +promiseBroken(note, actor, traceId)
+      +close(outcome, note, actor, traceId)
+      +persistencePatch()
+      +isClosed()
+    }
+
+    class CollectionCaseStatus {
+      &lt;&lt;enumeration&gt;&gt;
+      OPEN
+      ASSIGNED
+      IN_CONTACT
+      PROMISED
+      CLOSED
+      +canTransitionTo(target)
+      +isTerminal()
+    }
+
+    class CollectionActionType {
+      &lt;&lt;enumeration&gt;&gt;
+      ASSIGN
+      CONTACT
+      PROMISE
+      CLOSE
+      +targetStatus()
+    }
+
+    class CollectionTimePolicy {
+      +LocalTime windowStart
+      +LocalTime windowEnd
+      +allows(at)
+      +defaults()
+    }
+
+    class DpdCalculator {
+      +int gracePeriodDays
+      +compute(items, today)
+    }
+
+    class DpdStage {
+      &lt;&lt;enumeration&gt;&gt;
+      CURRENT
+      M1
+      M2
+      M3
+      M4
+      +fromDays(dpdDays)
+    }
+
+    CollectionCase --&gt; CollectionCaseStatus : 状态
+    CollectionCase --&gt; CollectionActionType : 动作
+    CollectionActionType --&gt; CollectionCaseStatus : 目标状态
+    DpdCalculator --&gt; DpdStage : 分层</code></pre></details></article>
+<article class="diagram-card" id="diagram-3"><div class="card-head"><h3>3.3 DPD 分层口径</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>3. 领域模型与不变式</code> · 图：<code>3.3 DPD 分层口径</code></p><pre class="mermaid">flowchart TD
+    S["effective = max(0, 自然日 DPD - 宽限期)"] --&gt; D1{"effective 小于等于 0？"}
+    D1 -- 是 --&gt; CUR["CURRENT"]
+    D1 -- 否 --&gt; D2{"effective 小于等于 30？"}
+    D2 -- 是 --&gt; M1["M1（1-30 天）"]
+    D2 -- 否 --&gt; D3{"effective 小于等于 60？"}
+    D3 -- 是 --&gt; M2["M2（31-60 天）"]
+    D3 -- 否 --&gt; D4{"effective 小于等于 90？"}
+    D4 -- 是 --&gt; M3["M3（61-90 天）"]
+    D4 -- 否 --&gt; M4["M4（91 天及以上）"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    S["effective = max(0, 自然日 DPD - 宽限期)"] --&gt; D1{"effective 小于等于 0？"}
+    D1 -- 是 --&gt; CUR["CURRENT"]
+    D1 -- 否 --&gt; D2{"effective 小于等于 30？"}
+    D2 -- 是 --&gt; M1["M1（1-30 天）"]
+    D2 -- 否 --&gt; D3{"effective 小于等于 60？"}
+    D3 -- 是 --&gt; M2["M2（31-60 天）"]
+    D3 -- 否 --&gt; D4{"effective 小于等于 90？"}
+    D4 -- 是 --&gt; M3["M3（61-90 天）"]
+    D4 -- 否 --&gt; M4["M4（91 天及以上）"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>4. 主流程一：DPD 快照日批（dpd-snapshot）</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-4"><div class="card-head"><h3>4.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：DPD 快照日批（dpd-snapshot）</code> · 图：<code>4.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant OPS as 运营
+    participant SCHED as DpdSnapshotScheduler
+    participant GUARD as BatchRunGuard
+    participant CT as ServicingJobController
+    participant S as DpdBatchAppService
+    participant Q as LoanScheduleQueryPort
+    participant C as DpdCalculator
+    participant SR as DpdSnapshotRepository
+    participant CR as CollectionCaseRepository
+    participant OB as OutboxPublisher
+    participant BR as BatchRunRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    alt 手工触发
+        OPS-&gt;&gt;CT: POST /api/jobs/dpd-snapshot
+        CT-&gt;&gt;S: run(bizDate, actor, traceId)
+    else 调度触发
+        SCHED-&gt;&gt;GUARD: tryClaim(DPD_SNAPSHOT, bizDate, traceId, 30)
+        GUARD--&gt;&gt;SCHED: true / false
+        SCHED-&gt;&gt;S: run(bizDate, "SYSTEM", traceId)
+    end
+
+    S-&gt;&gt;BR: start(DPD_SNAPSHOT, bizDate, traceId)
+    Note over BR,DB: INSERT ... ON CONFLICT (job_name, biz_date)&lt;br/&gt;DO UPDATE SET status='RUNNING'
+
+    S-&gt;&gt;Q: loadScheduleItems()
+    Q--&gt;&gt;S: itemId / loanId / dueDate / status
+    S-&gt;&gt;S: 按 loanId 分组
+
+    S-&gt;&gt;Q: loadLoansForDpd()
+    Q--&gt;&gt;S: 非终态债权列表
+
+    loop 每一笔非终态债权
+        S-&gt;&gt;C: compute(items, bizDate)
+        C--&gt;&gt;S: DpdResult(dpdDays, stage, overdueItemId)
+        S-&gt;&gt;SR: findLatestBefore(loanId, bizDate)
+        SR--&gt;&gt;S: 上一份快照（可能为空）
+        S-&gt;&gt;SR: insert(loanId, bizDate, dpdDays, stage)
+        alt 同日快照已存在
+            SR--&gt;&gt;S: false（幂等跳过本笔）
+        else 首次插入
+            SR--&gt;&gt;S: true
+            opt stage 非 CURRENT 且分层变化
+                S-&gt;&gt;OB: publish(DPD_CHANGED, loanId, payload)
+            end
+            opt stage 非 CURRENT 且无在途案件
+                S-&gt;&gt;CR: insert(loanId, stage, OPEN)
+                CR--&gt;&gt;S: true / false（部分唯一索引）
+            end
+        end
+    end
+
+    S-&gt;&gt;AU: write(DPD_BATCH_RUN ...)
+    S-&gt;&gt;BR: finish(DPD_SNAPSHOT, bizDate, SUCCESS)
+    S--&gt;&gt;CT: BatchSummary（手工路径）
+    S--&gt;&gt;SCHED: BatchSummary（调度路径）
+    CT--&gt;&gt;OPS: ApiResponse</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant OPS as 运营
+    participant SCHED as DpdSnapshotScheduler
+    participant GUARD as BatchRunGuard
+    participant CT as ServicingJobController
+    participant S as DpdBatchAppService
+    participant Q as LoanScheduleQueryPort
+    participant C as DpdCalculator
+    participant SR as DpdSnapshotRepository
+    participant CR as CollectionCaseRepository
+    participant OB as OutboxPublisher
+    participant BR as BatchRunRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    alt 手工触发
+        OPS-&gt;&gt;CT: POST /api/jobs/dpd-snapshot
+        CT-&gt;&gt;S: run(bizDate, actor, traceId)
+    else 调度触发
+        SCHED-&gt;&gt;GUARD: tryClaim(DPD_SNAPSHOT, bizDate, traceId, 30)
+        GUARD--&gt;&gt;SCHED: true / false
+        SCHED-&gt;&gt;S: run(bizDate, "SYSTEM", traceId)
+    end
+
+    S-&gt;&gt;BR: start(DPD_SNAPSHOT, bizDate, traceId)
+    Note over BR,DB: INSERT ... ON CONFLICT (job_name, biz_date)&lt;br/&gt;DO UPDATE SET status='RUNNING'
+
+    S-&gt;&gt;Q: loadScheduleItems()
+    Q--&gt;&gt;S: itemId / loanId / dueDate / status
+    S-&gt;&gt;S: 按 loanId 分组
+
+    S-&gt;&gt;Q: loadLoansForDpd()
+    Q--&gt;&gt;S: 非终态债权列表
+
+    loop 每一笔非终态债权
+        S-&gt;&gt;C: compute(items, bizDate)
+        C--&gt;&gt;S: DpdResult(dpdDays, stage, overdueItemId)
+        S-&gt;&gt;SR: findLatestBefore(loanId, bizDate)
+        SR--&gt;&gt;S: 上一份快照（可能为空）
+        S-&gt;&gt;SR: insert(loanId, bizDate, dpdDays, stage)
+        alt 同日快照已存在
+            SR--&gt;&gt;S: false（幂等跳过本笔）
+        else 首次插入
+            SR--&gt;&gt;S: true
+            opt stage 非 CURRENT 且分层变化
+                S-&gt;&gt;OB: publish(DPD_CHANGED, loanId, payload)
+            end
+            opt stage 非 CURRENT 且无在途案件
+                S-&gt;&gt;CR: insert(loanId, stage, OPEN)
+                CR--&gt;&gt;S: true / false（部分唯一索引）
+            end
+        end
+    end
+
+    S-&gt;&gt;AU: write(DPD_BATCH_RUN ...)
+    S-&gt;&gt;BR: finish(DPD_SNAPSHOT, bizDate, SUCCESS)
+    S--&gt;&gt;CT: BatchSummary（手工路径）
+    S--&gt;&gt;SCHED: BatchSummary（调度路径）
+    CT--&gt;&gt;OPS: ApiResponse</code></pre></details></article>
+<article class="diagram-card" id="diagram-5"><div class="card-head"><h3>4.3 run / doRun 内部流程图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>4. 主流程一：DPD 快照日批（dpd-snapshot）</code> · 图：<code>4.3 run / doRun 内部流程图</code></p><pre class="mermaid">flowchart TD
+    A["run(bizDate, actor, traceId) 开始&lt;br/&gt;@Transactional"] --&gt; B["batchRunRepository.start(DPD_SNAPSHOT, bizDate, traceId)&lt;br/&gt;INSERT ... ON CONFLICT DO UPDATE SET RUNNING"]
+    B --&gt; C["doRun 开始"]
+    C --&gt; D["loanScheduleQueryPort.loadScheduleItems()&lt;br/&gt;schedule_items JOIN repayment_plans 取 loan_id"]
+    D --&gt; E["按 loanId 分组&lt;br/&gt;Map 债权 -&gt; 期次列表"]
+    E --&gt; F["loanScheduleQueryPort.loadLoansForDpd()&lt;br/&gt;排除 SETTLED / EARLY_SETTLED / WRITTEN_OFF / CANCELLED"]
+    F --&gt; G{"还有未处理债权？"}
+    G -- 否 --&gt; H["汇总 BatchSummary"]
+    G -- 是 --&gt; I["取下一笔债权"]
+    I --&gt; J["calculator.compute(items, bizDate)"]
+    J --&gt; J1["逐期次过滤：&lt;br/&gt;PAID / WAIVED 跳过；dueDate 为空跳过；&lt;br/&gt;dueDate 不早于 bizDate 跳过"]
+    J1 --&gt; J2["dpd = DAYS.between(dueDate, bizDate)&lt;br/&gt;取最大；并列取更早 dueDate 的期次"]
+    J2 --&gt; J3["effective = max(0, dpd - grace)&lt;br/&gt;stage = DpdStage.fromDays(effective)"]
+    J3 --&gt; K["previous = snapshotRepository.findLatestBefore(loanId, bizDate)"]
+    K --&gt; L["snapshotRepository.insert(...)&lt;br/&gt;ON CONFLICT (loan_id, biz_date) DO NOTHING"]
+    L --&gt; M{"inserted？"}
+    M -- 否：同日已有快照 --&gt; G
+    M -- 是 --&gt; N{"stage 非 CURRENT 且&lt;br/&gt;previous 为空或 stage 变化？"}
+    N -- 是 --&gt; O["publish DPD_CHANGED&lt;br/&gt;aggregate_key = loanId"]
+    N -- 否 --&gt; P
+    O --&gt; P{"stage 非 CURRENT 且无在途案件？"}
+    P -- 是 --&gt; Q["caseRepository.insert(...)&lt;br/&gt;status=OPEN，部分唯一索引兜底"]
+    P -- 否 --&gt; R["跳过开案"]
+    Q --&gt; G
+    R --&gt; G
+    H --&gt; S["auditWriter.write(DPD_BATCH_RUN ...)&lt;br/&gt;目标 BATCH / DPD_SNAPSHOT"]
+    S --&gt; T["batchRunRepository.finish(SUCCESS)"]
+    T --&gt; U["事务提交"]
+    A -.-&gt;|任一步异常| V["抛 RuntimeException"]
+    V --&gt; W["catch：finish(FAILED) 后原样抛出&lt;br/&gt;整笔事务回滚"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["run(bizDate, actor, traceId) 开始&lt;br/&gt;@Transactional"] --&gt; B["batchRunRepository.start(DPD_SNAPSHOT, bizDate, traceId)&lt;br/&gt;INSERT ... ON CONFLICT DO UPDATE SET RUNNING"]
+    B --&gt; C["doRun 开始"]
+    C --&gt; D["loanScheduleQueryPort.loadScheduleItems()&lt;br/&gt;schedule_items JOIN repayment_plans 取 loan_id"]
+    D --&gt; E["按 loanId 分组&lt;br/&gt;Map 债权 -&gt; 期次列表"]
+    E --&gt; F["loanScheduleQueryPort.loadLoansForDpd()&lt;br/&gt;排除 SETTLED / EARLY_SETTLED / WRITTEN_OFF / CANCELLED"]
+    F --&gt; G{"还有未处理债权？"}
+    G -- 否 --&gt; H["汇总 BatchSummary"]
+    G -- 是 --&gt; I["取下一笔债权"]
+    I --&gt; J["calculator.compute(items, bizDate)"]
+    J --&gt; J1["逐期次过滤：&lt;br/&gt;PAID / WAIVED 跳过；dueDate 为空跳过；&lt;br/&gt;dueDate 不早于 bizDate 跳过"]
+    J1 --&gt; J2["dpd = DAYS.between(dueDate, bizDate)&lt;br/&gt;取最大；并列取更早 dueDate 的期次"]
+    J2 --&gt; J3["effective = max(0, dpd - grace)&lt;br/&gt;stage = DpdStage.fromDays(effective)"]
+    J3 --&gt; K["previous = snapshotRepository.findLatestBefore(loanId, bizDate)"]
+    K --&gt; L["snapshotRepository.insert(...)&lt;br/&gt;ON CONFLICT (loan_id, biz_date) DO NOTHING"]
+    L --&gt; M{"inserted？"}
+    M -- 否：同日已有快照 --&gt; G
+    M -- 是 --&gt; N{"stage 非 CURRENT 且&lt;br/&gt;previous 为空或 stage 变化？"}
+    N -- 是 --&gt; O["publish DPD_CHANGED&lt;br/&gt;aggregate_key = loanId"]
+    N -- 否 --&gt; P
+    O --&gt; P{"stage 非 CURRENT 且无在途案件？"}
+    P -- 是 --&gt; Q["caseRepository.insert(...)&lt;br/&gt;status=OPEN，部分唯一索引兜底"]
+    P -- 否 --&gt; R["跳过开案"]
+    Q --&gt; G
+    R --&gt; G
+    H --&gt; S["auditWriter.write(DPD_BATCH_RUN ...)&lt;br/&gt;目标 BATCH / DPD_SNAPSHOT"]
+    S --&gt; T["batchRunRepository.finish(SUCCESS)"]
+    T --&gt; U["事务提交"]
+    A -.-&gt;|任一步异常| V["抛 RuntimeException"]
+    V --&gt; W["catch：finish(FAILED) 后原样抛出&lt;br/&gt;整笔事务回滚"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>5. 主流程二：催收案件处置</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-6"><div class="card-head"><h3>5.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：催收案件处置</code> · 图：<code>5.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant ST as 员工
+    participant CT as CollectionCaseController
+    participant S as CollectionCaseAppService
+    participant TP as CollectionTimePolicy
+    participant CR as CollectionCaseRepository
+    participant AG as CollectionCase 聚合
+    participant AR as CollectionActionRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    ST-&gt;&gt;CT: POST /api/collection-cases/{id}/actions
+    CT-&gt;&gt;CT: WebSubjects.actor() / subjectType()
+    CT-&gt;&gt;S: executeAction(caseId, actionType, assignee, outcome, note, actor, subject, now, traceId)
+
+    S-&gt;&gt;S: parseActionType(...)
+    alt actionType 非法
+        S--&gt;&gt;CT: RF_VALID_001
+    end
+
+    S-&gt;&gt;TP: allows(at)
+    alt 时段窗口外
+        TP--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_TIME_WINDOW）
+    end
+
+    S-&gt;&gt;CR: findById(caseId)
+    alt 案件不存在
+        CR--&gt;&gt;S: empty
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_CASE_NOT_FOUND）
+    else 案件已关闭
+        CR--&gt;&gt;S: CaseRow(status=CLOSED)
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_CASE_CLOSED）
+    end
+
+    S-&gt;&gt;AG: assign / contact / promise / close
+    AG--&gt;&gt;S: CollectionAction + 新状态
+    S-&gt;&gt;CR: updateStatus(caseId, status, assignee, closed, expectedVersion)
+    alt 影响行数为 0
+        CR--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_CONFLICT_001（COLLECTION_CASE_CONCURRENT_UPDATE）
+    end
+
+    S-&gt;&gt;AR: insert(actionType, outcome, note, actor, actorSubject, traceId)
+    S-&gt;&gt;AU: write(COLLECTION_ACTION ...)
+    S--&gt;&gt;CT: ActionRow(caseId, actionType, outcome, caseStatus)
+    CT--&gt;&gt;ST: ApiResponse</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant ST as 员工
+    participant CT as CollectionCaseController
+    participant S as CollectionCaseAppService
+    participant TP as CollectionTimePolicy
+    participant CR as CollectionCaseRepository
+    participant AG as CollectionCase 聚合
+    participant AR as CollectionActionRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    ST-&gt;&gt;CT: POST /api/collection-cases/{id}/actions
+    CT-&gt;&gt;CT: WebSubjects.actor() / subjectType()
+    CT-&gt;&gt;S: executeAction(caseId, actionType, assignee, outcome, note, actor, subject, now, traceId)
+
+    S-&gt;&gt;S: parseActionType(...)
+    alt actionType 非法
+        S--&gt;&gt;CT: RF_VALID_001
+    end
+
+    S-&gt;&gt;TP: allows(at)
+    alt 时段窗口外
+        TP--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_TIME_WINDOW）
+    end
+
+    S-&gt;&gt;CR: findById(caseId)
+    alt 案件不存在
+        CR--&gt;&gt;S: empty
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_CASE_NOT_FOUND）
+    else 案件已关闭
+        CR--&gt;&gt;S: CaseRow(status=CLOSED)
+        S--&gt;&gt;CT: RF_VALID_002（COLLECTION_CASE_CLOSED）
+    end
+
+    S-&gt;&gt;AG: assign / contact / promise / close
+    AG--&gt;&gt;S: CollectionAction + 新状态
+    S-&gt;&gt;CR: updateStatus(caseId, status, assignee, closed, expectedVersion)
+    alt 影响行数为 0
+        CR--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_CONFLICT_001（COLLECTION_CASE_CONCURRENT_UPDATE）
+    end
+
+    S-&gt;&gt;AR: insert(actionType, outcome, note, actor, actorSubject, traceId)
+    S-&gt;&gt;AU: write(COLLECTION_ACTION ...)
+    S--&gt;&gt;CT: ActionRow(caseId, actionType, outcome, caseStatus)
+    CT--&gt;&gt;ST: ApiResponse</code></pre></details></article>
+<article class="diagram-card" id="diagram-7"><div class="card-head"><h3>5.3 executeAction 流程图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：催收案件处置</code> · 图：<code>5.3 executeAction 流程图</code></p><pre class="mermaid">flowchart TD
+    A["executeAction 开始&lt;br/&gt;@Transactional"] --&gt; B["parseActionType&lt;br/&gt;ASSIGN / CONTACT / PROMISE / CLOSE"]
+    B --&gt; B1{"合法？"}
+    B1 -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;actionType 非法"]
+    B1 -- 是 --&gt; C{"timePolicy.allows(at)？&lt;br/&gt;JST 09:00-20:00，含起点不含终点"}
+    C -- 否 --&gt; E2["RF_VALID_002&lt;br/&gt;COLLECTION_TIME_WINDOW"]
+    C -- 是 --&gt; D["caseRepository.findById(caseId)"]
+    D --&gt; D1{"案件存在？"}
+    D1 -- 否 --&gt; E3["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_NOT_FOUND"]
+    D1 -- 是 --&gt; D2{"status == CLOSED？"}
+    D2 -- 是 --&gt; E4["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_CLOSED"]
+    D2 -- 否 --&gt; F["重建 CollectionCase 聚合&lt;br/&gt;caseId / loanId / dpdStage / status / assignedTo / version"]
+    F --&gt; G{"actionType"}
+    G -- ASSIGN --&gt; H1["aggregate.assign(assignee, actor, traceId)&lt;br/&gt;OPEN -&gt; ASSIGNED；assignee 必填"]
+    G -- CONTACT --&gt; H2["aggregate.contact(note, actor, traceId)&lt;br/&gt;ASSIGNED -&gt; IN_CONTACT"]
+    G -- PROMISE --&gt; H3["aggregate.promise(note, actor, traceId)&lt;br/&gt;IN_CONTACT -&gt; PROMISED"]
+    G -- CLOSE --&gt; H4{"outcome 是 REPAID / UNRECOVERABLE？"}
+    H4 -- 否 --&gt; E5["RF_VALID_001&lt;br/&gt;CLOSE_OUTCOME_REQUIRED"]
+    H4 -- 是 --&gt; H5["aggregate.close(outcome, note, actor, traceId)&lt;br/&gt;任一在途状态 -&gt; CLOSED"]
+    H1 --&gt; I
+    H2 --&gt; I
+    H3 --&gt; I
+    H5 --&gt; I["caseRepository.updateStatus(...)&lt;br/&gt;WHERE case_id = ? AND version = ?"]
+    I --&gt; J{"影响行数 == 1？"}
+    J -- 否 --&gt; E6["RF_CONFLICT_001&lt;br/&gt;COLLECTION_CASE_CONCURRENT_UPDATE"]
+    J -- 是 --&gt; K["actionRepository.insert(...)&lt;br/&gt;core.collection_actions append-only"]
+    K --&gt; L["auditWriter.write(COLLECTION_ACTION ...)"]
+    L --&gt; M["return ActionRow"]
+    H1 -.非法迁移.-&gt; X["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_STATUS_TRANSITION_ILLEGAL"]
+    H2 -.非法迁移.-&gt; X
+    H3 -.非法迁移.-&gt; X
+    H5 -.非法迁移.-&gt; X</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["executeAction 开始&lt;br/&gt;@Transactional"] --&gt; B["parseActionType&lt;br/&gt;ASSIGN / CONTACT / PROMISE / CLOSE"]
+    B --&gt; B1{"合法？"}
+    B1 -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;actionType 非法"]
+    B1 -- 是 --&gt; C{"timePolicy.allows(at)？&lt;br/&gt;JST 09:00-20:00，含起点不含终点"}
+    C -- 否 --&gt; E2["RF_VALID_002&lt;br/&gt;COLLECTION_TIME_WINDOW"]
+    C -- 是 --&gt; D["caseRepository.findById(caseId)"]
+    D --&gt; D1{"案件存在？"}
+    D1 -- 否 --&gt; E3["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_NOT_FOUND"]
+    D1 -- 是 --&gt; D2{"status == CLOSED？"}
+    D2 -- 是 --&gt; E4["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_CLOSED"]
+    D2 -- 否 --&gt; F["重建 CollectionCase 聚合&lt;br/&gt;caseId / loanId / dpdStage / status / assignedTo / version"]
+    F --&gt; G{"actionType"}
+    G -- ASSIGN --&gt; H1["aggregate.assign(assignee, actor, traceId)&lt;br/&gt;OPEN -&gt; ASSIGNED；assignee 必填"]
+    G -- CONTACT --&gt; H2["aggregate.contact(note, actor, traceId)&lt;br/&gt;ASSIGNED -&gt; IN_CONTACT"]
+    G -- PROMISE --&gt; H3["aggregate.promise(note, actor, traceId)&lt;br/&gt;IN_CONTACT -&gt; PROMISED"]
+    G -- CLOSE --&gt; H4{"outcome 是 REPAID / UNRECOVERABLE？"}
+    H4 -- 否 --&gt; E5["RF_VALID_001&lt;br/&gt;CLOSE_OUTCOME_REQUIRED"]
+    H4 -- 是 --&gt; H5["aggregate.close(outcome, note, actor, traceId)&lt;br/&gt;任一在途状态 -&gt; CLOSED"]
+    H1 --&gt; I
+    H2 --&gt; I
+    H3 --&gt; I
+    H5 --&gt; I["caseRepository.updateStatus(...)&lt;br/&gt;WHERE case_id = ? AND version = ?"]
+    I --&gt; J{"影响行数 == 1？"}
+    J -- 否 --&gt; E6["RF_CONFLICT_001&lt;br/&gt;COLLECTION_CASE_CONCURRENT_UPDATE"]
+    J -- 是 --&gt; K["actionRepository.insert(...)&lt;br/&gt;core.collection_actions append-only"]
+    K --&gt; L["auditWriter.write(COLLECTION_ACTION ...)"]
+    L --&gt; M["return ActionRow"]
+    H1 -.非法迁移.-&gt; X["RF_VALID_002&lt;br/&gt;COLLECTION_CASE_STATUS_TRANSITION_ILLEGAL"]
+    H2 -.非法迁移.-&gt; X
+    H3 -.非法迁移.-&gt; X
+    H5 -.非法迁移.-&gt; X</code></pre></details></article>
+<article class="diagram-card" id="diagram-8"><div class="card-head"><h3>5.4 催收案件状态机</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>5. 主流程二：催收案件处置</code> · 图：<code>5.4 催收案件状态机</code></p><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; OPEN
+    OPEN --&gt; ASSIGNED: ASSIGN 分案
+    OPEN --&gt; CLOSED: CLOSE 关案（须结果）
+    ASSIGNED --&gt; IN_CONTACT: CONTACT 联系
+    ASSIGNED --&gt; CLOSED: CLOSE
+    IN_CONTACT --&gt; PROMISED: PROMISE 承诺
+    IN_CONTACT --&gt; CLOSED: CLOSE
+    PROMISED --&gt; IN_CONTACT: PROMISE_BROKEN（仅领域方法，未接 API）
+    PROMISED --&gt; CLOSED: CLOSE
+    CLOSED --&gt; [*]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>stateDiagram-v2
+    [*] --&gt; OPEN
+    OPEN --&gt; ASSIGNED: ASSIGN 分案
+    OPEN --&gt; CLOSED: CLOSE 关案（须结果）
+    ASSIGNED --&gt; IN_CONTACT: CONTACT 联系
+    ASSIGNED --&gt; CLOSED: CLOSE
+    IN_CONTACT --&gt; PROMISED: PROMISE 承诺
+    IN_CONTACT --&gt; CLOSED: CLOSE
+    PROMISED --&gt; IN_CONTACT: PROMISE_BROKEN（仅领域方法，未接 API）
+    PROMISED --&gt; CLOSED: CLOSE
+    CLOSED --&gt; [*]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>6. 主流程三：征信报送触发</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-9"><div class="card-head"><h3>6.2 时序图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：征信报送触发</code> · 图：<code>6.2 时序图</code></p><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant ST as 员工
+    participant CT as BureauReportTriggerController
+    participant S as BureauReportTriggerAppService
+    participant G as ConsentValidityGate
+    participant CUST as customer-service
+    participant CAL as BusinessCalendar
+    participant TR as BureauReportTriggerRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    ST-&gt;&gt;CT: POST /api/bureau-report-triggers
+    CT-&gt;&gt;S: register(loanId, consentId, dpdStage, actor, traceId)
+
+    S-&gt;&gt;S: 校验 loanId &gt; 0 且 consentId &gt; 0
+    alt 参数非法
+        S--&gt;&gt;CT: RF_VALID_001
+    end
+
+    S-&gt;&gt;G: isValid(consentId)
+    G-&gt;&gt;CUST: GET /api/consents/{id}/disbursement-gate
+    alt 2xx 且 code=OK 且 data.allowed=true
+        CUST--&gt;&gt;G: allowed=true
+        G--&gt;&gt;S: true
+    else 查不到 / 超时 / 异常 / allowed=false
+        CUST--&gt;&gt;G: 失败
+        G--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_UW_003（CONSENT_INVALID_OR_WITHDRAWN）
+    end
+
+    S-&gt;&gt;CAL: plusBusinessDays(LocalDate.now(), reportLeadDays)
+    CAL--&gt;&gt;S: targetBizDate（跳过周末与 core.holidays）
+    S-&gt;&gt;TR: insert(loanId, dpdStage, DELINQUENCY, consentId, targetBizDate)
+    alt 唯一键冲突
+        TR--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_CONFLICT_001（REPORT_TRIGGER_DUPLICATE）
+    end
+    S-&gt;&gt;TR: findByLoanAndType(loanId, DELINQUENCY)
+    TR--&gt;&gt;S: TriggerRow
+    S-&gt;&gt;AU: write(REPORT_TRIGGER_REGISTERED ...)
+    S--&gt;&gt;CT: TriggerRow
+    CT--&gt;&gt;ST: ApiResponse</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>sequenceDiagram
+    autonumber
+    participant ST as 员工
+    participant CT as BureauReportTriggerController
+    participant S as BureauReportTriggerAppService
+    participant G as ConsentValidityGate
+    participant CUST as customer-service
+    participant CAL as BusinessCalendar
+    participant TR as BureauReportTriggerRepository
+    participant AU as AuditWriter
+    participant DB as core schema
+
+    ST-&gt;&gt;CT: POST /api/bureau-report-triggers
+    CT-&gt;&gt;S: register(loanId, consentId, dpdStage, actor, traceId)
+
+    S-&gt;&gt;S: 校验 loanId &gt; 0 且 consentId &gt; 0
+    alt 参数非法
+        S--&gt;&gt;CT: RF_VALID_001
+    end
+
+    S-&gt;&gt;G: isValid(consentId)
+    G-&gt;&gt;CUST: GET /api/consents/{id}/disbursement-gate
+    alt 2xx 且 code=OK 且 data.allowed=true
+        CUST--&gt;&gt;G: allowed=true
+        G--&gt;&gt;S: true
+    else 查不到 / 超时 / 异常 / allowed=false
+        CUST--&gt;&gt;G: 失败
+        G--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_UW_003（CONSENT_INVALID_OR_WITHDRAWN）
+    end
+
+    S-&gt;&gt;CAL: plusBusinessDays(LocalDate.now(), reportLeadDays)
+    CAL--&gt;&gt;S: targetBizDate（跳过周末与 core.holidays）
+    S-&gt;&gt;TR: insert(loanId, dpdStage, DELINQUENCY, consentId, targetBizDate)
+    alt 唯一键冲突
+        TR--&gt;&gt;S: false
+        S--&gt;&gt;CT: RF_CONFLICT_001（REPORT_TRIGGER_DUPLICATE）
+    end
+    S-&gt;&gt;TR: findByLoanAndType(loanId, DELINQUENCY)
+    TR--&gt;&gt;S: TriggerRow
+    S-&gt;&gt;AU: write(REPORT_TRIGGER_REGISTERED ...)
+    S--&gt;&gt;CT: TriggerRow
+    CT--&gt;&gt;ST: ApiResponse</code></pre></details></article>
+<article class="diagram-card" id="diagram-10"><div class="card-head"><h3>6.3 register 流程图</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：征信报送触发</code> · 图：<code>6.3 register 流程图</code></p><pre class="mermaid">flowchart TD
+    A["register 开始&lt;br/&gt;@Transactional"] --&gt; B{"loanId &gt; 0 且 consentId &gt; 0？"}
+    B -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;LOAN_AND_CONSENT_REQUIRED"]
+    B -- 是 --&gt; C["consentValidityGate.isValid(consentId)"]
+    C --&gt; C1{"true？"}
+    C1 -- 否 --&gt; E2["RF_UW_003&lt;br/&gt;CONSENT_INVALID_OR_WITHDRAWN"]
+    C1 -- 是 --&gt; D["targetBizDate =&lt;br/&gt;businessCalendar.plusBusinessDays(LocalDate.now(), reportLeadDays)"]
+    D --&gt; F["triggerRepository.insert(...)&lt;br/&gt;ON CONFLICT (loan_id, trigger_type) DO NOTHING"]
+    F --&gt; G{"inserted？"}
+    G -- 否 --&gt; E3["RF_CONFLICT_001&lt;br/&gt;REPORT_TRIGGER_DUPLICATE"]
+    G -- 是 --&gt; H["findByLoanAndType 回读 TriggerRow&lt;br/&gt;status 默认 REGISTERED"]
+    H --&gt; I["auditWriter.write(REPORT_TRIGGER_REGISTERED ...)"]
+    I --&gt; J["return TriggerRow"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["register 开始&lt;br/&gt;@Transactional"] --&gt; B{"loanId &gt; 0 且 consentId &gt; 0？"}
+    B -- 否 --&gt; E1["RF_VALID_001&lt;br/&gt;LOAN_AND_CONSENT_REQUIRED"]
+    B -- 是 --&gt; C["consentValidityGate.isValid(consentId)"]
+    C --&gt; C1{"true？"}
+    C1 -- 否 --&gt; E2["RF_UW_003&lt;br/&gt;CONSENT_INVALID_OR_WITHDRAWN"]
+    C1 -- 是 --&gt; D["targetBizDate =&lt;br/&gt;businessCalendar.plusBusinessDays(LocalDate.now(), reportLeadDays)"]
+    D --&gt; F["triggerRepository.insert(...)&lt;br/&gt;ON CONFLICT (loan_id, trigger_type) DO NOTHING"]
+    F --&gt; G{"inserted？"}
+    G -- 否 --&gt; E3["RF_CONFLICT_001&lt;br/&gt;REPORT_TRIGGER_DUPLICATE"]
+    G -- 是 --&gt; H["findByLoanAndType 回读 TriggerRow&lt;br/&gt;status 默认 REGISTERED"]
+    H --&gt; I["auditWriter.write(REPORT_TRIGGER_REGISTERED ...)"]
+    I --&gt; J["return TriggerRow"]</code></pre></details></article>
+<article class="diagram-card" id="diagram-11"><div class="card-head"><h3>6.4 同意前置校验（fail-closed）</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>6. 主流程三：征信报送触发</code> · 图：<code>6.4 同意前置校验（fail-closed）</code></p><pre class="mermaid">flowchart TD
+    A["isValid(consentId)"] --&gt; B{"consentId &gt; 0？"}
+    B -- 否 --&gt; F["return false"]
+    B -- 是 --&gt; C["Feign 调用&lt;br/&gt;GET /api/consents/{id}/disbursement-gate"]
+    C --&gt; C1{"HTTP 2xx 且 code=OK 且 data.allowed=true？"}
+    C1 -- 是 --&gt; T["return true"]
+    C1 -- 否 --&gt; F
+    C -. 异常 / 超时 .-&gt; D{"customerBaseUrl 非空？"}
+    D -- 否 --&gt; F
+    D -- 是 --&gt; E["原始 HTTP 兜底&lt;br/&gt;同 URL、同 JSON 契约&lt;br/&gt;GATE_RAW：连接 500ms / 读 2s / 不重试 / 熔断"]
+    E --&gt; E1{"2xx 且 code=OK 且 allowed=true？"}
+    E1 -- 是 --&gt; T
+    E1 -- 否 / 异常 --&gt; F</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["isValid(consentId)"] --&gt; B{"consentId &gt; 0？"}
+    B -- 否 --&gt; F["return false"]
+    B -- 是 --&gt; C["Feign 调用&lt;br/&gt;GET /api/consents/{id}/disbursement-gate"]
+    C --&gt; C1{"HTTP 2xx 且 code=OK 且 data.allowed=true？"}
+    C1 -- 是 --&gt; T["return true"]
+    C1 -- 否 --&gt; F
+    C -. 异常 / 超时 .-&gt; D{"customerBaseUrl 非空？"}
+    D -- 否 --&gt; F
+    D -- 是 --&gt; E["原始 HTTP 兜底&lt;br/&gt;同 URL、同 JSON 契约&lt;br/&gt;GATE_RAW：连接 500ms / 读 2s / 不重试 / 熔断"]
+    E --&gt; E1{"2xx 且 code=OK 且 allowed=true？"}
+    E1 -- 是 --&gt; T
+    E1 -- 否 / 异常 --&gt; F</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>7. 日批调度与批次护栏</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-12"><div class="card-head"><h3>7.2 抢占与失败处理</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>7. 日批调度与批次护栏</code> · 图：<code>7.2 抢占与失败处理</code></p><pre class="mermaid">flowchart TD
+    A["runScheduled() 触发"] --&gt; B["bizDate = LocalDate.now()&lt;br/&gt;traceId = SCHED-xxxxxxxx"]
+    B --&gt; C["guard.tryClaim(DPD_SNAPSHOT, bizDate, traceId, staleMinutes)"]
+    C --&gt; D{"满足占位条件？&lt;br/&gt;无行 / FAILED / RUNNING 超时"}
+    D -- 否 --&gt; E["跳过本轮&lt;br/&gt;同日已有 SUCCESS 或活跃 RUNNING"]
+    D -- 是 --&gt; F["dpdBatchAppService.run(bizDate, SYSTEM, traceId)"]
+    F --&gt; G{"成功？"}
+    G -- 是 --&gt; H["run 内部 finish(SUCCESS)"]
+    G -- 否 --&gt; I["catch RuntimeException：&lt;br/&gt;guard.markFinished(FAILED)&lt;br/&gt;日志记录，不中断调度线程"]</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart TD
+    A["runScheduled() 触发"] --&gt; B["bizDate = LocalDate.now()&lt;br/&gt;traceId = SCHED-xxxxxxxx"]
+    B --&gt; C["guard.tryClaim(DPD_SNAPSHOT, bizDate, traceId, staleMinutes)"]
+    C --&gt; D{"满足占位条件？&lt;br/&gt;无行 / FAILED / RUNNING 超时"}
+    D -- 否 --&gt; E["跳过本轮&lt;br/&gt;同日已有 SUCCESS 或活跃 RUNNING"]
+    D -- 是 --&gt; F["dpdBatchAppService.run(bizDate, SYSTEM, traceId)"]
+    F --&gt; G{"成功？"}
+    G -- 是 --&gt; H["run 内部 finish(SUCCESS)"]
+    G -- 否 --&gt; I["catch RuntimeException：&lt;br/&gt;guard.markFinished(FAILED)&lt;br/&gt;日志记录，不中断调度线程"]</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>10. 数据表与迁移</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-13"><div class="card-head"><h3>10.1 表关系</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>10. 数据表与迁移</code> · 图：<code>10.1 表关系</code></p><pre class="mermaid">erDiagram
+    LOANS ||--o{ REPAYMENT_PLANS : "只读：计划头"
+    REPAYMENT_PLANS ||--o{ SCHEDULE_ITEMS : "只读：还款期次"
+    LOANS ||--o{ DPD_SNAPSHOTS : "每日一份"
+    LOANS ||--o{ COLLECTION_CASES : "一债权一在途"
+    COLLECTION_CASES ||--o{ COLLECTION_ACTIONS : "动作留痕"
+    LOANS ||--o{ BUREAU_REPORT_TRIGGERS : "一债权一触发类型"
+
+    LOANS {
+        bigint loan_id PK
+        varchar status
+    }
+
+    REPAYMENT_PLANS {
+        bigint plan_id PK
+        bigint loan_id FK
+    }
+
+    SCHEDULE_ITEMS {
+        bigint item_id PK
+        bigint plan_id FK
+        date due_date
+        varchar status
+    }
+
+    DPD_SNAPSHOTS {
+        bigint snapshot_id PK
+        bigint loan_id
+        date biz_date
+        int dpd_days
+        varchar stage
+        varchar day_basis
+    }
+
+    COLLECTION_CASES {
+        bigint case_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar status
+        varchar assigned_to
+        timestamptz closed_at
+        int version
+    }
+
+    COLLECTION_ACTIONS {
+        bigint action_id PK
+        bigint case_id FK
+        varchar action_type
+        varchar outcome
+        varchar actor
+        varchar actor_subject
+    }
+
+    BUREAU_REPORT_TRIGGERS {
+        bigint trigger_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar trigger_type
+        bigint consent_id
+        date target_biz_date
+        varchar status
+    }</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>erDiagram
+    LOANS ||--o{ REPAYMENT_PLANS : "只读：计划头"
+    REPAYMENT_PLANS ||--o{ SCHEDULE_ITEMS : "只读：还款期次"
+    LOANS ||--o{ DPD_SNAPSHOTS : "每日一份"
+    LOANS ||--o{ COLLECTION_CASES : "一债权一在途"
+    COLLECTION_CASES ||--o{ COLLECTION_ACTIONS : "动作留痕"
+    LOANS ||--o{ BUREAU_REPORT_TRIGGERS : "一债权一触发类型"
+
+    LOANS {
+        bigint loan_id PK
+        varchar status
+    }
+
+    REPAYMENT_PLANS {
+        bigint plan_id PK
+        bigint loan_id FK
+    }
+
+    SCHEDULE_ITEMS {
+        bigint item_id PK
+        bigint plan_id FK
+        date due_date
+        varchar status
+    }
+
+    DPD_SNAPSHOTS {
+        bigint snapshot_id PK
+        bigint loan_id
+        date biz_date
+        int dpd_days
+        varchar stage
+        varchar day_basis
+    }
+
+    COLLECTION_CASES {
+        bigint case_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar status
+        varchar assigned_to
+        timestamptz closed_at
+        int version
+    }
+
+    COLLECTION_ACTIONS {
+        bigint action_id PK
+        bigint case_id FK
+        varchar action_type
+        varchar outcome
+        varchar actor
+        varchar actor_subject
+    }
+
+    BUREAU_REPORT_TRIGGERS {
+        bigint trigger_id PK
+        bigint loan_id
+        varchar dpd_stage
+        varchar trigger_type
+        bigint consent_id
+        date target_biz_date
+        varchar status
+    }</code></pre></details></article>
+</section>
+<section class="doc-group">
+<div class="doc-head"><h2>12. 事件与外部依赖</h2><span class="source">来源：interview/servicing-service-代码流程.md</span></div>
+<article class="diagram-card" id="diagram-14"><div class="card-head"><h3>12.1 依赖方向</h3><div class="card-actions"><span class="badge">Mermaid</span><button class="zoom-btn" type="button" title="宽图可切换为原始尺寸并横向滚动">原始尺寸</button></div></div><p class="meta">章节：<code>12. 事件与外部依赖</code> · 图：<code>12.1 依赖方向</code></p><pre class="mermaid">flowchart LR
+    subgraph SVC["servicing-service"]
+        DPD["DPD 批处理"]
+        COL["催收案件"]
+        TRG["报送触发"]
+    end
+
+    CORE[("retail-core 只读表&lt;br/&gt;core.loans / repayment_plans / schedule_items")]
+    CUST["customer-service&lt;br/&gt;GET /api/consents/{id}/disbursement-gate"]
+    OUT[("core.outbox_events")]
+    BUREAU["bureau-service&lt;br/&gt;DPD_CHANGED 消费 / 报送执行"]
+    AUD[("audit.audit_events")]
+
+    CORE --&gt; DPD
+    CORE --&gt; COL
+    TRG --&gt; CUST
+    DPD --&gt; OUT
+    OUT --&gt; BUREAU
+    DPD --&gt; AUD
+    COL --&gt; AUD
+    TRG --&gt; AUD</pre><details><summary>查看 Mermaid 源码</summary><pre class="source-code"><code>flowchart LR
+    subgraph SVC["servicing-service"]
+        DPD["DPD 批处理"]
+        COL["催收案件"]
+        TRG["报送触发"]
+    end
+
+    CORE[("retail-core 只读表&lt;br/&gt;core.loans / repayment_plans / schedule_items")]
+    CUST["customer-service&lt;br/&gt;GET /api/consents/{id}/disbursement-gate"]
+    OUT[("core.outbox_events")]
+    BUREAU["bureau-service&lt;br/&gt;DPD_CHANGED 消费 / 报送执行"]
+    AUD[("audit.audit_events")]
+
+    CORE --&gt; DPD
+    CORE --&gt; COL
+    TRG --&gt; CUST
+    DPD --&gt; OUT
+    OUT --&gt; BUREAU
+    DPD --&gt; AUD
+    COL --&gt; AUD
+    TRG --&gt; AUD</code></pre></details></article>
+</section>
+  </main>
+</div>
+<footer class="footer">
+  <p>生成命令：<code>python interview/tools/gen_servicing_html.py</code> ·
+     图源：<code>interview/servicing-service-代码流程.md</code> 中的 Mermaid 代码块。</p>
+  <p>Mermaid 10.9.1（MIT）已本地化到 <code>docs/assets/mermaid-10.9.1.min.js</code>；
+     若本地资源缺失会尝试 CDN。离线打开时图仍可渲染，源码可在每张图下展开查看。</p>
+</footer>
+<script>
+(function () {
+  function warn(message) {
+    var el = document.getElementById('mermaid-warning');
+    if (el) { el.textContent = message; }
+    document.body.classList.add('mermaid-failed');
+  }
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.zoom-btn');
+    if (!button) { return; }
+    var card = button.closest('.diagram-card');
+    if (!card) { return; }
+    var natural = card.classList.toggle('natural');
+    button.textContent = natural ? '适合宽度' : '原始尺寸';
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.mermaid) {
+      warn('Mermaid 资源未加载。请确认 ../docs/assets/mermaid-10.9.1.min.js 存在，或联网后刷新。');
+      return;
+    }
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'base',
+      themeVariables: {
+        fontFamily: '"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif',
+        primaryColor: '#e0f2fe',
+        primaryBorderColor: '#0284c7',
+        primaryTextColor: '#0f172a',
+        secondaryColor: '#f1f5f9',
+        tertiaryColor: '#f8fafc',
+        lineColor: '#475569',
+        clusterBkg: '#f8fafc',
+        clusterBorder: '#cbd5e1'
+      },
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false },
+      sequence: { useMaxWidth: false, wrap: true },
+      state: { useMaxWidth: false }
+    });
+    mermaid.run({ nodes: document.querySelectorAll('pre.mermaid') })
+      .then(function () { document.body.classList.add('mermaid-ready'); })
+      .catch(function (err) {
+        console.error(err);
+        warn('部分图渲染失败。可展开每张图的「Mermaid 源码」查看原始定义。');
+      });
+  });
+})();
+
+
+/* ===== gallery_nav: 左侧目录水平折叠（所有图集共用） ===== */
+(function () {
+  function init() {
+    var layout = document.querySelector('.layout');
+    var toggle = document.getElementById('nav-toggle');
+    var rail = document.getElementById('nav-rail-toggle');
+    if (!layout || !toggle || !rail || layout.dataset.navBound === '1') { return; }
+    layout.dataset.navBound = '1';
+
+    var key = 'rf-gallery-nav-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('nav-collapsed', collapsed);
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      rail.setAttribute('aria-expanded', String(!collapsed));
+      try {
+        localStorage.setItem(key, collapsed ? '1' : '0');
+      } catch (e) { /* file:// 或隐私模式下不可用，忽略 */ }
+    }
+
+    var stored = null;
+    try { stored = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    setCollapsed(stored === '1');
+
+    function bind(button) {
+      button.addEventListener('click', function () {
+        setCollapsed(!layout.classList.contains('nav-collapsed'));
+      });
+    }
+    bind(toggle);
+    bind(rail);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

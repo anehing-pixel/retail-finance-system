@@ -114,7 +114,11 @@ public class RepaymentPlanApplicationService {
     }
 
     public PlanItemsView items(long loanId) {
-        List<ScheduleItem> items = planRepository.findItems(loanId);
+        // plan_id 与 loan_id 是两个独立序列：必须先按 loanId 解析 planId，不能把 loanId 当 planId 查
+        long planId = planRepository.findPlanIdByLoanId(loanId)
+                .orElseThrow(() -> new BusinessException(RFErrorCode.RF_VALID_001,
+                        "该债权尚无还款计划", java.util.Map.of("loanId", String.valueOf(loanId))));
+        List<ScheduleItem> items = planRepository.findItems(planId);
         if (items.isEmpty()) {
             throw new BusinessException(RFErrorCode.RF_VALID_001,
                     "该债权尚无还款计划", java.util.Map.of("loanId", String.valueOf(loanId)));

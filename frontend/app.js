@@ -11,6 +11,10 @@ const S = {
   planItems: [],      // 还款计划期次（核销用）
 };
 
+/* 员工会话：登录页写入，控制台读取；未登录访问已由 index.html 的 <head> 跳转登录页 */
+const SESSION = window.RFStaffSession ? window.RFStaffSession.load() : null;
+if (SESSION) S.token = SESSION.token;
+
 const $ = (id) => document.getElementById(id);
 
 function runTag() { return "fe-" + S.ts; }
@@ -133,9 +137,35 @@ async function s1Login() {
   const token = (r.data || {}).token || "";
   const ok = r.code === 200 && token && (r.data || {}).subjectType === "EMPLOYEE";
   S.token = ok ? token : "";
+  if (ok) window.RFStaffSession.save(r.data, $("staff-user").value.trim());
   setState("s1-state", ok ? "✅ 员工 token 已取得" : "❌ 登录失败 " + r.code,
     ok ? "step-ok" : "step-bad");
+  renderStaffSession();
   return ok;
+}
+
+/* ---------------- 员工会话（顶部身份与退出） ---------------- */
+
+function renderStaffSession() {
+  const s = window.RFStaffSession ? window.RFStaffSession.load() : null;
+  const name = (s && (s.displayName || s.username)) || "未登录";
+  $("staff-name").textContent = name;
+  $("staff-avatar").textContent = (name.trim().charAt(0) || "·").toUpperCase();
+  const who = s && s.username && s.username !== name ? name + "（" + s.username + "）" : name;
+  $("staff-chip").title = s
+    ? "当前登录员工：" + who + (s.roles && s.roles.length ? " · " + s.roles.join(" / ") : "")
+    : "未登录";
+  if (s) {
+    $("staff-user").value = s.username || $("staff-user").value;
+    if (!$("s1-state").textContent) {
+      setState("s1-state", "✅ 已登录（会话 " + name + "）", "step-ok");
+    }
+  }
+}
+
+function staffLogout() {
+  if (window.RFStaffSession) window.RFStaffSession.clear();
+  location.replace("login.html");
 }
 
 /* ---------------- S2 客户注册 ---------------- */
@@ -534,7 +564,9 @@ async function runAll() {
 }
 
 function resetRun() {
-  S.token = ""; S.custToken = ""; S.ids = {};
+  // 只重置本次流程数据；员工登录会话保持不变（退出登录走顶部「退出」）
+  S.token = window.RFStaffSession ? window.RFStaffSession.token() : "";
+  S.custToken = ""; S.ids = {};
   S.ts = Math.floor(Date.now() / 1000);
   S.vin = ""; S.planItems = [];
   ["s1-state", "s2-state", "s3-state", "s4-state", "s5-state", "s6-state", "s7-state",
@@ -585,5 +617,7 @@ async function selfNegative() {
   return ok;
 }
 
-/* 首屏渲染会话对象占位（后续每步 renderChips 刷新） */
+/* 首屏渲染：会话对象占位 + 顶部员工身份（后续每步 renderChips 刷新） */
 renderChips();
+renderStaffSession();
+$("logout-btn").addEventListener("click", staffLogout);

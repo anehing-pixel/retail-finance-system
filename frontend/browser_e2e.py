@@ -22,7 +22,15 @@ def check(name, ok, detail=""):
 
 
 def click_and_wait(page, btn_text, state_id, timeout_ms, must="✅", scope="#pane-staff"):
-    """点击按钮并等待状态 span 出现 must 文本；返回最终文本。"""
+    """点击按钮并等待状态 span 出现 must 文本；返回最终文本。
+
+    S8a/S8b 共用 s8-state、S11 三步共用 s11-state：点击前必须清空状态位，
+    否则会立刻匹配到上一步的旧 ✅（2026-11-26 实测：S8b 正例未完成就点了负例，
+    两个代付请求并发，偶发网关 502）。
+    """
+    page.evaluate(
+        "(sel) => { const el = document.querySelector(sel); if (el) el.textContent = ''; }",
+        scope + " #" + state_id)
     page.click(scope + " button.act:has-text(\"" + btn_text + "\")")
     sel = scope + " #" + state_id + ":has-text(\"" + must + "\")"
     try:
@@ -50,6 +58,15 @@ with sync_playwright() as p:
     page.on("requestfailed", lambda r: failed_req.append(r.url))
 
     page.goto(BASE, wait_until="networkidle")
+    # 未登录访问控制台应由 session.js 守卫跳到员工登录页
+    check("00 未登录访问控制台 → 跳转员工登录页", "login.html" in page.url, page.url)
+    check("00b 登录页账号/密码表单渲染",
+          page.is_visible("#login-user") and page.is_visible("#login-pass"))
+    page.fill("#login-user", "admin")
+    page.fill("#login-pass", "admin123")
+    page.click("#login-submit")
+    page.wait_for_url("**/index.html", timeout=15000)
+    check("00c 员工登录成功 → 进入控制台", "运营控制台" in page.title(), page.url)
     check("01 页面加载", "运营控制台" in page.title())
     check("02 无 JS 加载错误", not any(r[2] == "" and r[0].startswith("JS") for r in results))
 
@@ -115,6 +132,68 @@ with sync_playwright() as p:
     js_errs = [r[0] for r in results if r[0].startswith("JS运行时错误")]
     check("29 无 JS 运行时错误", not js_errs, "; ".join(js_errs[:3]))
     check("30 无网络层失败请求", not failed_req, "; ".join(failed_req[:3]))
+
+    # 顶部员工身份
+    staff_name = page.inner_text("#staff-name").strip()
+    staff_title = page.get_attribute("#staff-chip", "title") or ""
+    check("31 顶部显示当前员工",
+          page.is_visible("#staff-chip") and staff_name not in ("", "未登录") and "admin" in staff_title,
+          "{} | {}".format(staff_name, staff_title))
+
+    # ---- 客户管理页（/api/customers）----
+    page.goto(BASE + "customers.html", wait_until="networkidle")
+    check("32 客户管理页加载", "客户管理" in page.title(), page.title())
+
+    page.fill("#reg-name", "山田花子")
+    page.fill("#reg-kana", "ヤマダハナコ")
+    page.click("#reg-submit")
+    page.wait_for_selector('#reg-state:has-text("✅")', timeout=15000)
+    reg_txt = page.inner_text("#reg-state")
+    check("33 客户建档成功", "customerId=" in reg_txt, reg_txt)
+    cid = reg_txt.split("customerId=")[-1].strip()
+
+    page.wait_for_selector("#masked-view table", timeout=10000)
+    masked = page.inner_text("#masked-view")
+    check("34 脱敏视图渲染且不含明文姓名",
+          "山田花子" not in masked and "***" in masked, masked.replace("\n", " · ")[:140])
+    check("35 建档后客户号回填查询", page.input_value("#lookup-id") == cid, cid)
+
+    page.fill("#full-purpose", "E2E_PII_VIEW")
+    page.click("#full-btn")
+    page.wait_for_selector("#full-view table", timeout=10000)
+    full = page.inner_text("#full-view")
+    check("36 全量视图含明文姓名（PII_VIEW_FULL）", "山田花子" in full,
+          full.replace("\n", " · ")[:140])
+
+    page.click("#idv-create")
+    page.wait_for_selector('#idv-status:has-text("PENDING")', timeout=10000)
+    page.click("#idv-doc")
+    page.wait_for_selector('#idv-status:has-text("DOCUMENTS_RECEIVED")', timeout=10000)
+    page.click("#idv-start")
+    page.wait_for_selector('#idv-status:has-text("VERIFYING")', timeout=10000)
+    page.click("#idv-approve")
+    page.wait_for_selector('#idv-status:has-text("VERIFIED")', timeout=10000)
+    check("37 身份核验 → VERIFIED", "VERIFIED" in page.inner_text("#idv-status"),
+          page.inner_text("#idv-info"))
+
+    page.click("#consent-grant")
+    page.wait_for_selector('#consent-status:has-text("有效")', timeout=10000)
+    consent_txt = page.inner_text("#consent-info")
+    check("38 征信同意有效（CREDIT_INQUIRY）", "consentId=" in consent_txt, consent_txt)
+    page.click("#consent-withdraw")
+    page.wait_for_selector('#consent-status:has-text("无效")', timeout=10000)
+    check("39 撤回后同意无效", "无效" in page.inner_text("#consent-status"),
+          page.inner_text("#consent-info"))
+    page.screenshot(path=str(SHOTS / "browser-e2e-customers.png"), full_page=True)
+
+    # 返回控制台（同一标签页，会话保持）并退出登录
+    page.goto(BASE + "index.html", wait_until="networkidle")
+    check("40 客户页返回控制台且会话保持", "运营控制台" in page.title(), page.url)
+    page.click("#logout-btn")
+    page.wait_for_url("**/login.html", timeout=10000)
+    check("41 退出登录 → 回到员工登录页", "login.html" in page.url, page.url)
+    check("42 退出后会话已清除",
+          page.evaluate("window.sessionStorage.getItem('retail.staff.session')") is None)
     browser.close()
 
 fails = [r for r in results if not r[1]]
